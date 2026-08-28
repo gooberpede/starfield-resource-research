@@ -1,5 +1,12 @@
 # Ghidra tooling
 
+This directory currently provides two read-only exporters:
+
+- `ExportSelectedFunctionContext.java` exports one selected function.
+- `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1.
+
+Both scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. Neither script starts a transaction or modifies the open program.
+
 ## ExportSelectedFunctionContext.java
 
 `ExportSelectedFunctionContext.java` is a read-only Ghidra Java script that exports analysis context for the function containing the CodeBrowser cursor. It does not start a transaction and does not modify the program, symbols, types, labels, comments, or function names.
@@ -69,3 +76,82 @@ Existing files with these names in the target function directory are replaced on
 - `constants.json` contains scalar operands found in the function's instructions, including signed decimal and unsigned hexadecimal forms. This deliberately preserves offsets and masks as well as obvious numeric literals; later tooling can filter them without losing evidence.
 
 All JSON files are UTF-8 and deterministic by address where applicable. The script reads the current analysis database and writes only to the selected export directory.
+
+## ExportFunctionNeighbourhood.java
+
+`ExportFunctionNeighbourhood.java` reduces the manual work needed to inspect one function and its immediate implementation neighbourhood. It exports:
+
+- depth 0: the function containing the CodeBrowser cursor;
+- depth 1: each distinct, exportable internal implementation reached by a direct call from the root.
+
+It does not export callees of the depth-1 functions. Their direct caller and callee summaries are still included in each function bundle, just as they are for the single-function exporter.
+
+### Installation and usage
+
+If this repository's `ghidra/scripts` directory is already configured in Script Manager, refresh the manager and `ExportFunctionNeighbourhood.java` should appear under **Starfield Research**. Otherwise, follow the script-directory installation steps above or copy the new script into a configured Ghidra script directory.
+
+To run it:
+
+1. Open the analysed program in CodeBrowser and allow normal analysis to complete.
+2. Put the cursor anywhere inside the root function. For the first planned live test, go to `1431BC320` and confirm that the containing function is `FUN_1431bc320`.
+3. Run `ExportFunctionNeighbourhood.java` from Script Manager.
+4. Choose the repository's `exports` directory as the export root. Do not choose a directory inside Ghidra project storage.
+5. Review the console and the generated `manifest.json` for any per-function export failures.
+
+The script reports an error and writes nothing if the cursor is not inside a defined function. A decompilation failure does not stop the other context files from being generated. Failure to export one function bundle is recorded in the manifest and does not stop the remaining bundles.
+
+### Thunk handling
+
+For every direct callee, the script records the function referenced by the root's call instruction. If that function is a Ghidra thunk, the script follows `Function.getThunkedFunction(false)` one hop at a time until it reaches a non-thunk implementation. It retains the original thunk name/address, grouped call-site addresses, resolution status, hop count, and resolved name/address in `graph.json`.
+
+Thunk traversal tracks visited entry addresses and has a 100-hop safety limit. An unresolved or cyclic chain is recorded on its graph edge without aborting the neighbourhood export. External targets remain in the graph but do not receive full context bundles.
+
+Resolved implementations are keyed by function entry address. If several thunks or direct callees resolve to the same implementation, the graph preserves every original edge while the implementation bundle is exported once.
+
+### Output structure
+
+Directory names use:
+
+```text
+<sanitised-function-name>__<sanitised-uppercase-entry-address>
+```
+
+Each character outside `A-Z`, `a-z`, `0-9`, `.`, `_`, and `-` is replaced with `_`. Including the address avoids collisions between functions with the same name.
+
+For `FUN_1431bc320`, the output has this shape:
+
+```text
+exports/
+└─ neighbourhoods/
+   └─ FUN_1431bc320__1431BC320/
+      ├─ graph.json
+      ├─ manifest.json
+      └─ functions/
+         ├─ FUN_1431bc320__1431BC320/
+         │  ├─ metadata.json
+         │  ├─ decompiled.c
+         │  ├─ callers.json
+         │  ├─ callees.json
+         │  ├─ strings.json
+         │  ├─ globals.json
+         │  └─ constants.json
+         └─ FUN_140e457b0__140E457B0/
+            └─ ...same seven context files...
+```
+
+`manifest.json` identifies the root, fixed depth, program, timestamp, successful bundle count, and any per-function failures. `graph.json` contains the root and one edge per distinct direct callee; each edge preserves the directly called function and the resolved implementation separately.
+
+Files with the same names are replaced when the same neighbourhood is exported again. The script does not delete old function directories, so a bundle from an earlier run can remain if analysis changes and that function is no longer a direct callee. Use the current manifest and graph as the authoritative membership list for a run.
+
+### Compatibility and known limitations
+
+- The script is written against the same Ghidra 11.x APIs as the tested single-function exporter. The neighbourhood exporter itself has not yet been live-tested in Ghidra.
+- Direct callees come from Ghidra's `Function.getCalledFunctions` results and therefore depend on call references and defined functions in the current analysis database.
+- Thunk resolution depends on Ghidra having marked the forwarding function as a thunk and assigned its thunk target.
+- Indirect calls, unresolved call targets, and virtual dispatch recovery are out of scope and will not appear as resolved graph edges.
+- External/imported functions are represented in relationship metadata but are not decompiled or given context bundles.
+- Depth is fixed at 1; there is no recursive or transitive call-tree crawl.
+- The exporter does not generate control-flow graphs, p-code, decompiler ASTs, dataflow, inferred semantic names, reconstructed structures, or vtable analysis.
+- The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
+
+Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.
