@@ -3,7 +3,7 @@
 This directory currently provides two read-only exporters:
 
 - `ExportSelectedFunctionContext.java` exports one selected function.
-- `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1.
+- `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1. It also performs focused recovery of simple vtable-based indirect calls in the root.
 
 Both scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. Neither script starts a transaction or modifies the open program.
 
@@ -83,6 +83,7 @@ All JSON files are UTF-8 and deterministic by address where applicable. The scri
 
 - depth 0: the function containing the CodeBrowser cursor;
 - depth 1: each distinct, exportable internal implementation reached by a direct call from the root.
+- resolved virtual target: each distinct internal function recovered from a supported static vtable call in the root.
 
 It does not export callees of the depth-1 functions. Their direct caller and callee summaries are still included in each function bundle, just as they are for the single-function exporter.
 
@@ -99,6 +100,40 @@ To run it:
 5. Review the console and the generated `manifest.json` for any per-function export failures.
 
 The script reports an error and writes nothing if the cursor is not inside a defined function. A decompilation failure does not stop the other context files from being generated. Failure to export one function bundle is recorded in the manifest and does not stop the remaining bundles.
+
+### Focused virtual-call resolution
+
+The neighbourhood exporter inspects the root function's decompiler high p-code for `CALLIND` operations. It supports the deliberately limited case where the target has the form:
+
+```text
+load(load(receiver) + constant byte offset)
+```
+
+For that pattern, it attempts to tie the receiver to one uniquely identifiable vtable. It accepts either a vtable address propagated directly into the decompiler expression or a vtable symbol used as the stored value of a `STORE` operation in an earlier direct callee that receives the same decompiler high variable as its first argument. The latter is intended to recognize a constructor call followed by virtual dispatch. Candidate symbols must contain `vftable` or `vtable`; the script does not scan arbitrary address tables or infer a class hierarchy.
+
+Once one vtable is identified, the script:
+
+1. adds the fixed byte offset to the vtable symbol address;
+2. calculates the slot index when the offset is aligned to `Program.getDefaultPointerSize()`;
+3. reads exactly that many bytes from program memory using the program's endianness;
+4. maps the resulting address with `FunctionManager.getFunctionAt()`;
+5. follows any Ghidra-defined thunk chain using the same bounded logic as direct calls;
+6. exports the resolved internal implementation's normal seven-file context bundle.
+
+This is not a general-purpose C++ devirtualizer. It does not perform whole-program points-to analysis, class-hierarchy recovery, symbolic execution, or speculative target enumeration. If receiver matching is absent or ambiguous, the call remains unresolved.
+
+Every computed call instruction in the root is retained in `indirect-calls.json`. When high p-code exposes a supported call, its record includes the call-site address, status, receiver expression, pointer size, vtable identity, byte offset, slot index, slot address and value, resolved function, resolution basis, evidence, and export status. Unsupported or failed cases include a `failureReason`. Status values currently include:
+
+```text
+resolved-static-vtable
+unresolved-unknown-vtable
+unresolved-nonconstant-offset
+unresolved-multiple-candidates
+unresolved-no-function-at-slot
+unsupported-pattern
+```
+
+`graph.json` preserves its existing direct `edges` array and adds a separate `indirectEdges` array. Resolved targets are deduplicated with direct targets by function entry address, so a function bundle is written at most once per run.
 
 ### Thunk handling
 
@@ -126,6 +161,7 @@ exports/
    └─ FUN_1431bc320__1431BC320/
       ├─ graph.json
       ├─ manifest.json
+      ├─ indirect-calls.json
       └─ functions/
          ├─ FUN_1431bc320__1431BC320/
          │  ├─ metadata.json
@@ -139,19 +175,30 @@ exports/
             └─ ...same seven context files...
 ```
 
-`manifest.json` identifies the root, fixed depth, program, timestamp, successful bundle count, and any per-function failures. `graph.json` contains the root and one edge per distinct direct callee; each edge preserves the directly called function and the resolved implementation separately.
+`manifest.json` identifies the root, fixed depth, program, timestamp, successful bundle count, indirect-call counts and analysis status, and any per-function failures. `graph.json` contains the root and one edge per distinct direct callee; each edge preserves the directly called function and the resolved implementation separately.
+
+For the first virtual-call live test against `FUN_1431bc320`:
+
+1. Go to `1431BC320` in the analysed `CreationKit.exe` program and confirm the cursor is inside `FUN_1431bc320`.
+2. Confirm normal analysis is complete and that Ghidra exposes the expected `TESContainer::vftable` symbol.
+3. Run `ExportFunctionNeighbourhood.java` and choose the repository's `exports` directory.
+4. Open `exports/neighbourhoods/FUN_1431bc320__1431BC320/indirect-calls.json`.
+5. Locate the computed call whose `vtableByteOffset` is `80`; verify that `vtableSlotIndex` is `10` for the 8-byte pointer-size program.
+6. Verify that the record names `TESContainer::vftable`, reports `resolved-static-vtable`, and identifies both the slot pointer and resolved function.
+7. Confirm that `functions/<resolved-name>__<resolved-address>/` contains the seven standard context files and that `graph.json` contains the matching `indirectEdges` entry.
+8. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
 
 Files with the same names are replaced when the same neighbourhood is exported again. The script does not delete old function directories, so a bundle from an earlier run can remain if analysis changes and that function is no longer a direct callee. Use the current manifest and graph as the authoritative membership list for a run.
 
 ### Compatibility and known limitations
 
-- The script is written against the same Ghidra 11.x APIs as the tested single-function exporter. The neighbourhood exporter itself has not yet been live-tested in Ghidra.
+- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 export has been live-tested; the new virtual-call pass still requires the live test above.
 - Direct callees come from Ghidra's `Function.getCalledFunctions` results and therefore depend on call references and defined functions in the current analysis database.
 - Thunk resolution depends on Ghidra having marked the forwarding function as a thunk and assigned its thunk target.
-- Indirect calls, unresolved call targets, and virtual dispatch recovery are out of scope and will not appear as resolved graph edges.
+- Only simple fixed-offset vtable dispatch is eligible for indirect resolution. All other computed calls are retained as unresolved records rather than being guessed or dropped.
 - External/imported functions are represented in relationship metadata but are not decompiled or given context bundles.
 - Depth is fixed at 1; there is no recursive or transitive call-tree crawl.
-- The exporter does not generate control-flow graphs, p-code, decompiler ASTs, dataflow, inferred semantic names, reconstructed structures, or vtable analysis.
+- The exporter uses decompiler high p-code only for the focused call pattern and same-high-variable receiver check. It does not export p-code, build an SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies.
 - The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.
