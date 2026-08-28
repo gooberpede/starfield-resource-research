@@ -346,8 +346,10 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             String key = callSite.toString().toUpperCase(Locale.ROOT);
             if (!callsBySite.containsKey(key)) {
                 try {
-                    IndirectCall call = resolveIndirectCall(decompilation.highFunction, operation);
-                    if ("unresolved-receiver-provenance".equals(call.status)) {
+                    IndirectCall call = resolveIndirectCall(
+                        root, decompilation.highFunction, operation);
+                    if ("unresolved-receiver-provenance".equals(call.status) ||
+                            call.usedStackObjectReceiverResolution()) {
                         try {
                             call.pcodeDiagnostic = pcodeDiagnostic(root, operation, call.status);
                         }
@@ -819,7 +821,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         result.put("evidence", evidence);
         result.put(
             "diagnosticOnly",
-            "This correlation does not affect indirect-call receiver resolution.");
+            "This record preserves the detailed correlation evidence. The resolver may use " +
+            "the same exact-offset rule when stronger receiver normalization is unavailable.");
         return result;
     }
 
@@ -845,6 +848,21 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         HighVariable high = varnode == null ? null : varnode.getHigh();
         Varnode representative = high == null ? null : high.getRepresentative();
         return isStackStorage(representative) ? representative : null;
+    }
+
+    private List<Varnode> stackStorageCandidatesFor(Varnode varnode) {
+        Map<String, Varnode> candidates = new LinkedHashMap<>();
+        if (isStackStorage(varnode)) {
+            candidates.put(varnode.getOffset() + ":" + varnode.getSize(), varnode);
+        }
+        HighVariable high = varnode == null ? null : varnode.getHigh();
+        Varnode representative = high == null ? null : high.getRepresentative();
+        if (isStackStorage(representative)) {
+            candidates.put(
+                representative.getOffset() + ":" + representative.getSize(),
+                representative);
+        }
+        return new ArrayList<>(candidates.values());
     }
 
     private static boolean isSimpleWrapper(int opcode) {
@@ -1006,7 +1024,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         return calls;
     }
 
-    private IndirectCall resolveIndirectCall(HighFunction highFunction, PcodeOp callOperation)
+    private IndirectCall resolveIndirectCall(
+            Function parentFunction, HighFunction highFunction, PcodeOp callOperation)
             throws CancelledException {
         int pointerSize = currentProgram.getDefaultPointerSize();
         IndirectCall result = new IndirectCall(callOperation.getSeqnum().getTarget(), pointerSize);
@@ -1052,10 +1071,34 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
 
         Varnode vptr = stripCopiesAndCasts(slotExpression.base);
         PcodeOp vptrDefinition = vptr == null ? null : vptr.getDef();
-        Varnode receiver = null;
+        Varnode directReceiver = null;
         if (vptrDefinition != null && vptrDefinition.getOpcode() == PcodeOp.LOAD &&
                 vptrDefinition.getNumInputs() >= 2) {
-            receiver = stripCopiesAndCasts(vptrDefinition.getInput(1));
+            directReceiver = stripCopiesAndCasts(vptrDefinition.getInput(1));
+        }
+
+        Varnode receiver = directReceiver;
+        ReceiverResolution stackResolution = resolveStackObjectReceiver(
+            parentFunction, callOperation, vptr);
+        if (directReceiver != null && variableIdentity(directReceiver) != null) {
+            result.receiverResolution = ReceiverResolution.normalized(
+                directReceiver,
+                callOperation.getNumInputs() > 1 ? callOperation.getInput(1) : null);
+            if (callOperation.getNumInputs() > 1 && stackResolution.isResolved() &&
+                    !sameVariableIdentity(directReceiver, callOperation.getInput(1))) {
+                result.receiverResolution = ReceiverResolution.ambiguous(
+                    result.receiverResolution,
+                    stackResolution,
+                    "Direct receiver normalization and stack-object correlation identify " +
+                    "different receiver expressions.");
+                receiver = null;
+            }
+        }
+        else {
+            result.receiverResolution = stackResolution;
+            receiver = stackResolution.isResolved() && callOperation.getNumInputs() > 1
+                ? stripCopiesAndCasts(callOperation.getInput(1))
+                : null;
         }
         result.receiverExpression = describeVarnode(receiver);
         result.receiverIdentity = variableIdentity(receiver);
@@ -1145,6 +1188,80 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         return result;
     }
 
+    private ReceiverResolution resolveStackObjectReceiver(
+            Function parentFunction, PcodeOp callOperation, Varnode vptrSource) {
+        if (callOperation.getNumInputs() <= 1) {
+            return ReceiverResolution.unresolved(
+                "unresolved-no-argument-0", "CALLIND has no argument 0.");
+        }
+
+        Varnode argument = callOperation.getInput(1);
+        StackAddressProvenance argumentStack = resolveStackAddress(
+            argument, parentFunction, new PcodeDiagnosticContext());
+        ReceiverResolution result = ReceiverResolution.fromArgument(argumentStack, argument);
+        if (!argumentStack.isResolved()) {
+            result.failureReason =
+                "Argument 0 did not resolve to exactly one supported stack-object address.";
+            return result;
+        }
+
+        List<Varnode> targetStorages = stackStorageCandidatesFor(
+            stripCopiesAndCasts(vptrSource));
+        if (targetStorages.isEmpty()) {
+            result.status = "unresolved-target-vptr-stack-storage";
+            result.failureReason =
+                "The call-target vptr source did not expose one stack-backed storage object.";
+            return result;
+        }
+        if (targetStorages.size() != 1) {
+            result.status = "unresolved-ambiguous-target-vptr-stack-storage";
+            result.failureReason =
+                "The call-target vptr source exposed more than one distinct stack storage offset.";
+            return result;
+        }
+        Varnode targetStorage = targetStorages.get(0);
+        result.targetVptrStorageStackOffset = targetStorage.getOffset();
+        result.targetVptrStorageSize = targetStorage.getSize();
+        PcodeOp targetDefinition = vptrSource == null ? null : vptrSource.getDef();
+        result.targetVptrDefiningOpcode = targetDefinition == null
+            ? null
+            : targetDefinition.getMnemonic();
+        result.targetVptrDefinitionAddress = targetDefinition == null
+            ? null
+            : formatAddress(targetDefinition.getSeqnum().getTarget());
+
+        int pointerSize = currentProgram.getDefaultPointerSize();
+        if (argument.getSize() != pointerSize || targetStorage.getSize() != pointerSize) {
+            result.status = "unresolved-incompatible-receiver-size";
+            result.failureReason =
+                "Argument 0 and target vptr storage must both match the program pointer size.";
+            return result;
+        }
+        if (argumentStack.stackOffset != targetStorage.getOffset()) {
+            result.status = "unresolved-different-stack-storage";
+            result.failureReason =
+                "Argument 0 and target vptr storage resolve to different exact stack offsets.";
+            return result;
+        }
+
+        result.status = "resolved-stack-object";
+        result.resolutionBasis = "stack-object-address-vptr-match";
+        result.sameStackObject = true;
+        result.failureReason = null;
+        result.evidence.add(
+            "Argument 0 resolves to the address of " +
+            formatStackLocation(argumentStack.stackOffset) + ".");
+        result.evidence.add(
+            "The call-target vptr source is stored at the same exact stack offset.");
+        if (targetDefinition != null && targetDefinition.getOpcode() == PcodeOp.INDIRECT) {
+            result.evidence.add(
+                "The target-side stack value has an INDIRECT definition at " +
+                formatAddress(targetDefinition.getSeqnum().getTarget()) +
+                "; this is supporting provenance, not constructor proof.");
+        }
+        return result;
+    }
+
     private void collectConstructorVtables(
             HighFunction highFunction,
             PcodeOp indirectCall,
@@ -1215,9 +1332,13 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
 
     private void setConstructorFailure(IndirectCall result) {
         if (result.receiverIdentity == null) {
+            String detail = result.receiverResolution == null ||
+                result.receiverResolution.failureReason == null
+                    ? "The receiver could not be normalized conservatively from high p-code."
+                    : result.receiverResolution.failureReason;
             result.fail(
                 "unresolved-receiver-provenance",
-                "The receiver could not be normalized conservatively from high p-code.");
+                detail);
             return;
         }
         if (result.initializerCandidates.isEmpty()) {
@@ -1693,7 +1814,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         rootSummary.put("address", address(root));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 2);
+        result.put("schemaVersion", 3);
         result.put("rootFunction", rootSummary);
         result.put("pointerSize", currentProgram.getDefaultPointerSize());
         result.put("analysisCompleted", analysis.completed);
@@ -1720,7 +1841,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         result.put("maximumDefinitionDepth", PCODE_DIAGNOSTIC_MAX_DEPTH);
         result.put(
             "scope",
-            "Focused high-p-code diagnostics for unresolved-receiver-provenance CALLIND operations in the selected root function.");
+            "Focused high-p-code diagnostics for unresolved receiver provenance and " +
+            "stack-object-address-vptr-match CALLIND resolution in the selected root function.");
         result.put("calls", calls);
         return result;
     }
@@ -1735,8 +1857,13 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             edge.put("callSiteAddress", call.callSiteAddress);
             edge.put("edgeKind", call.kind == null ? "indirect" : call.kind);
             edge.put("status", call.status);
+            edge.put("receiverResolutionBasis", call.receiverResolution == null
+                ? null
+                : call.receiverResolution.resolutionBasis);
             edge.put("vtableName", call.vtableName);
+            edge.put("vtableAddress", call.vtableAddress);
             edge.put("vtableByteOffset", call.vtableByteOffset);
+            edge.put("vtableSlotIndex", call.vtableSlotIndex);
             edge.put("resolvedName", call.resolvedFunctionName);
             edge.put("resolvedAddress", call.resolvedFunctionAddress);
             edge.put("resolvedInternal", call.resolvedInternal);
@@ -2012,6 +2139,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         final int pointerSize;
         String receiverExpression;
         String receiverIdentity;
+        ReceiverResolution receiverResolution;
         String vtableName;
         String vtableAddress;
         Long vtableByteOffset;
@@ -2066,6 +2194,83 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             this.resolvedInternal = !function.isExternal() && function.getBody() != null &&
                 !function.getBody().isEmpty();
             this.thunkHopCount = thunkHopCount;
+        }
+
+        boolean usedStackObjectReceiverResolution() {
+            return receiverResolution != null &&
+                ("stack-object-address-vptr-match".equals(
+                    receiverResolution.resolutionBasis) ||
+                 "ambiguous-receiver-resolution".equals(
+                    receiverResolution.resolutionBasis));
+        }
+    }
+
+    private static final class ReceiverResolution {
+        String status;
+        String resolutionBasis;
+        final int argumentIndex = 0;
+        String receiverIdentity;
+        Long argumentStackOffset;
+        Integer argumentSize;
+        Long targetVptrStorageStackOffset;
+        Integer targetVptrStorageSize;
+        boolean sameStackObject;
+        String targetVptrDefiningOpcode;
+        String targetVptrDefinitionAddress;
+        String failureReason;
+        final List<String> evidence = new ArrayList<>();
+
+        private ReceiverResolution(String status) {
+            this.status = status;
+        }
+
+        static ReceiverResolution normalized(Varnode receiver, Varnode argument) {
+            ReceiverResolution result = new ReceiverResolution("resolved-normalized-receiver");
+            result.resolutionBasis = "high-pcode-receiver-normalization";
+            result.receiverIdentity = variableIdentity(receiver);
+            result.argumentSize = argument == null ? null : argument.getSize();
+            return result;
+        }
+
+        static ReceiverResolution fromArgument(
+                StackAddressProvenance provenance, Varnode argument) {
+            ReceiverResolution result = new ReceiverResolution(provenance.status);
+            result.argumentStackOffset = provenance.isResolved()
+                ? provenance.stackOffset
+                : null;
+            result.argumentSize = argument == null ? null : argument.getSize();
+            result.receiverIdentity = variableIdentity(argument);
+            result.failureReason = provenance.failureReason;
+            return result;
+        }
+
+        static ReceiverResolution unresolved(String status, String reason) {
+            ReceiverResolution result = new ReceiverResolution(status);
+            result.failureReason = reason;
+            return result;
+        }
+
+        static ReceiverResolution ambiguous(
+                ReceiverResolution direct,
+                ReceiverResolution stack,
+                String reason) {
+            ReceiverResolution result = new ReceiverResolution("unresolved-ambiguous-receiver");
+            result.resolutionBasis = "ambiguous-receiver-resolution";
+            result.receiverIdentity = direct.receiverIdentity;
+            result.argumentStackOffset = stack.argumentStackOffset;
+            result.argumentSize = stack.argumentSize;
+            result.targetVptrStorageStackOffset = stack.targetVptrStorageStackOffset;
+            result.targetVptrStorageSize = stack.targetVptrStorageSize;
+            result.sameStackObject = stack.sameStackObject;
+            result.targetVptrDefiningOpcode = stack.targetVptrDefiningOpcode;
+            result.targetVptrDefinitionAddress = stack.targetVptrDefinitionAddress;
+            result.failureReason = reason;
+            result.evidence.addAll(stack.evidence);
+            return result;
+        }
+
+        boolean isResolved() {
+            return "resolved-stack-object".equals(status);
         }
     }
 
