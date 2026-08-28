@@ -157,12 +157,20 @@ For each included call, the JSON records:
 - the indirect target varnode and a recursive tree of its defining operations;
 - every defining operation's opcode, sequence metadata, parent function, output, input count, and indexed inputs;
 - varnode size, address space, offset, address, storage flags, constant value, high-variable metadata, representative storage, and datatype where available;
-- every `CALLIND` argument, using `argumentIndex` for the call argument and `pcodeInputIndex` for its original p-code input position;
+- every `CALLIND` argument, using `argumentIndex` for the call argument and `pcodeInputIndex` for its original p-code input position, together with its own recursive definition tree;
+- conservative stack-address provenance for each argument, including a signed stack offset, readable stack location, confidence label, resolution basis, and derivation chain when the expression reduces to a stack pointer plus constant offsets through supported wrappers;
+- stack-backed storage nodes found in the call-target definition tree, including their path, size, defining operation, and whether they occur on the base side of a constant-offset addition;
+- focused `INDIRECT` metadata for target stack-storage nodes defined by a call side effect, including the operation inputs, sequence address, associated instruction, and same-storage check;
+- `receiverStorageCorrelation`, which compares argument 0's resolved stack-address offset with the target expression's stack-storage offsets and reports `matched-stack-object` only when the offsets agree;
 - comparisons between call argument 0 (the likely C++ `this` argument) and each nonconstant varnode encountered in the target tree: exact varnode, high-variable object identity, storage, and defining-operation equality.
 
 The diagnostic follows Ghidra's high-p-code `CALLIND` convention: input 0 is the indirect target and inputs 1 through N are call arguments. Thus `argumentIndex: 0` corresponds to `pcodeInputIndex: 1`. This convention is also recorded in each diagnostic call object.
 
-Definition traversal has a maximum depth of 8. It stops at constants, null varnodes, inputs without definitions, the depth bound, and previously visited varnodes or defining operations. Repeated nodes receive stable IDs within that one call diagnostic, and stopped branches contain a `stopReason`. The IDs are diagnostic identities scoped to one exported call; high-variable names or storage equality alone are not treated as proof of semantic equivalence.
+Definition traversal has a maximum depth of 8. The target and each argument use independent visited sets, so a node seen in one tree does not prematurely stop another tree. Traversal stops at constants, null varnodes, inputs without definitions, the depth bound, and previously visited varnodes or defining operations within that tree. Repeated nodes receive stable IDs within that one call diagnostic, and stopped branches contain a `stopReason`. The IDs are diagnostic identities scoped to one exported call; high-variable names or storage equality alone are not treated as proof of semantic equivalence.
+
+Stack-address provenance is deliberately narrower than alias analysis. It recognizes the configured stack-pointer register plus constant `INT_ADD`, `PTRSUB`, or constant-index `PTRADD` arithmetic, with `COPY`, `CAST`, and integer-extension wrappers. Status is `resolved-stack-address`, `unresolved-stack-address`, or `unsupported-stack-address-pattern`. Stack offsets are emitted as signed decimal values, signed hexadecimal strings such as `-0xA8`, and readable labels such as `stack[-0xA8]`. A stack-space varnode in the target tree is treated as stored contents, not as proof that an argument is its address.
+
+`receiverStorageCorrelation` is diagnostic only. It tests the intended address/storage relationship—argument 0 is the address of a stack object while the target expression reads contents from the same stack offset. It does not compare the argument value to the vptr value and does not feed a match into receiver normalization, constructor provenance, or virtual-target resolution. `indirect-calls.json` and its resolution statuses are unchanged; in particular, `1431BC350` may correctly remain `unresolved-receiver-provenance`.
 
 For the current diagnostic target, navigate to `FUN_1431bc320` at `1431BC320`, run the exporter, and open:
 
@@ -170,7 +178,7 @@ For the current diagnostic target, navigate to `FUN_1431bc320` at `1431BC320`, r
 exports/neighbourhoods/FUN_1431bc320__1431BC320/pcode-diagnostics.json
 ```
 
-Locate `CALLIND` at `1431BC350`. If it remains `unresolved-receiver-provenance`, inspect `callTarget.definitionTree` for the fixed `0x50` addition and nested loads, then compare `arguments[0]` with `receiverComparisons`. This preserves the real high-p-code shape for review without changing the receiver normalizer or guessing a virtual target.
+Locate `CALLIND` at `1431BC350`. If it remains `unresolved-receiver-provenance`, inspect `callTarget.definitionTree` for the fixed `0x50` addition and nested loads. Then inspect `arguments[0].definitionTree`, `arguments[0].stackAddressProvenance`, `callTarget.stackStorageNodes`, and `receiverStorageCorrelation`. A useful successful result is argument 0 resolving to `stack[-0xA8]`, a target storage node at offset `-168`, and correlation status `matched-stack-object` with `sameStackObject: true`. This preserves the real high-p-code shape for review without changing the receiver normalizer or guessing a virtual target.
 
 `graph.json` preserves its existing direct `edges` array and adds a separate `indirectEdges` array. Resolved targets are deduplicated with direct targets by function entry address, so a function bundle is written at most once per run.
 
@@ -226,9 +234,11 @@ For the targeted high-p-code diagnostic live test against `FUN_1431bc320`:
 5. If its status is `unresolved-receiver-provenance`, open the sibling `pcode-diagnostics.json` and locate the entry for `1431BC350`.
 6. Verify that `callOperation.inputs[0]` is the target and that `arguments[0]` has `pcodeInputIndex: 1`.
 7. Inspect `callTarget.definitionTree` and confirm it exposes the target `LOAD`, the fixed `0x50` arithmetic, the inner pointer/vtable load, and all input varnodes with sequence and storage metadata.
-8. Review `receiverComparisons` for the exact, high-variable, storage, and defining-operation relationships between the first actual call argument and nonconstant nodes in the target tree.
-9. Confirm `manifest.json` reports `pcodeDiagnosticCount: 1` for this unresolved call and that the normal direct-call bundles and graph outputs remain present.
-10. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
+8. Confirm every item in `arguments` now has a bounded `definitionTree`. For `arguments[0]`, inspect `stackAddressProvenance`; the expected useful result is `status: resolved-stack-address`, `stackOffset: -168`, and `stackLocation: stack[-0xA8]`.
+9. Inspect `callTarget.stackStorageNodes` for a node with `stackOffset: -168`, `beforeConstantOffsetAddition: true`, and the path leading to it. If its defining opcode is `INDIRECT`, verify the nested metadata preserves the sequence/associated instruction near `1431BC331` and reports whether its output uses the same stack storage.
+10. Inspect `receiverStorageCorrelation`; the expected success indicators are `status: matched-stack-object`, equal argument and target offsets, and `sameStackObject: true`. Review `receiverComparisons` separately as the older value-identity diagnostics; they may remain false because the object address and stored vptr are different values.
+11. Confirm `pcode-diagnostics.json` has schema version 2, `manifest.json` reports `pcodeDiagnosticCount: 1`, and the normal direct-call bundles, `indirect-calls.json`, and graph outputs remain present.
+12. Confirm the `1431BC350` receiver-resolution status has not changed merely because of this diagnostic, then review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
 
 If the call remains unresolved, use its precise status and `initializerCandidates` diagnostics to distinguish receiver matching, thunk resolution, parameter-0 recovery, offset-zero store recovery, constant-address recovery, vtable-symbol confidence, and slot lookup failures. Do not update the function register with a virtual target until this live output directly supports it.
 
@@ -236,7 +246,7 @@ Files with the same names are replaced when the same neighbourhood is exported a
 
 ### Compatibility and known limitations
 
-- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 and virtual-call detection paths have been live-tested; the new diagnostic schema and the exact `1431BC350` definition-tree shape still require the live test above.
+- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 and virtual-call detection paths have been live-tested; diagnostic schema version 2, argument stack-address recovery, and the exact `1431BC350` receiver-storage correlation still require the live test above.
 - Direct callees come from Ghidra's `Function.getCalledFunctions` results and therefore depend on call references and defined functions in the current analysis database.
 - Thunk resolution depends on Ghidra having marked the forwarding function as a thunk and assigned its thunk target.
 - Only simple fixed-offset vtable dispatch is eligible for indirect resolution. All other computed calls are retained as unresolved records rather than being guessed or dropped.
@@ -245,7 +255,7 @@ Files with the same names are replaced when the same neighbourhood is exported a
 - The constructor-to-vptr path assumes the decompiler exposes the caller receiver and argument 0 in equivalent supported forms, exposes the resolved initializer's parameter 0 in `LocalSymbolMap`, and represents the vptr assignment as a high-p-code `STORE` whose destination is parameter 0 plus constant zero.
 - Constant vtable recovery assumes the stored value remains a constant/address varnode (possibly under the supported wrappers) and that the exact address has one unambiguous symbol name containing `vftable` or `vtable`.
 - The exporter does not follow aliases through memory, PHI/`MULTIEQUAL`, nonconstant pointer arithmetic, helper calls inside the initializer, base-to-derived adjustments, multiple inheritance, or nested constructor chains. It does not infer which of several distinct vptr stores is final.
-- The exporter uses decompiler high p-code only for focused virtual-call analysis and unresolved-receiver diagnostics. It does not dump every p-code operation, build a general SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies. Diagnostic object IDs are stable only within one exported call, and metadata availability depends on the decompiler's high-p-code objects.
+- The exporter uses decompiler high p-code only for focused virtual-call analysis and unresolved-receiver diagnostics. Stack provenance does not follow memory aliases, `MULTIEQUAL`, nonconstant pointer arithmetic, or unsupported defining operations. Target storage collection reports stack-backed nodes exposed within the same depth-8 tree and may include several nodes or paths. It does not dump every p-code operation, build a general SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies. Diagnostic object IDs are stable only within one exported call, and metadata availability depends on the decompiler's high-p-code objects.
 - The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.

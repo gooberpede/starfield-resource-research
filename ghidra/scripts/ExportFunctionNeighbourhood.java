@@ -36,6 +36,7 @@ import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.lang.Register;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.HighParam;
 import ghidra.program.model.pcode.HighVariable;
@@ -398,17 +399,31 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         Varnode target = callOperation.getNumInputs() == 0 ? null : callOperation.getInput(0);
         Map<String, Object> callTarget = new LinkedHashMap<>();
         callTarget.put("varnode", varnodeMetadata(target, context));
+        context.resetTreeTraversal();
         callTarget.put(
             "definitionTree",
-            definitionTree(target, parentFunction, context, 0));
+            definitionTree(target, parentFunction, context, 0, true));
+        List<Map<String, Object>> targetStackStorage =
+            collectTargetStackStorage(target, parentFunction, context);
+        callTarget.put("stackStorageNodes", targetStackStorage);
         result.put("callTarget", callTarget);
 
         List<Map<String, Object>> arguments = new ArrayList<>();
+        List<StackAddressProvenance> argumentStackProvenance = new ArrayList<>();
         for (int inputIndex = 1; inputIndex < callOperation.getNumInputs(); inputIndex++) {
+            Varnode argumentVarnode = callOperation.getInput(inputIndex);
             Map<String, Object> argument = new LinkedHashMap<>();
             argument.put("argumentIndex", inputIndex - 1);
             argument.put("pcodeInputIndex", inputIndex);
-            argument.put("varnode", varnodeMetadata(callOperation.getInput(inputIndex), context));
+            argument.put("varnode", varnodeMetadata(argumentVarnode, context));
+            context.resetTreeTraversal();
+            argument.put(
+                "definitionTree",
+                definitionTree(argumentVarnode, parentFunction, context, 0, false));
+            StackAddressProvenance stackProvenance =
+                resolveStackAddress(argumentVarnode, parentFunction, context);
+            argumentStackProvenance.add(stackProvenance);
+            argument.put("stackAddressProvenance", stackProvenance.toMap());
             arguments.add(argument);
         }
         result.put("arguments", arguments);
@@ -438,6 +453,13 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             }
         }
         result.put("receiverComparisons", comparisons);
+        StackAddressProvenance receiverStackProvenance = argumentStackProvenance.isEmpty()
+            ? StackAddressProvenance.unresolved(
+                "unresolved-stack-address", "CALLIND has no argument 0.")
+            : argumentStackProvenance.get(0);
+        result.put(
+            "receiverStorageCorrelation",
+            receiverStorageCorrelation(receiverStackProvenance, targetStackStorage));
         return result;
     }
 
@@ -456,7 +478,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             Varnode varnode,
             Function parentFunction,
             PcodeDiagnosticContext context,
-            int depth) {
+            int depth,
+            boolean recordTargetVarnodes) {
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("depth", depth);
         node.put("varnode", varnodeMetadata(varnode, context));
@@ -464,7 +487,9 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             node.put("stopReason", "null-varnode");
             return node;
         }
-        context.addTargetTreeVarnode(varnode);
+        if (recordTargetVarnodes) {
+            context.addTargetTreeVarnode(varnode);
+        }
         if (varnode.isConstant()) {
             node.put("stopReason", "constant");
             return node;
@@ -497,12 +522,376 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             input.put("role", pcodeInputRole(definition, index));
             input.put(
                 "expression",
-                definitionTree(definition.getInput(index), parentFunction, context, depth + 1));
+                definitionTree(
+                    definition.getInput(index),
+                    parentFunction,
+                    context,
+                    depth + 1,
+                    recordTargetVarnodes));
             inputs.add(input);
         }
         definitionNode.put("inputs", inputs);
         node.put("definition", definitionNode);
         return node;
+    }
+
+    private StackAddressProvenance resolveStackAddress(
+            Varnode varnode, Function parentFunction, PcodeDiagnosticContext context) {
+        Set<Varnode> visited = Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>());
+        return resolveStackAddress(varnode, parentFunction, context, visited, 0);
+    }
+
+    private StackAddressProvenance resolveStackAddress(
+            Varnode varnode,
+            Function parentFunction,
+            PcodeDiagnosticContext context,
+            Set<Varnode> visited,
+            int depth) {
+        if (varnode == null) {
+            return StackAddressProvenance.unresolved(
+                "unresolved-stack-address", "The argument varnode is null.");
+        }
+        if (depth > PCODE_DIAGNOSTIC_MAX_DEPTH) {
+            return StackAddressProvenance.unresolved(
+                "unresolved-stack-address", "Stack-address traversal reached the depth limit.");
+        }
+        if (!visited.add(varnode)) {
+            return StackAddressProvenance.unresolved(
+                "unresolved-stack-address", "Stack-address traversal encountered a cycle.");
+        }
+
+        if (isStackPointer(varnode)) {
+            StackAddressProvenance result = StackAddressProvenance.resolved(0);
+            result.baseAddressSpace = currentProgram.getCompilerSpec().getStackSpace() == null
+                ? "stack"
+                : currentProgram.getCompilerSpec().getStackSpace().getName();
+            result.resolutionBasis = "stack-pointer-base";
+            result.derivationChain.add(stackDerivationStep(
+                "stack-pointer", varnode, null, parentFunction, context, 0L));
+            return result;
+        }
+
+        PcodeOp definition = varnode.getDef();
+        if (definition == null) {
+            return StackAddressProvenance.unresolved(
+                "unresolved-stack-address",
+                "The argument does not resolve to stack storage or a defined stack-pointer expression.");
+        }
+
+        int opcode = definition.getOpcode();
+        if (isSimpleWrapper(opcode) && definition.getNumInputs() > 0) {
+            StackAddressProvenance result = resolveStackAddress(
+                definition.getInput(0), parentFunction, context, visited, depth + 1);
+            result.derivationChain.add(stackDerivationStep(
+                definition.getMnemonic(), varnode, definition, parentFunction, context, 0L));
+            return result;
+        }
+
+        if ((opcode == PcodeOp.INT_ADD || opcode == PcodeOp.PTRSUB) &&
+                definition.getNumInputs() == 2) {
+            Varnode left = definition.getInput(0);
+            Varnode right = definition.getInput(1);
+            Varnode base = null;
+            Varnode constant = null;
+            if (right != null && right.isConstant()) {
+                base = left;
+                constant = right;
+            }
+            else if (opcode == PcodeOp.INT_ADD && left != null && left.isConstant()) {
+                base = right;
+                constant = left;
+            }
+            if (base != null && constant != null) {
+                long delta = signedConstant(constant);
+                StackAddressProvenance result = resolveStackAddress(
+                    base, parentFunction, context, visited, depth + 1);
+                if (result.isResolved()) {
+                    result.stackOffset += delta;
+                    result.resolutionBasis = "stack-pointer-plus-constant";
+                }
+                result.derivationChain.add(stackDerivationStep(
+                    definition.getMnemonic(), varnode, definition, parentFunction, context, delta));
+                return result;
+            }
+            return StackAddressProvenance.unresolved(
+                "unsupported-stack-address-pattern",
+                definition.getMnemonic() + " does not have one conservatively usable constant operand.");
+        }
+
+        if (opcode == PcodeOp.PTRADD && definition.getNumInputs() == 3) {
+            Varnode index = definition.getInput(1);
+            Varnode elementSize = definition.getInput(2);
+            if (index != null && index.isConstant() &&
+                    elementSize != null && elementSize.isConstant()) {
+                long delta = signedConstant(index) * signedConstant(elementSize);
+                StackAddressProvenance result = resolveStackAddress(
+                    definition.getInput(0), parentFunction, context, visited, depth + 1);
+                if (result.isResolved()) {
+                    result.stackOffset += delta;
+                    result.resolutionBasis = "stack-pointer-plus-constant";
+                }
+                result.derivationChain.add(stackDerivationStep(
+                    definition.getMnemonic(), varnode, definition, parentFunction, context, delta));
+                return result;
+            }
+            return StackAddressProvenance.unresolved(
+                "unsupported-stack-address-pattern",
+                "PTRADD index and element size are not both constant.");
+        }
+
+        return StackAddressProvenance.unresolved(
+            "unsupported-stack-address-pattern",
+            "Defining opcode " + definition.getMnemonic() +
+            " is outside the supported stack-address patterns.");
+    }
+
+    private Map<String, Object> stackDerivationStep(
+            String kind,
+            Varnode varnode,
+            PcodeOp operation,
+            Function parentFunction,
+            PcodeDiagnosticContext context,
+            long constantDelta) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("kind", kind);
+        result.put("varnode", varnodeMetadata(varnode, context));
+        result.put("operation", pcodeOpMetadata(operation, parentFunction, context));
+        result.put("constantDelta", constantDelta);
+        result.put("constantDeltaHex", signedHex(constantDelta));
+        return result;
+    }
+
+    private List<Map<String, Object>> collectTargetStackStorage(
+            Varnode target, Function parentFunction, PcodeDiagnosticContext context) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Set<Varnode> visited = Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>());
+        collectTargetStackStorage(
+            target, parentFunction, context, visited, result, "root", false, 0);
+        return result;
+    }
+
+    private void collectTargetStackStorage(
+            Varnode varnode,
+            Function parentFunction,
+            PcodeDiagnosticContext context,
+            Set<Varnode> visited,
+            List<Map<String, Object>> result,
+            String path,
+            boolean beforeConstantOffsetAddition,
+            int depth) {
+        if (varnode == null || depth > PCODE_DIAGNOSTIC_MAX_DEPTH || !visited.add(varnode)) {
+            return;
+        }
+
+        Varnode storage = stackStorageFor(varnode);
+        if (storage != null) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("varnodeId", context.id(varnode));
+            item.put("storageVarnode", varnodeMetadata(storage, context));
+            item.put("addressSpace", storage.getAddress().getAddressSpace().getName());
+            item.put("stackOffset", storage.getOffset());
+            item.put("stackOffsetHex", signedHex(storage.getOffset()));
+            item.put("stackLocation", formatStackLocation(storage.getOffset()));
+            item.put("size", storage.getSize());
+            PcodeOp definition = varnode.getDef();
+            item.put("definingOperation", pcodeOpMetadata(definition, parentFunction, context));
+            item.put("beforeConstantOffsetAddition", beforeConstantOffsetAddition);
+            item.put("path", path);
+            item.put(
+                "indirectDefinition",
+                definition != null && definition.getOpcode() == PcodeOp.INDIRECT
+                    ? indirectDefinitionMetadata(
+                        definition, storage, parentFunction, context)
+                    : null);
+            result.add(item);
+        }
+
+        PcodeOp definition = varnode.getDef();
+        if (definition == null) {
+            return;
+        }
+        for (int index = 0; index < definition.getNumInputs(); index++) {
+            boolean onBaseSide = beforeConstantOffsetAddition ||
+                isBaseInputOfConstantOffsetExpression(definition, index);
+            collectTargetStackStorage(
+                definition.getInput(index),
+                parentFunction,
+                context,
+                visited,
+                result,
+                path + "/definition/input[" + index + "]",
+                onBaseSide,
+                depth + 1);
+        }
+    }
+
+    private Map<String, Object> indirectDefinitionMetadata(
+            PcodeOp operation,
+            Varnode storage,
+            Function parentFunction,
+            PcodeDiagnosticContext context) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("operation", pcodeOpMetadata(operation, parentFunction, context));
+        result.put("sequenceAddress", formatAddress(operation.getSeqnum().getTarget()));
+        result.put(
+            "sameStackStorage",
+            sameStorage(stackStorageFor(operation.getOutput()), storage));
+        Instruction instruction = currentProgram.getListing().getInstructionAt(
+            operation.getSeqnum().getTarget());
+        result.put(
+            "associatedInstructionAddress",
+            instruction == null ? null : formatAddress(instruction.getAddress()));
+        result.put("associatedInstructionMnemonic", instruction == null
+            ? null : instruction.getMnemonicString());
+        result.put("associatedInstructionIsCall", instruction != null &&
+            instruction.getFlowType().isCall());
+        return result;
+    }
+
+    private Map<String, Object> receiverStorageCorrelation(
+            StackAddressProvenance argument,
+            List<Map<String, Object>> targetStorage) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("argumentIndex", 0);
+        result.put("argumentStatus", argument.status);
+        result.put("argumentStackOffset", argument.isResolved() ? argument.stackOffset : null);
+        result.put(
+            "argumentStackOffsetHex", argument.isResolved() ? signedHex(argument.stackOffset) : null);
+
+        List<Long> targetOffsets = new ArrayList<>();
+        List<Long> targetBaseOffsets = new ArrayList<>();
+        List<String> matchedTargetVarnodeIds = new ArrayList<>();
+        for (Map<String, Object> storage : targetStorage) {
+            Object offset = storage.get("stackOffset");
+            if (!(offset instanceof Number)) {
+                continue;
+            }
+            long targetOffset = ((Number) offset).longValue();
+            targetOffsets.add(targetOffset);
+            boolean targetBaseStorage =
+                Boolean.TRUE.equals(storage.get("beforeConstantOffsetAddition"));
+            if (targetBaseStorage) {
+                targetBaseOffsets.add(targetOffset);
+            }
+            if (targetBaseStorage && argument.isResolved() &&
+                    argument.stackOffset == targetOffset) {
+                Object id = storage.get("varnodeId");
+                if (id != null) {
+                    matchedTargetVarnodeIds.add(String.valueOf(id));
+                }
+            }
+        }
+        result.put("targetStorageStackOffsets", targetOffsets);
+        result.put("targetBaseStorageStackOffsets", targetBaseOffsets);
+        result.put("matchedTargetVarnodeIds", matchedTargetVarnodeIds);
+
+        List<String> evidence = new ArrayList<>();
+        if (!argument.isResolved()) {
+            result.put("status", "unresolved-argument-stack-address");
+            result.put("sameStackObject", false);
+            evidence.add("Argument 0 did not resolve to the address of a stack object.");
+        }
+        else if (!matchedTargetVarnodeIds.isEmpty()) {
+            result.put("status", "matched-stack-object");
+            result.put("targetStorageStackOffset", argument.stackOffset);
+            result.put("targetStorageStackOffsetHex", signedHex(argument.stackOffset));
+            result.put("sameStackObject", true);
+            evidence.add(
+                "Argument 0 resolves to the address of " +
+                formatStackLocation(argument.stackOffset) + ".");
+            evidence.add(
+                "The call-target definition reads storage at " +
+                formatStackLocation(argument.stackOffset) + ".");
+        }
+        else if (targetBaseOffsets.isEmpty()) {
+            result.put("status", "unresolved-target-stack-storage");
+            result.put("sameStackObject", false);
+            evidence.add(
+                "No stack-backed storage was found on the base side of a constant-offset " +
+                "addition in the call-target definition tree.");
+        }
+        else {
+            result.put("status", "different-stack-storage");
+            result.put("sameStackObject", false);
+            evidence.add(
+                "Argument 0 resolved to a stack address, but no target storage node used the same offset.");
+        }
+        result.put("evidence", evidence);
+        result.put(
+            "diagnosticOnly",
+            "This correlation does not affect indirect-call receiver resolution.");
+        return result;
+    }
+
+    private boolean isStackPointer(Varnode varnode) {
+        if (varnode == null || !varnode.isRegister()) {
+            return false;
+        }
+        Register stackPointer = currentProgram.getCompilerSpec().getStackPointer();
+        return stackPointer != null && varnode.getAddress().equals(stackPointer.getAddress());
+    }
+
+    private boolean isStackStorage(Varnode varnode) {
+        return varnode != null && varnode.getAddress() != null &&
+            currentProgram.getCompilerSpec().getStackSpace() != null &&
+            varnode.getAddress().getAddressSpace().equals(
+                currentProgram.getCompilerSpec().getStackSpace());
+    }
+
+    private Varnode stackStorageFor(Varnode varnode) {
+        if (isStackStorage(varnode)) {
+            return varnode;
+        }
+        HighVariable high = varnode == null ? null : varnode.getHigh();
+        Varnode representative = high == null ? null : high.getRepresentative();
+        return isStackStorage(representative) ? representative : null;
+    }
+
+    private static boolean isSimpleWrapper(int opcode) {
+        return opcode == PcodeOp.COPY || opcode == PcodeOp.CAST ||
+            opcode == PcodeOp.INT_ZEXT || opcode == PcodeOp.INT_SEXT;
+    }
+
+    private static boolean isBaseInputOfConstantOffsetExpression(PcodeOp operation, int inputIndex) {
+        int opcode = operation.getOpcode();
+        if ((opcode == PcodeOp.INT_ADD || opcode == PcodeOp.PTRSUB) &&
+                operation.getNumInputs() == 2) {
+            Varnode left = operation.getInput(0);
+            Varnode right = operation.getInput(1);
+            return (inputIndex == 0 && right != null && right.isConstant()) ||
+                (opcode == PcodeOp.INT_ADD && inputIndex == 1 &&
+                 left != null && left.isConstant());
+        }
+        Varnode index = operation.getNumInputs() > 1 ? operation.getInput(1) : null;
+        Varnode elementSize = operation.getNumInputs() > 2 ? operation.getInput(2) : null;
+        return opcode == PcodeOp.PTRADD && operation.getNumInputs() == 3 &&
+            inputIndex == 0 && index != null && index.isConstant() &&
+            elementSize != null && elementSize.isConstant();
+    }
+
+    private static long signedConstant(Varnode constant) {
+        long value = constant.getOffset();
+        int bits = Math.min(Long.SIZE, constant.getSize() * Byte.SIZE);
+        if (bits <= 0 || bits == Long.SIZE) {
+            return value;
+        }
+        long mask = (1L << bits) - 1;
+        value &= mask;
+        long signBit = 1L << (bits - 1);
+        return (value & signBit) == 0 ? value : value | ~mask;
+    }
+
+    private static String signedHex(long value) {
+        if (value < 0) {
+            return "-0x" + Long.toUnsignedString(-value, 16).toUpperCase(Locale.ROOT);
+        }
+        return "0x" + Long.toUnsignedString(value, 16).toUpperCase(Locale.ROOT);
+    }
+
+    private static String formatStackLocation(long offset) {
+        return offset < 0
+            ? "stack[-0x" + Long.toUnsignedString(-offset, 16).toUpperCase(Locale.ROOT) + "]"
+            : "stack[+0x" + Long.toUnsignedString(offset, 16).toUpperCase(Locale.ROOT) + "]";
     }
 
     private Map<String, Object> pcodeOpMetadata(
@@ -1326,7 +1715,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 1);
+        result.put("schemaVersion", 2);
         result.put("rootFunction", rootSummary);
         result.put("maximumDefinitionDepth", PCODE_DIAGNOSTIC_MAX_DEPTH);
         result.put(
@@ -1722,6 +2111,55 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             if (targetTreeVarnodeSet.add(varnode)) {
                 targetTreeVarnodes.add(varnode);
             }
+        }
+
+        void resetTreeTraversal() {
+            visitedTreeVarnodes.clear();
+            visitedTreeOps.clear();
+        }
+    }
+
+    private static final class StackAddressProvenance {
+        final String status;
+        String failureReason;
+        String baseAddressSpace;
+        long stackOffset;
+        String resolutionBasis;
+        final List<Map<String, Object>> derivationChain = new ArrayList<>();
+
+        private StackAddressProvenance(String status) {
+            this.status = status;
+        }
+
+        static StackAddressProvenance resolved(long stackOffset) {
+            StackAddressProvenance result =
+                new StackAddressProvenance("resolved-stack-address");
+            result.stackOffset = stackOffset;
+            return result;
+        }
+
+        static StackAddressProvenance unresolved(String status, String reason) {
+            StackAddressProvenance result = new StackAddressProvenance(status);
+            result.failureReason = reason;
+            return result;
+        }
+
+        boolean isResolved() {
+            return "resolved-stack-address".equals(status);
+        }
+
+        Map<String, Object> toMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("status", status);
+            result.put("baseAddressSpace", baseAddressSpace);
+            result.put("stackOffset", isResolved() ? stackOffset : null);
+            result.put("stackOffsetHex", isResolved() ? signedHex(stackOffset) : null);
+            result.put("stackLocation", isResolved() ? formatStackLocation(stackOffset) : null);
+            result.put("confidence", isResolved() ? "conservative-pattern-match" : null);
+            result.put("resolutionBasis", resolutionBasis);
+            result.put("failureReason", failureReason);
+            result.put("derivationChain", derivationChain);
+            return result;
         }
     }
 
