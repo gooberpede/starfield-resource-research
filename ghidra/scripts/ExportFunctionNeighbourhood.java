@@ -36,6 +36,7 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.pcode.HighFunction;
+import ghidra.program.model.pcode.HighParam;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.scalar.Scalar;
@@ -433,6 +434,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             receiver = stripCopiesAndCasts(vptrDefinition.getInput(1));
         }
         result.receiverExpression = describeVarnode(receiver);
+        result.receiverIdentity = variableIdentity(receiver);
 
         Map<String, VtableEvidence> candidates = new LinkedHashMap<>();
         VtableEvidence propagated = vtableAtConstant(slotExpression.base);
@@ -440,13 +442,12 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             candidates.put(propagated.address.toString(), propagated);
         }
         if (receiver != null) {
-            collectConstructorVtables(highFunction, callOperation, receiver, candidates, result.evidence);
+            collectConstructorVtables(
+                highFunction, callOperation, receiver, candidates, result);
         }
 
         if (candidates.isEmpty()) {
-            result.fail(
-                "unresolved-unknown-vtable",
-                "No unique vtable could be tied to the receiver from direct program data.");
+            setConstructorFailure(result);
             return result;
         }
         if (candidates.size() != 1) {
@@ -454,8 +455,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                 result.vtableCandidates.add(candidate.summary());
             }
             result.fail(
-                "unresolved-multiple-candidates",
-                "More than one vtable was tied to the receiver; no target was guessed.");
+                "unresolved-ambiguous-vptr-stores",
+                "More than one distinct vtable was tied to the receiver; no target was guessed.");
             return result;
         }
 
@@ -463,6 +464,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         result.vtableName = vtable.name;
         result.vtableAddress = formatAddress(vtable.address);
         result.evidence.add(vtable.description);
+        result.provenance.addAll(vtable.provenance);
 
         Address slotAddress;
         try {
@@ -524,7 +526,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             PcodeOp indirectCall,
             Varnode receiver,
             Map<String, VtableEvidence> candidates,
-            List<String> evidence) throws CancelledException {
+            IndirectCall result) throws CancelledException {
         String receiverIdentity = variableIdentity(receiver);
         if (receiverIdentity == null) {
             return;
@@ -539,36 +541,95 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                     operation.getSeqnum().getTarget().compareTo(indirectSite) >= 0) {
                 continue;
             }
-            if (!firstArgumentAliases(operation, receiverIdentity)) {
+            String argumentIdentity = variableIdentity(operation.getInput(1));
+            if (!sameVariableIdentity(receiver, operation.getInput(1))) {
                 continue;
             }
 
+            InitializerCallDiagnostic diagnostic = new InitializerCallDiagnostic(operation);
+            diagnostic.receiverArgumentIdentity = argumentIdentity;
+            result.initializerCandidates.add(diagnostic);
+
             Function called = directCalledFunction(operation);
             if (called == null) {
+                diagnostic.analysisError =
+                    "Argument 0 matches, but the CALL target is not a defined direct function.";
                 continue;
             }
+            diagnostic.calledFunctionName = called.getName();
+            diagnostic.calledFunctionAddress = address(called);
             ThunkResolution resolution = resolveThunk(called);
+            diagnostic.thunkResolutionSucceeded = resolution.succeeded;
+            diagnostic.thunkHopCount = resolution.hopCount;
+            diagnostic.thunkResolutionError = resolution.error;
             Function implementation = resolution.resolvedFunction;
             if (implementation == null) {
                 continue;
             }
+            diagnostic.initializerFunctionName = implementation.getName();
+            diagnostic.initializerFunctionAddress = address(implementation);
 
-            List<VtableEvidence> assignments = collectVtableAssignments(implementation);
+            List<VtableEvidence> assignments = collectVtableAssignments(
+                implementation, diagnostic, called, operation.getSeqnum().getTarget());
             if (!assignments.isEmpty()) {
-                evidence.add(
+                result.evidence.add(
                     "Earlier direct call " + called.getName() + " at " +
                     formatAddress(operation.getSeqnum().getTarget()) +
                     " receives the indirect-call receiver as its first argument.");
             }
             for (VtableEvidence candidate : assignments) {
-                candidates.put(candidate.address.toString(), candidate);
+                VtableEvidence existing = candidates.get(candidate.address.toString());
+                if (existing == null) {
+                    candidates.put(candidate.address.toString(), candidate);
+                }
+                else {
+                    existing.provenance.addAll(candidate.provenance);
+                }
             }
         }
     }
 
-    private boolean firstArgumentAliases(PcodeOp call, String receiverIdentity) {
-        return call.getNumInputs() >= 2 &&
-            receiverIdentity.equals(variableIdentity(call.getInput(1)));
+    private void setConstructorFailure(IndirectCall result) {
+        if (result.receiverIdentity == null) {
+            result.fail(
+                "unresolved-receiver-provenance",
+                "The receiver could not be normalized conservatively from high p-code.");
+            return;
+        }
+        if (result.initializerCandidates.isEmpty()) {
+            result.fail(
+                "unresolved-no-initializer-call",
+                "No earlier direct CALL passed the normalized receiver as argument 0.");
+            return;
+        }
+
+        boolean sawOffsetZeroStore = false;
+        boolean sawStoredAddress = false;
+        for (InitializerCallDiagnostic initializer : result.initializerCandidates) {
+            for (VptrStoreDiagnostic store : initializer.vptrStores) {
+                if (store.throughThis && Long.valueOf(0).equals(store.storeOffset)) {
+                    sawOffsetZeroStore = true;
+                    if (store.storedAddress != null) {
+                        sawStoredAddress = true;
+                    }
+                }
+            }
+        }
+        if (!sawOffsetZeroStore) {
+            result.fail(
+                "unresolved-no-vptr-store",
+                "Candidate initializer implementations exposed no STORE through argument 0 at offset zero.");
+        }
+        else if (sawStoredAddress) {
+            result.fail(
+                "unresolved-vtable-symbol",
+                "Offset-zero stores were found, but no stored address had exactly one vtable/vftable symbol name.");
+        }
+        else {
+            result.fail(
+                "unresolved-no-vptr-store",
+                "Offset-zero stores were found, but their stored values were not constant program addresses.");
+        }
     }
 
     private Function directCalledFunction(PcodeOp call) {
@@ -585,11 +646,32 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         }
     }
 
-    private List<VtableEvidence> collectVtableAssignments(Function function)
+    private List<VtableEvidence> collectVtableAssignments(
+            Function function,
+            InitializerCallDiagnostic initializerDiagnostic,
+            Function calledFunction,
+            Address initializerCallSite)
             throws CancelledException {
         Map<String, VtableEvidence> results = new LinkedHashMap<>();
         Decompilation decompilation = decompile(function);
         if (!decompilation.completed || decompilation.highFunction == null) {
+            initializerDiagnostic.analysisError = decompilation.error == null
+                ? "Initializer decompilation returned no high p-code."
+                : decompilation.error;
+            return new ArrayList<>(results.values());
+        }
+
+        HighParam thisParameter = decompilation.highFunction.getLocalSymbolMap().getParam(0);
+        if (thisParameter == null || thisParameter.getRepresentative() == null) {
+            initializerDiagnostic.analysisError =
+                "Decompiler high p-code exposed no parameter 0 representative.";
+            return new ArrayList<>(results.values());
+        }
+        String thisIdentity = variableIdentity(thisParameter.getRepresentative());
+        initializerDiagnostic.thisParameterIdentity = thisIdentity;
+        if (thisIdentity == null) {
+            initializerDiagnostic.analysisError =
+                "Parameter 0 could not be normalized conservatively.";
             return new ArrayList<>(results.values());
         }
 
@@ -600,6 +682,28 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             if (operation.getOpcode() != PcodeOp.STORE || operation.getNumInputs() < 3) {
                 continue;
             }
+
+            VptrStoreDiagnostic storeDiagnostic = new VptrStoreDiagnostic(operation);
+            initializerDiagnostic.vptrStores.add(storeDiagnostic);
+            OffsetExpression destination = extractBasePlusConstant(operation.getInput(1));
+            if (destination == null) {
+                storeDiagnostic.rejectionReason =
+                    "STORE destination is not a conservatively supported base-plus-constant expression.";
+                continue;
+            }
+            storeDiagnostic.storeOffset = destination.offset;
+            storeDiagnostic.destinationBaseIdentity = variableIdentity(destination.base);
+            storeDiagnostic.throughThis = sameVariableIdentity(
+                thisParameter.getRepresentative(), destination.base);
+            if (!storeDiagnostic.throughThis) {
+                storeDiagnostic.rejectionReason = "STORE destination is not based on parameter 0.";
+                continue;
+            }
+            if (destination.offset != 0) {
+                storeDiagnostic.rejectionReason = "STORE through parameter 0 is not at offset zero.";
+                continue;
+            }
+
             Address assignedAddress;
             try {
                 assignedAddress = addressFromVarnode(stripCopiesAndCasts(operation.getInput(2)));
@@ -608,20 +712,45 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                 continue;
             }
             if (assignedAddress == null) {
+                storeDiagnostic.rejectionReason =
+                    "Stored value is not a constant program address.";
                 continue;
             }
+            storeDiagnostic.storedAddress = formatAddress(assignedAddress);
+            Set<String> vtableNames = new TreeSet<>();
             for (Symbol symbol : currentProgram.getSymbolTable().getSymbols(assignedAddress)) {
                 String name = symbol.getName(true);
+                storeDiagnostic.symbolNames.add(name);
                 if (isVtableName(name)) {
-                    results.put(
-                        assignedAddress.toString(),
-                        new VtableEvidence(
-                            name,
-                            assignedAddress,
-                            "Resolved implementation " + function.getName() + " stores vtable " +
-                            name + " at " + formatAddress(operation.getSeqnum().getTarget()) + "."));
-                    break;
+                    vtableNames.add(name);
                 }
+            }
+            Collections.sort(storeDiagnostic.symbolNames);
+            if (vtableNames.size() != 1) {
+                storeDiagnostic.rejectionReason = vtableNames.isEmpty()
+                    ? "Stored address has no symbol name containing vtable or vftable."
+                    : "Stored address has more than one vtable/vftable symbol name.";
+                continue;
+            }
+
+            String vtableName = vtableNames.iterator().next();
+            storeDiagnostic.accepted = true;
+            storeDiagnostic.acceptedVtableName = vtableName;
+            InitializerProvenance provenance = new InitializerProvenance(
+                initializerCallSite, calledFunction, function, operation.getSeqnum().getTarget());
+            VtableEvidence evidence = new VtableEvidence(
+                vtableName,
+                assignedAddress,
+                "Resolved implementation " + function.getName() + " stores vtable " +
+                vtableName + " through parameter 0 at offset zero at " +
+                formatAddress(operation.getSeqnum().getTarget()) + ".");
+            evidence.provenance.add(provenance);
+            VtableEvidence existing = results.get(assignedAddress.toString());
+            if (existing == null) {
+                results.put(assignedAddress.toString(), evidence);
+            }
+            else {
+                existing.provenance.add(provenance);
             }
         }
         return new ArrayList<>(results.values());
@@ -661,6 +790,13 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         if (varnode.isConstant()) {
             return currentProgram.getAddressFactory().getDefaultAddressSpace()
                 .getAddress(varnode.getOffset());
+        }
+        OffsetExpression expression = extractBasePlusConstant(varnode);
+        if (expression != null && expression.base != varnode) {
+            Address base = addressFromVarnode(expression.base);
+            if (base != null) {
+                return base.add(expression.offset);
+            }
         }
         return null;
     }
@@ -729,20 +865,78 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         if (current == null) {
             return null;
         }
-        if (current.getHigh() != null && current.getHigh().getName() != null) {
-            Varnode representative = current.getHigh().getRepresentative();
-            return "high:" + current.getHigh().getName() + ":" +
-                (representative == null ? "no-storage" : representative.encodePiece());
-        }
         PcodeOp definition = current.getDef();
-        if (definition != null && definition.getOpcode() == PcodeOp.PTRSUB &&
+        if (definition != null &&
+                (definition.getOpcode() == PcodeOp.PTRSUB ||
+                 definition.getOpcode() == PcodeOp.INT_ADD) &&
                 definition.getNumInputs() == 2) {
-            Varnode offset = stripCopiesAndCasts(definition.getInput(1));
-            if (offset != null && offset.isConstant()) {
-                return variableIdentity(definition.getInput(0)) + "+" + hex(offset.getOffset());
+            Varnode left = stripCopiesAndCasts(definition.getInput(0));
+            Varnode right = stripCopiesAndCasts(definition.getInput(1));
+            if (right != null && right.isConstant()) {
+                String baseIdentity = variableIdentity(left);
+                return baseIdentity == null ? null :
+                    "offset(" + baseIdentity + "," + hex(right.getOffset()) + ")";
+            }
+            if (definition.getOpcode() == PcodeOp.INT_ADD && left != null && left.isConstant()) {
+                String baseIdentity = variableIdentity(right);
+                return baseIdentity == null ? null :
+                    "offset(" + baseIdentity + "," + hex(left.getOffset()) + ")";
             }
         }
-        return current.encodePiece();
+        if (definition != null && definition.getOpcode() == PcodeOp.PTRADD &&
+                definition.getNumInputs() == 3) {
+            Varnode index = stripCopiesAndCasts(definition.getInput(1));
+            Varnode elementSize = stripCopiesAndCasts(definition.getInput(2));
+            if (index != null && index.isConstant() &&
+                    elementSize != null && elementSize.isConstant()) {
+                String baseIdentity = variableIdentity(definition.getInput(0));
+                return baseIdentity == null ? null :
+                    "offset(" + baseIdentity + "," +
+                    hex(index.getOffset() * elementSize.getOffset()) + ")";
+            }
+        }
+        if (current.getHigh() != null && current.getHigh().getName() != null) {
+            Varnode representative = current.getHigh().getRepresentative();
+            return "high-storage:" +
+                (representative == null ? "no-storage" : representative.encodePiece());
+        }
+        return "varnode:" + current.encodePiece();
+    }
+
+    private boolean sameVariableIdentity(Varnode leftInput, Varnode rightInput) {
+        return sameVariableIdentity(leftInput, rightInput, 0);
+    }
+
+    private boolean sameVariableIdentity(Varnode leftInput, Varnode rightInput, int depth) {
+        if (depth > 32) {
+            return false;
+        }
+        Varnode left = stripCopiesAndCasts(leftInput);
+        Varnode right = stripCopiesAndCasts(rightInput);
+        if (left == null || right == null) {
+            return left == right;
+        }
+        if (left == right || left.equals(right)) {
+            return true;
+        }
+
+        OffsetExpression leftOffset = extractBasePlusConstant(left);
+        OffsetExpression rightOffset = extractBasePlusConstant(right);
+        boolean leftIsExpression = leftOffset != null && leftOffset.base != left;
+        boolean rightIsExpression = rightOffset != null && rightOffset.base != right;
+        if (leftIsExpression || rightIsExpression) {
+            Varnode leftBase = leftIsExpression ? leftOffset.base : left;
+            Varnode rightBase = rightIsExpression ? rightOffset.base : right;
+            long leftValue = leftIsExpression ? leftOffset.offset : 0;
+            long rightValue = rightIsExpression ? rightOffset.offset : 0;
+            return leftValue == rightValue &&
+                sameVariableIdentity(leftBase, rightBase, depth + 1);
+        }
+
+        if (left.getHigh() != null && right.getHigh() != null) {
+            return left.getHigh() == right.getHigh();
+        }
+        return false;
     }
 
     private static String describeVarnode(Varnode varnode) {
@@ -875,7 +1069,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         rootSummary.put("address", address(root));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 1);
+        result.put("schemaVersion", 2);
         result.put("rootFunction", rootSummary);
         result.put("pointerSize", currentProgram.getDefaultPointerSize());
         result.put("analysisCompleted", analysis.completed);
@@ -1163,11 +1357,14 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         String kind = "indirect";
         final int pointerSize;
         String receiverExpression;
+        String receiverIdentity;
         String vtableName;
         String vtableAddress;
         Long vtableByteOffset;
         Long vtableSlotIndex;
         final List<Map<String, String>> vtableCandidates = new ArrayList<>();
+        final List<InitializerCallDiagnostic> initializerCandidates = new ArrayList<>();
+        final List<InitializerProvenance> provenance = new ArrayList<>();
         String targetPointerAddress;
         String slotPointerValue;
         String slotFunctionName;
@@ -1203,7 +1400,9 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
 
         void resolve(Function function, int thunkHopCount) {
             this.status = "resolved-static-vtable";
-            this.resolutionBasis = "direct-program-data";
+            this.resolutionBasis = provenance.isEmpty()
+                ? "direct-program-data"
+                : "constructor-vptr-store";
             this.failureReason = null;
             this.resolvedFunction = function;
             this.resolvedFunctionKey = functionKey(function);
@@ -1229,6 +1428,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         final String name;
         final Address address;
         final String description;
+        final List<InitializerProvenance> provenance = new ArrayList<>();
 
         VtableEvidence(String name, Address address, String description) {
             this.name = name;
@@ -1242,6 +1442,67 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             result.put("address", formatAddress(address));
             result.put("evidence", description);
             return result;
+        }
+    }
+
+    private static final class InitializerCallDiagnostic {
+        final String initializerCallSite;
+        final int receiverArgumentIndex = 0;
+        String receiverArgumentIdentity;
+        String calledFunctionName;
+        String calledFunctionAddress;
+        boolean thunkResolutionSucceeded;
+        int thunkHopCount;
+        String thunkResolutionError;
+        String initializerFunctionName;
+        String initializerFunctionAddress;
+        String thisParameterIdentity;
+        String analysisError;
+        final List<VptrStoreDiagnostic> vptrStores = new ArrayList<>();
+
+        InitializerCallDiagnostic(PcodeOp operation) {
+            this.initializerCallSite = formatAddress(operation.getSeqnum().getTarget());
+        }
+    }
+
+    private static final class VptrStoreDiagnostic {
+        final String storeAddress;
+        String destinationBaseIdentity;
+        Long storeOffset;
+        boolean throughThis;
+        String storedAddress;
+        final List<String> symbolNames = new ArrayList<>();
+        boolean accepted;
+        String acceptedVtableName;
+        String rejectionReason;
+
+        VptrStoreDiagnostic(PcodeOp operation) {
+            this.storeAddress = formatAddress(operation.getSeqnum().getTarget());
+        }
+    }
+
+    private static final class InitializerProvenance {
+        final String method = "constructor-vptr-store";
+        final String initializerCallSite;
+        final String calledFunctionName;
+        final String calledFunctionAddress;
+        final String initializerFunctionName;
+        final String initializerFunctionAddress;
+        final int receiverArgumentIndex = 0;
+        final String vptrStoreAddress;
+        final long vptrStoreOffset = 0;
+
+        InitializerProvenance(
+                Address initializerCallSite,
+                Function calledFunction,
+                Function initializerFunction,
+                Address vptrStoreAddress) {
+            this.initializerCallSite = formatAddress(initializerCallSite);
+            this.calledFunctionName = calledFunction.getName();
+            this.calledFunctionAddress = address(calledFunction);
+            this.initializerFunctionName = initializerFunction.getName();
+            this.initializerFunctionAddress = address(initializerFunction);
+            this.vptrStoreAddress = formatAddress(vptrStoreAddress);
         }
     }
 

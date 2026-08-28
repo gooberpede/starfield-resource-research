@@ -109,7 +109,18 @@ The neighbourhood exporter inspects the root function's decompiler high p-code f
 load(load(receiver) + constant byte offset)
 ```
 
-For that pattern, it attempts to tie the receiver to one uniquely identifiable vtable. It accepts either a vtable address propagated directly into the decompiler expression or a vtable symbol used as the stored value of a `STORE` operation in an earlier direct callee that receives the same decompiler high variable as its first argument. The latter is intended to recognize a constructor call followed by virtual dispatch. Candidate symbols must contain `vftable` or `vtable`; the script does not scan arbitrary address tables or infer a class hierarchy.
+For that pattern, it attempts to tie the receiver to one uniquely identifiable vtable. It accepts either a vtable address propagated directly into the decompiler expression or the following limited initializer pattern:
+
+1. normalize the receiver through `COPY`, `CAST`, integer extension, and constant `PTRSUB`, `PTRADD`, or `INT_ADD` wrappers;
+2. find an earlier direct `CALL` in the same high function whose argument 0 has the same normalized identity;
+3. resolve the called function's Ghidra-defined thunk chain;
+4. decompile the resolved implementation and obtain its high-p-code parameter 0;
+5. require a `STORE` through that parameter at byte offset zero;
+6. require the stored value to resolve to a program address with exactly one symbol name containing `vftable` or `vtable`, case-insensitively.
+
+This is dataflow evidence only: the script does not require the callee to be named or typed as a constructor. Matching uses structural constant-offset expressions and high-variable object identity within each decompilation, not decompiled C variable names or storage reuse alone. The serialized identity strings are diagnostics rather than the equality test. Matching is deliberately conservative and confined to argument 0.
+
+Every relevant `STORE` in a matched initializer is recorded in execution-address context with its destination identity, offset, stored address, symbol names, and acceptance or rejection reason. Repeated stores of the same vtable address are retained as provenance but collapse to one vtable candidate. If stores yield more than one distinct accepted vtable address, the result is `unresolved-ambiguous-vptr-stores`; the script does not assume that the first or last constructor store is the final dynamic type.
 
 Once one vtable is identified, the script:
 
@@ -122,13 +133,16 @@ Once one vtable is identified, the script:
 
 This is not a general-purpose C++ devirtualizer. It does not perform whole-program points-to analysis, class-hierarchy recovery, symbolic execution, or speculative target enumeration. If receiver matching is absent or ambiguous, the call remains unresolved.
 
-Every computed call instruction in the root is retained in `indirect-calls.json`. When high p-code exposes a supported call, its record includes the call-site address, status, receiver expression, pointer size, vtable identity, byte offset, slot index, slot address and value, resolved function, resolution basis, evidence, and export status. Unsupported or failed cases include a `failureReason`. Status values currently include:
+Every computed call instruction in the root is retained in `indirect-calls.json`. Schema version 2 adds `receiverIdentity`, `initializerCandidates`, and `provenance` to the existing call record. `initializerCandidates` contains the earlier matching call, thunk-resolution result, resolved implementation, normalized parameter-0 identity, inspected vptr stores, symbol evidence, and rejection reasons. A successful constructor-derived result uses `resolutionBasis: constructor-vptr-store`; its `provenance` array identifies the earlier call, directly called function, resolved implementation, argument index, and offset-zero store. Unsupported or failed cases include a `failureReason`. Status values currently include:
 
 ```text
 resolved-static-vtable
-unresolved-unknown-vtable
+unresolved-receiver-provenance
+unresolved-no-initializer-call
+unresolved-no-vptr-store
+unresolved-ambiguous-vptr-stores
+unresolved-vtable-symbol
 unresolved-nonconstant-offset
-unresolved-multiple-candidates
 unresolved-no-function-at-slot
 unsupported-pattern
 ```
@@ -184,9 +198,14 @@ For the first virtual-call live test against `FUN_1431bc320`:
 3. Run `ExportFunctionNeighbourhood.java` and choose the repository's `exports` directory.
 4. Open `exports/neighbourhoods/FUN_1431bc320__1431BC320/indirect-calls.json`.
 5. Locate the computed call whose `vtableByteOffset` is `80`; verify that `vtableSlotIndex` is `10` for the 8-byte pointer-size program.
-6. Verify that the record names `TESContainer::vftable`, reports `resolved-static-vtable`, and identifies both the slot pointer and resolved function.
-7. Confirm that `functions/<resolved-name>__<resolved-address>/` contains the seven standard context files and that `graph.json` contains the matching `indirectEdges` entry.
-8. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
+6. Verify that `receiverIdentity` is populated and that an `initializerCandidates` entry at the preceding initialization call identifies the called thunk and its resolved implementation corresponding to `FUN_140d7ce60`.
+7. In that candidate, verify an accepted `vptrStores` entry at offset `0`, with a stored address whose `symbolNames` includes `TESContainer::vftable`.
+8. Verify that the indirect-call record names `TESContainer::vftable`, reports `resolved-static-vtable`, uses `resolutionBasis: constructor-vptr-store`, and identifies both the slot pointer and resolved function.
+9. Verify that `provenance` records the initializer call site, direct and resolved initializer functions, argument index `0`, vptr store address, and store offset `0`.
+10. Confirm that `functions/<resolved-name>__<resolved-address>/` contains the seven standard context files and that `graph.json` contains the matching `indirectEdges` entry.
+11. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
+
+If the call remains unresolved, use its precise status and `initializerCandidates` diagnostics to distinguish receiver matching, thunk resolution, parameter-0 recovery, offset-zero store recovery, constant-address recovery, vtable-symbol confidence, and slot lookup failures. Do not update the function register with a virtual target until this live output directly supports it.
 
 Files with the same names are replaced when the same neighbourhood is exported again. The script does not delete old function directories, so a bundle from an earlier run can remain if analysis changes and that function is no longer a direct callee. Use the current manifest and graph as the authoritative membership list for a run.
 
@@ -198,7 +217,10 @@ Files with the same names are replaced when the same neighbourhood is exported a
 - Only simple fixed-offset vtable dispatch is eligible for indirect resolution. All other computed calls are retained as unresolved records rather than being guessed or dropped.
 - External/imported functions are represented in relationship metadata but are not decompiled or given context bundles.
 - Depth is fixed at 1; there is no recursive or transitive call-tree crawl.
-- The exporter uses decompiler high p-code only for the focused call pattern and same-high-variable receiver check. It does not export p-code, build an SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies.
+- The constructor-to-vptr path assumes the decompiler exposes the caller receiver and argument 0 in equivalent supported forms, exposes the resolved initializer's parameter 0 in `LocalSymbolMap`, and represents the vptr assignment as a high-p-code `STORE` whose destination is parameter 0 plus constant zero.
+- Constant vtable recovery assumes the stored value remains a constant/address varnode (possibly under the supported wrappers) and that the exact address has one unambiguous symbol name containing `vftable` or `vtable`.
+- The exporter does not follow aliases through memory, PHI/`MULTIEQUAL`, nonconstant pointer arithmetic, helper calls inside the initializer, base-to-derived adjustments, multiple inheritance, or nested constructor chains. It does not infer which of several distinct vptr stores is final.
+- The exporter uses decompiler high p-code only for this focused pattern. It does not export raw p-code, build a general SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies.
 - The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.
