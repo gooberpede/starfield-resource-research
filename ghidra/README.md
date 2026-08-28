@@ -147,6 +147,31 @@ unresolved-no-function-at-slot
 unsupported-pattern
 ```
 
+### Focused high-p-code diagnostics
+
+The neighbourhood exporter also writes `pcode-diagnostics.json` to explain indirect calls whose status is `unresolved-receiver-provenance`. This file is intentionally a focused diagnostic for unresolved `CALLIND` receiver provenance, not a general dump of every p-code operation in the function. A successful or differently unresolved indirect call does not receive a diagnostic entry; the file is still written with an empty `calls` array so each run has a predictable output shape.
+
+For each included call, the JSON records:
+
+- the `CALLIND` operation, opcode, sequence number, instruction address, output, and indexed inputs;
+- the indirect target varnode and a recursive tree of its defining operations;
+- every defining operation's opcode, sequence metadata, parent function, output, input count, and indexed inputs;
+- varnode size, address space, offset, address, storage flags, constant value, high-variable metadata, representative storage, and datatype where available;
+- every `CALLIND` argument, using `argumentIndex` for the call argument and `pcodeInputIndex` for its original p-code input position;
+- comparisons between call argument 0 (the likely C++ `this` argument) and each nonconstant varnode encountered in the target tree: exact varnode, high-variable object identity, storage, and defining-operation equality.
+
+The diagnostic follows Ghidra's high-p-code `CALLIND` convention: input 0 is the indirect target and inputs 1 through N are call arguments. Thus `argumentIndex: 0` corresponds to `pcodeInputIndex: 1`. This convention is also recorded in each diagnostic call object.
+
+Definition traversal has a maximum depth of 8. It stops at constants, null varnodes, inputs without definitions, the depth bound, and previously visited varnodes or defining operations. Repeated nodes receive stable IDs within that one call diagnostic, and stopped branches contain a `stopReason`. The IDs are diagnostic identities scoped to one exported call; high-variable names or storage equality alone are not treated as proof of semantic equivalence.
+
+For the current diagnostic target, navigate to `FUN_1431bc320` at `1431BC320`, run the exporter, and open:
+
+```text
+exports/neighbourhoods/FUN_1431bc320__1431BC320/pcode-diagnostics.json
+```
+
+Locate `CALLIND` at `1431BC350`. If it remains `unresolved-receiver-provenance`, inspect `callTarget.definitionTree` for the fixed `0x50` addition and nested loads, then compare `arguments[0]` with `receiverComparisons`. This preserves the real high-p-code shape for review without changing the receiver normalizer or guessing a virtual target.
+
 `graph.json` preserves its existing direct `edges` array and adds a separate `indirectEdges` array. Resolved targets are deduplicated with direct targets by function entry address, so a function bundle is written at most once per run.
 
 ### Thunk handling
@@ -176,6 +201,7 @@ exports/
       ├─ graph.json
       ├─ manifest.json
       ├─ indirect-calls.json
+      ├─ pcode-diagnostics.json
       └─ functions/
          ├─ FUN_1431bc320__1431BC320/
          │  ├─ metadata.json
@@ -191,19 +217,18 @@ exports/
 
 `manifest.json` identifies the root, fixed depth, program, timestamp, successful bundle count, indirect-call counts and analysis status, and any per-function failures. `graph.json` contains the root and one edge per distinct direct callee; each edge preserves the directly called function and the resolved implementation separately.
 
-For the first virtual-call live test against `FUN_1431bc320`:
+For the targeted high-p-code diagnostic live test against `FUN_1431bc320`:
 
 1. Go to `1431BC320` in the analysed `CreationKit.exe` program and confirm the cursor is inside `FUN_1431bc320`.
 2. Confirm normal analysis is complete and that Ghidra exposes the expected `TESContainer::vftable` symbol.
 3. Run `ExportFunctionNeighbourhood.java` and choose the repository's `exports` directory.
-4. Open `exports/neighbourhoods/FUN_1431bc320__1431BC320/indirect-calls.json`.
-5. Locate the computed call whose `vtableByteOffset` is `80`; verify that `vtableSlotIndex` is `10` for the 8-byte pointer-size program.
-6. Verify that `receiverIdentity` is populated and that an `initializerCandidates` entry at the preceding initialization call identifies the called thunk and its resolved implementation corresponding to `FUN_140d7ce60`.
-7. In that candidate, verify an accepted `vptrStores` entry at offset `0`, with a stored address whose `symbolNames` includes `TESContainer::vftable`.
-8. Verify that the indirect-call record names `TESContainer::vftable`, reports `resolved-static-vtable`, uses `resolutionBasis: constructor-vptr-store`, and identifies both the slot pointer and resolved function.
-9. Verify that `provenance` records the initializer call site, direct and resolved initializer functions, argument index `0`, vptr store address, and store offset `0`.
-10. Confirm that `functions/<resolved-name>__<resolved-address>/` contains the seven standard context files and that `graph.json` contains the matching `indirectEdges` entry.
-11. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
+4. Open `exports/neighbourhoods/FUN_1431bc320__1431BC320/indirect-calls.json` and locate `CALLIND` at `1431BC350`; verify that it remains identifiable as a vtable call with `vtableByteOffset: 80` and `vtableSlotIndex: 10` for the 8-byte pointer-size program.
+5. If its status is `unresolved-receiver-provenance`, open the sibling `pcode-diagnostics.json` and locate the entry for `1431BC350`.
+6. Verify that `callOperation.inputs[0]` is the target and that `arguments[0]` has `pcodeInputIndex: 1`.
+7. Inspect `callTarget.definitionTree` and confirm it exposes the target `LOAD`, the fixed `0x50` arithmetic, the inner pointer/vtable load, and all input varnodes with sequence and storage metadata.
+8. Review `receiverComparisons` for the exact, high-variable, storage, and defining-operation relationships between the first actual call argument and nonconstant nodes in the target tree.
+9. Confirm `manifest.json` reports `pcodeDiagnosticCount: 1` for this unresolved call and that the normal direct-call bundles and graph outputs remain present.
+10. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
 
 If the call remains unresolved, use its precise status and `initializerCandidates` diagnostics to distinguish receiver matching, thunk resolution, parameter-0 recovery, offset-zero store recovery, constant-address recovery, vtable-symbol confidence, and slot lookup failures. Do not update the function register with a virtual target until this live output directly supports it.
 
@@ -211,7 +236,7 @@ Files with the same names are replaced when the same neighbourhood is exported a
 
 ### Compatibility and known limitations
 
-- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 export has been live-tested; the new virtual-call pass still requires the live test above.
+- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 and virtual-call detection paths have been live-tested; the new diagnostic schema and the exact `1431BC350` definition-tree shape still require the live test above.
 - Direct callees come from Ghidra's `Function.getCalledFunctions` results and therefore depend on call references and defined functions in the current analysis database.
 - Thunk resolution depends on Ghidra having marked the forwarding function as a thunk and assigned its thunk target.
 - Only simple fixed-offset vtable dispatch is eligible for indirect resolution. All other computed calls are retained as unresolved records rather than being guessed or dropped.
@@ -220,7 +245,7 @@ Files with the same names are replaced when the same neighbourhood is exported a
 - The constructor-to-vptr path assumes the decompiler exposes the caller receiver and argument 0 in equivalent supported forms, exposes the resolved initializer's parameter 0 in `LocalSymbolMap`, and represents the vptr assignment as a high-p-code `STORE` whose destination is parameter 0 plus constant zero.
 - Constant vtable recovery assumes the stored value remains a constant/address varnode (possibly under the supported wrappers) and that the exact address has one unambiguous symbol name containing `vftable` or `vtable`.
 - The exporter does not follow aliases through memory, PHI/`MULTIEQUAL`, nonconstant pointer arithmetic, helper calls inside the initializer, base-to-derived adjustments, multiple inheritance, or nested constructor chains. It does not infer which of several distinct vptr stores is final.
-- The exporter uses decompiler high p-code only for this focused pattern. It does not export raw p-code, build a general SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies.
+- The exporter uses decompiler high p-code only for focused virtual-call analysis and unresolved-receiver diagnostics. It does not dump every p-code operation, build a general SSA/dataflow framework, infer semantic names, or reconstruct structures or class hierarchies. Diagnostic object IDs are stable only within one exported call, and metadata availability depends on the decompiler's high-p-code objects.
 - The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.

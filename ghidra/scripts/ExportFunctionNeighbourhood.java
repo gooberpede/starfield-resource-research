@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,6 +38,7 @@ import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.HighParam;
+import ghidra.program.model.pcode.HighVariable;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.scalar.Scalar;
@@ -50,6 +52,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
     private static final int EXPORT_DEPTH = 1;
     private static final int DECOMPILE_TIMEOUT_SECONDS = 60;
     private static final int MAX_THUNK_HOPS = 100;
+    private static final int PCODE_DIAGNOSTIC_MAX_DEPTH = 8;
     private static final Gson JSON = new GsonBuilder()
         .setPrettyPrinting()
         .disableHtmlEscaping()
@@ -161,6 +164,9 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         write(
             neighbourhoodDirectory.resolve("indirect-calls.json"),
             json(indirectCalls(root, indirectAnalysis)));
+        write(
+            neighbourhoodDirectory.resolve("pcode-diagnostics.json"),
+            json(pcodeDiagnostics(root, indirectAnalysis)));
         write(
             neighbourhoodDirectory.resolve("manifest.json"),
             json(manifest(
@@ -339,7 +345,19 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             String key = callSite.toString().toUpperCase(Locale.ROOT);
             if (!callsBySite.containsKey(key)) {
                 try {
-                    callsBySite.put(key, resolveIndirectCall(decompilation.highFunction, operation));
+                    IndirectCall call = resolveIndirectCall(decompilation.highFunction, operation);
+                    if ("unresolved-receiver-provenance".equals(call.status)) {
+                        try {
+                            call.pcodeDiagnostic = pcodeDiagnostic(root, operation, call.status);
+                        }
+                        catch (RuntimeException exception) {
+                            call.pcodeDiagnostic = failedPcodeDiagnostic(
+                                operation,
+                                call.status,
+                                exception.getClass().getSimpleName() + ": " + safeMessage(exception));
+                        }
+                    }
+                    callsBySite.put(key, call);
                 }
                 catch (CancelledException exception) {
                     throw exception;
@@ -364,6 +382,223 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         }
 
         return IndirectAnalysis.completed(new ArrayList<>(callsBySite.values()));
+    }
+
+    private Map<String, Object> pcodeDiagnostic(
+            Function parentFunction, PcodeOp callOperation, String status) {
+        PcodeDiagnosticContext context = new PcodeDiagnosticContext();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("callSiteAddress", formatAddress(callOperation.getSeqnum().getTarget()));
+        result.put("opcode", callOperation.getMnemonic());
+        result.put("status", status);
+        result.put("diagnosticCompleted", true);
+        result.put("diagnosticError", null);
+        result.put("callOperation", pcodeOpMetadata(callOperation, parentFunction, context));
+
+        Varnode target = callOperation.getNumInputs() == 0 ? null : callOperation.getInput(0);
+        Map<String, Object> callTarget = new LinkedHashMap<>();
+        callTarget.put("varnode", varnodeMetadata(target, context));
+        callTarget.put(
+            "definitionTree",
+            definitionTree(target, parentFunction, context, 0));
+        result.put("callTarget", callTarget);
+
+        List<Map<String, Object>> arguments = new ArrayList<>();
+        for (int inputIndex = 1; inputIndex < callOperation.getNumInputs(); inputIndex++) {
+            Map<String, Object> argument = new LinkedHashMap<>();
+            argument.put("argumentIndex", inputIndex - 1);
+            argument.put("pcodeInputIndex", inputIndex);
+            argument.put("varnode", varnodeMetadata(callOperation.getInput(inputIndex), context));
+            arguments.add(argument);
+        }
+        result.put("arguments", arguments);
+        result.put(
+            "callindConvention",
+            "input 0 is the indirect target; inputs 1..N are call arguments, so argumentIndex 0 is pcodeInputIndex 1.");
+
+        List<Map<String, Object>> comparisons = new ArrayList<>();
+        Varnode receiverArgument = callOperation.getNumInputs() > 1
+            ? callOperation.getInput(1)
+            : null;
+        if (receiverArgument != null) {
+            for (Varnode encountered : context.targetTreeVarnodes) {
+                if (encountered == null || encountered.isConstant()) {
+                    continue;
+                }
+                Map<String, Object> comparison = new LinkedHashMap<>();
+                comparison.put("argumentIndex", 0);
+                comparison.put("argumentVarnodeId", context.id(receiverArgument));
+                comparison.put("targetTreeVarnodeId", context.id(encountered));
+                comparison.put("sameVarnode", sameVarnode(receiverArgument, encountered));
+                comparison.put("sameHighVariable", sameHighVariable(receiverArgument, encountered));
+                comparison.put("sameStorage", sameStorage(receiverArgument, encountered));
+                comparison.put("sameDefiningOp", receiverArgument.getDef() != null &&
+                    receiverArgument.getDef() == encountered.getDef());
+                comparisons.add(comparison);
+            }
+        }
+        result.put("receiverComparisons", comparisons);
+        return result;
+    }
+
+    private Map<String, Object> failedPcodeDiagnostic(
+            PcodeOp callOperation, String status, String error) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("callSiteAddress", formatAddress(callOperation.getSeqnum().getTarget()));
+        result.put("opcode", callOperation.getMnemonic());
+        result.put("status", status);
+        result.put("diagnosticCompleted", false);
+        result.put("diagnosticError", error);
+        return result;
+    }
+
+    private Map<String, Object> definitionTree(
+            Varnode varnode,
+            Function parentFunction,
+            PcodeDiagnosticContext context,
+            int depth) {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("depth", depth);
+        node.put("varnode", varnodeMetadata(varnode, context));
+        if (varnode == null) {
+            node.put("stopReason", "null-varnode");
+            return node;
+        }
+        context.addTargetTreeVarnode(varnode);
+        if (varnode.isConstant()) {
+            node.put("stopReason", "constant");
+            return node;
+        }
+        if (depth >= PCODE_DIAGNOSTIC_MAX_DEPTH) {
+            node.put("stopReason", "maximum-depth");
+            return node;
+        }
+        if (!context.visitedTreeVarnodes.add(varnode)) {
+            node.put("stopReason", "visited-varnode");
+            return node;
+        }
+
+        PcodeOp definition = varnode.getDef();
+        if (definition == null) {
+            node.put("stopReason", "no-definition");
+            return node;
+        }
+        if (!context.visitedTreeOps.add(definition)) {
+            node.put("stopReason", "visited-definition");
+            node.put("definition", pcodeOpMetadata(definition, parentFunction, context));
+            return node;
+        }
+
+        Map<String, Object> definitionNode = pcodeOpMetadata(definition, parentFunction, context);
+        List<Map<String, Object>> inputs = new ArrayList<>();
+        for (int index = 0; index < definition.getNumInputs(); index++) {
+            Map<String, Object> input = new LinkedHashMap<>();
+            input.put("index", index);
+            input.put("role", pcodeInputRole(definition, index));
+            input.put(
+                "expression",
+                definitionTree(definition.getInput(index), parentFunction, context, depth + 1));
+            inputs.add(input);
+        }
+        definitionNode.put("inputs", inputs);
+        node.put("definition", definitionNode);
+        return node;
+    }
+
+    private Map<String, Object> pcodeOpMetadata(
+            PcodeOp operation, Function parentFunction, PcodeDiagnosticContext context) {
+        if (operation == null) {
+            return null;
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", context.id(operation));
+        result.put("opcode", operation.getMnemonic());
+        result.put("opcodeValue", operation.getOpcode());
+        result.put("sequenceNumber", operation.getSeqnum().toString());
+        result.put("sequenceAddress", formatAddress(operation.getSeqnum().getTarget()));
+        result.put("sequenceTime", operation.getSeqnum().getTime());
+        result.put("parentFunctionName", parentFunction.getName());
+        result.put("parentFunctionAddress", address(parentFunction));
+        result.put("output", varnodeMetadata(operation.getOutput(), context));
+        result.put("inputCount", operation.getNumInputs());
+        List<Map<String, Object>> inputs = new ArrayList<>();
+        for (int index = 0; index < operation.getNumInputs(); index++) {
+            Map<String, Object> input = new LinkedHashMap<>();
+            input.put("index", index);
+            input.put("role", pcodeInputRole(operation, index));
+            input.put("varnode", varnodeMetadata(operation.getInput(index), context));
+            inputs.add(input);
+        }
+        result.put("inputs", inputs);
+        return result;
+    }
+
+    private Map<String, Object> varnodeMetadata(
+            Varnode varnode, PcodeDiagnosticContext context) {
+        if (varnode == null) {
+            return null;
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", context.id(varnode));
+        result.put("encoded", varnode.encodePiece());
+        result.put("size", varnode.getSize());
+        result.put("space", varnode.getAddress().getAddressSpace().getName());
+        result.put("offset", hex(varnode.getOffset()));
+        result.put("address", formatAddress(varnode.getAddress()));
+        result.put("isConstant", varnode.isConstant());
+        result.put("isAddress", varnode.isAddress());
+        result.put("isRegister", varnode.isRegister());
+        result.put("isUnique", varnode.isUnique());
+        result.put("isPersistent", varnode.isPersistent());
+        result.put("isInput", varnode.isInput());
+        result.put("isUnaffected", varnode.isUnaffected());
+        if (varnode.isConstant()) {
+            result.put("constantValue", varnode.getOffset());
+            result.put("constantHex", hex(varnode.getOffset()));
+        }
+
+        HighVariable high = varnode.getHigh();
+        if (high == null) {
+            result.put("highVariable", null);
+        }
+        else {
+            Map<String, Object> highMetadata = new LinkedHashMap<>();
+            highMetadata.put("name", high.getName());
+            highMetadata.put("class", high.getClass().getName());
+            highMetadata.put("identity", context.id(high));
+            Varnode representative = high.getRepresentative();
+            highMetadata.put(
+                "representativeStorage",
+                representative == null ? null : representative.encodePiece());
+            DataType dataType = high.getDataType();
+            highMetadata.put("dataType", dataType == null ? null : dataType.getDisplayName());
+            result.put("highVariable", highMetadata);
+        }
+        return result;
+    }
+
+    private static String pcodeInputRole(PcodeOp operation, int index) {
+        if (operation.getOpcode() == PcodeOp.CALLIND) {
+            return index == 0 ? "target" : "argument-" + (index - 1);
+        }
+        if (operation.getOpcode() == PcodeOp.LOAD) {
+            return index == 0 ? "space" : index == 1 ? "pointer" : "input-" + index;
+        }
+        return "input-" + index;
+    }
+
+    private static boolean sameVarnode(Varnode left, Varnode right) {
+        return left != null && left == right;
+    }
+
+    private static boolean sameHighVariable(Varnode left, Varnode right) {
+        return left != null && right != null && left.getHigh() != null &&
+            left.getHigh() == right.getHigh();
+    }
+
+    private static boolean sameStorage(Varnode left, Varnode right) {
+        return left != null && right != null && left.getSize() == right.getSize() &&
+            left.getAddress().equals(right.getAddress());
     }
 
     private List<IndirectCall> collectRawIndirectCalls(Function root) throws CancelledException {
@@ -1078,6 +1313,29 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         return result;
     }
 
+    private Map<String, Object> pcodeDiagnostics(Function root, IndirectAnalysis analysis) {
+        Map<String, Object> rootSummary = new LinkedHashMap<>();
+        rootSummary.put("name", root.getName());
+        rootSummary.put("address", address(root));
+
+        List<Map<String, Object>> calls = new ArrayList<>();
+        for (IndirectCall call : analysis.calls) {
+            if (call.pcodeDiagnostic != null) {
+                calls.add(call.pcodeDiagnostic);
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("rootFunction", rootSummary);
+        result.put("maximumDefinitionDepth", PCODE_DIAGNOSTIC_MAX_DEPTH);
+        result.put(
+            "scope",
+            "Focused high-p-code diagnostics for unresolved-receiver-provenance CALLIND operations in the selected root function.");
+        result.put("calls", calls);
+        return result;
+    }
+
     private List<Map<String, Object>> indirectGraphEdges(
             Function root, List<IndirectCall> calls) {
         List<Map<String, Object>> edges = new ArrayList<>();
@@ -1122,6 +1380,13 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         result.put("resolvedIndirectCallCount", resolvedIndirectCallCount);
         result.put("indirectAnalysisCompleted", indirectAnalysis.completed);
         result.put("indirectAnalysisError", indirectAnalysis.error);
+        int pcodeDiagnosticCount = 0;
+        for (IndirectCall call : indirectAnalysis.calls) {
+            if (call.pcodeDiagnostic != null) {
+                pcodeDiagnosticCount++;
+            }
+        }
+        result.put("pcodeDiagnosticCount", pcodeDiagnosticCount);
         result.put("generatedAt", generatedAt.toString());
         result.put("programName", currentProgram.getName());
         result.put("failures", failures);
@@ -1381,6 +1646,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         boolean exportEligible;
         boolean exported;
         String exportError;
+        transient Map<String, Object> pcodeDiagnostic;
 
         IndirectCall(Address callSite, int pointerSize) {
             this.callSiteAddress = formatAddress(callSite);
@@ -1411,6 +1677,51 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             this.resolvedInternal = !function.isExternal() && function.getBody() != null &&
                 !function.getBody().isEmpty();
             this.thunkHopCount = thunkHopCount;
+        }
+    }
+
+    private static final class PcodeDiagnosticContext {
+        private final IdentityHashMap<Object, String> ids = new IdentityHashMap<>();
+        private final Set<Varnode> visitedTreeVarnodes =
+            Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>());
+        private final Set<PcodeOp> visitedTreeOps =
+            Collections.newSetFromMap(new IdentityHashMap<PcodeOp, Boolean>());
+        private final Set<Varnode> targetTreeVarnodeSet =
+            Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>());
+        private final List<Varnode> targetTreeVarnodes = new ArrayList<>();
+        private int nextVarnodeId = 1;
+        private int nextOpId = 1;
+        private int nextHighVariableId = 1;
+
+        String id(Object object) {
+            if (object == null) {
+                return null;
+            }
+            String existing = ids.get(object);
+            if (existing != null) {
+                return existing;
+            }
+            String id;
+            if (object instanceof Varnode) {
+                id = "varnode-" + nextVarnodeId++;
+            }
+            else if (object instanceof PcodeOp) {
+                id = "op-" + nextOpId++;
+            }
+            else if (object instanceof HighVariable) {
+                id = "high-variable-" + nextHighVariableId++;
+            }
+            else {
+                id = "object-" + ids.size();
+            }
+            ids.put(object, id);
+            return id;
+        }
+
+        void addTargetTreeVarnode(Varnode varnode) {
+            if (targetTreeVarnodeSet.add(varnode)) {
+                targetTreeVarnodes.add(varnode);
+            }
         }
     }
 
