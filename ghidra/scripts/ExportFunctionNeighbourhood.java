@@ -10,9 +10,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -41,6 +43,8 @@ import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.HighParam;
 import ghidra.program.model.pcode.HighVariable;
 import ghidra.program.model.pcode.PcodeOp;
+import ghidra.program.model.pcode.PcodeBlock;
+import ghidra.program.model.pcode.PcodeBlockBasic;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.Reference;
@@ -1119,11 +1123,20 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         }
         if (candidates.size() != 1) {
             for (VtableEvidence candidate : candidates.values()) {
-                result.vtableCandidates.add(candidate.summary());
+                addVtableCandidateSummary(result, candidate);
             }
+            boolean hasControlFlowFailure = result.vptrSelection != null &&
+                !result.vptrSelection.isResolved();
+            String status = hasControlFlowFailure
+                ? result.vptrSelection.status
+                : "unresolved-ambiguous-vptr-stores";
+            String reason = !hasControlFlowFailure ||
+                result.vptrSelection.failureReason == null
+                    ? "More than one distinct vtable was tied to the receiver; no target was guessed."
+                    : result.vptrSelection.failureReason;
             result.fail(
-                "unresolved-ambiguous-vptr-stores",
-                "More than one distinct vtable was tied to the receiver; no target was guessed.");
+                status,
+                reason);
             return result;
         }
 
@@ -1310,8 +1323,15 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             diagnostic.initializerFunctionName = implementation.getName();
             diagnostic.initializerFunctionAddress = address(implementation);
 
-            List<VtableEvidence> assignments = collectVtableAssignments(
+            VptrAssignmentAnalysis assignmentAnalysis = collectVtableAssignments(
                 implementation, diagnostic, called, operation.getSeqnum().getTarget());
+            List<VtableEvidence> assignments = assignmentAnalysis.selectedCandidates;
+            if (assignmentAnalysis.selection != null) {
+                result.vptrSelection = assignmentAnalysis.selection;
+            }
+            for (VtableEvidence candidate : assignmentAnalysis.allCandidates) {
+                addVtableCandidateSummary(result, candidate);
+            }
             if (!assignments.isEmpty()) {
                 result.evidence.add(
                     "Earlier direct call " + called.getName() + " at " +
@@ -1328,6 +1348,17 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                 }
             }
         }
+    }
+
+    private static void addVtableCandidateSummary(
+            IndirectCall result, VtableEvidence candidate) {
+        String candidateAddress = formatAddress(candidate.address);
+        for (Map<String, String> existing : result.vtableCandidates) {
+            if (candidateAddress.equals(existing.get("address"))) {
+                return;
+            }
+        }
+        result.vtableCandidates.add(candidate.summary());
     }
 
     private void setConstructorFailure(IndirectCall result) {
@@ -1391,7 +1422,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         }
     }
 
-    private List<VtableEvidence> collectVtableAssignments(
+    private VptrAssignmentAnalysis collectVtableAssignments(
             Function function,
             InitializerCallDiagnostic initializerDiagnostic,
             Function calledFunction,
@@ -1403,23 +1434,24 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             initializerDiagnostic.analysisError = decompilation.error == null
                 ? "Initializer decompilation returned no high p-code."
                 : decompilation.error;
-            return new ArrayList<>(results.values());
+            return VptrAssignmentAnalysis.withCandidates(results.values());
         }
 
         HighParam thisParameter = decompilation.highFunction.getLocalSymbolMap().getParam(0);
         if (thisParameter == null || thisParameter.getRepresentative() == null) {
             initializerDiagnostic.analysisError =
                 "Decompiler high p-code exposed no parameter 0 representative.";
-            return new ArrayList<>(results.values());
+            return VptrAssignmentAnalysis.withCandidates(results.values());
         }
         String thisIdentity = variableIdentity(thisParameter.getRepresentative());
         initializerDiagnostic.thisParameterIdentity = thisIdentity;
         if (thisIdentity == null) {
             initializerDiagnostic.analysisError =
                 "Parameter 0 could not be normalized conservatively.";
-            return new ArrayList<>(results.values());
+            return VptrAssignmentAnalysis.withCandidates(results.values());
         }
 
+        List<AcceptedVptrStore> acceptedStores = new ArrayList<>();
         Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
         while (operations.hasNext()) {
             monitor.checkCancelled();
@@ -1490,6 +1522,8 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                 vtableName + " through parameter 0 at offset zero at " +
                 formatAddress(operation.getSeqnum().getTarget()) + ".");
             evidence.provenance.add(provenance);
+            acceptedStores.add(new AcceptedVptrStore(
+                operation, storeDiagnostic, destination.offset, evidence));
             VtableEvidence existing = results.get(assignedAddress.toString());
             if (existing == null) {
                 results.put(assignedAddress.toString(), evidence);
@@ -1498,7 +1532,210 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
                 existing.provenance.add(provenance);
             }
         }
-        return new ArrayList<>(results.values());
+        List<VtableEvidence> allCandidates = new ArrayList<>(results.values());
+        if (results.size() <= 1) {
+            return VptrAssignmentAnalysis.withCandidates(allCandidates);
+        }
+
+        VptrSelection selection = analyzeFinalVptrStore(
+            decompilation.highFunction, acceptedStores);
+        initializerDiagnostic.vptrSelection = selection;
+        if (!selection.isResolved()) {
+            return new VptrAssignmentAnalysis(allCandidates, allCandidates, selection);
+        }
+
+        List<VtableEvidence> selected = new ArrayList<>();
+        selected.add(selection.selectedStore.evidence);
+        return new VptrAssignmentAnalysis(allCandidates, selected, selection);
+    }
+
+    private VptrSelection analyzeFinalVptrStore(
+            HighFunction highFunction, List<AcceptedVptrStore> stores)
+            throws CancelledException {
+        VptrSelection result = new VptrSelection(stores.size());
+        if (stores.isEmpty()) {
+            return result.fail(
+                "unresolved-no-unique-final-vptr", "No accepted vptr stores were available.");
+        }
+
+        long receiverOffset = stores.get(0).receiverOffset;
+        result.receiverOffset = receiverOffset;
+        for (AcceptedVptrStore store : stores) {
+            if (store.receiverOffset != receiverOffset) {
+                return result.fail(
+                    "unresolved-vptr-control-flow",
+                    "Accepted vptr stores do not all target the same receiver offset.");
+            }
+        }
+
+        ArrayList<PcodeBlockBasic> blocks = highFunction.getBasicBlocks();
+        if (blocks == null || blocks.isEmpty()) {
+            return result.fail(
+                "unresolved-vptr-control-flow",
+                "Decompiler high p-code exposed no basic blocks for the initializer.");
+        }
+
+        Map<PcodeOp, AcceptedVptrStore> storesByOperation = new IdentityHashMap<>();
+        for (AcceptedVptrStore store : stores) {
+            storesByOperation.put(store.operation, store);
+        }
+        PcodeBlockBasic entryBlock = null;
+        Address functionEntry = highFunction.getFunction().getEntryPoint();
+        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
+            monitor.checkCancelled();
+            PcodeBlockBasic block = blocks.get(blockIndex);
+            if (block.contains(functionEntry)) {
+                entryBlock = block;
+            }
+            int operationIndex = 0;
+            Iterator<PcodeOp> blockOperations = block.getIterator();
+            while (blockOperations.hasNext()) {
+                PcodeOp operation = blockOperations.next();
+                AcceptedVptrStore store = storesByOperation.get(operation);
+                if (store != null) {
+                    store.block = block;
+                    store.diagnostic.basicBlockStart = formatAddress(block.getStart());
+                    store.diagnostic.basicBlockIndex = blockIndex;
+                    store.diagnostic.orderWithinBlock = operationIndex;
+                }
+                operationIndex++;
+            }
+            List<String> outgoing = new ArrayList<>();
+            for (int edgeIndex = 0; edgeIndex < block.getOutSize(); edgeIndex++) {
+                PcodeBlock successor = block.getOut(edgeIndex);
+                outgoing.add(successor instanceof PcodeBlockBasic
+                    ? formatAddress(((PcodeBlockBasic) successor).getStart())
+                    : "unsupported:" + successor.getClass().getSimpleName());
+            }
+            for (AcceptedVptrStore store : stores) {
+                if (store.block == block) {
+                    store.diagnostic.outgoingBasicBlocks.addAll(outgoing);
+                }
+            }
+        }
+
+        if (entryBlock == null) {
+            return result.fail(
+                "unresolved-vptr-control-flow",
+                "No high-p-code basic block contains the initializer entry address.");
+        }
+
+        for (AcceptedVptrStore store : stores) {
+            if (store.block == null) {
+                return result.fail(
+                    "unresolved-vptr-control-flow",
+                    "An accepted vptr STORE could not be assigned to a high-p-code basic block.");
+            }
+        }
+
+        Deque<VptrFlowState> work = new ArrayDeque<>();
+        Map<PcodeBlockBasic, Set<Integer>> visited = new IdentityHashMap<>();
+        Set<Integer> reachableStores = new LinkedHashSet<>();
+        Set<Integer> returnFinalStores = new LinkedHashSet<>();
+        work.add(new VptrFlowState(entryBlock, -1));
+        boolean sawNormalReturn = false;
+
+        while (!work.isEmpty()) {
+            monitor.checkCancelled();
+            VptrFlowState state = work.removeFirst();
+            Set<Integer> blockStates = visited.get(state.block);
+            if (blockStates == null) {
+                blockStates = new LinkedHashSet<>();
+                visited.put(state.block, blockStates);
+            }
+            if (!blockStates.add(state.lastStoreIndex)) {
+                continue;
+            }
+
+            int lastStoreIndex = state.lastStoreIndex;
+            boolean returned = false;
+            Iterator<PcodeOp> operations = state.block.getIterator();
+            while (operations.hasNext()) {
+                PcodeOp operation = operations.next();
+                AcceptedVptrStore store = storesByOperation.get(operation);
+                if (store != null) {
+                    lastStoreIndex = stores.indexOf(store);
+                    reachableStores.add(lastStoreIndex);
+                }
+                if (operation.getOpcode() == PcodeOp.BRANCHIND) {
+                    return result.fail(
+                        "unresolved-vptr-control-flow",
+                        "A reachable indirect branch prevents conservative normal-return analysis.");
+                }
+                if (operation.getOpcode() == PcodeOp.RETURN) {
+                    sawNormalReturn = true;
+                    returned = true;
+                    result.normalReturnAddresses.add(
+                        formatAddress(operation.getSeqnum().getTarget()));
+                    returnFinalStores.add(lastStoreIndex);
+                    break;
+                }
+            }
+            if (returned) {
+                continue;
+            }
+            if (state.block.getOutSize() == 0) {
+                return result.fail(
+                    "unresolved-vptr-control-flow",
+                    "A reachable terminal basic block has no normal RETURN.");
+            }
+            for (int edgeIndex = 0; edgeIndex < state.block.getOutSize(); edgeIndex++) {
+                PcodeBlock successor = state.block.getOut(edgeIndex);
+                if (!(successor instanceof PcodeBlockBasic)) {
+                    return result.fail(
+                        "unresolved-vptr-control-flow",
+                        "A reachable CFG edge does not target a basic block.");
+                }
+                work.addLast(new VptrFlowState((PcodeBlockBasic) successor, lastStoreIndex));
+            }
+        }
+
+        if (!sawNormalReturn) {
+            return result.fail(
+                "unresolved-vptr-control-flow",
+                "No reachable normal RETURN was found in the initializer high p-code.");
+        }
+        if (reachableStores.size() != stores.size()) {
+            return result.fail(
+                "unresolved-vptr-control-flow",
+                "At least one accepted vptr store is unreachable from the initializer entry block.");
+        }
+        for (int index = 0; index < stores.size(); index++) {
+            stores.get(index).diagnostic
+                .canReachNormalReturnWithoutAnotherAcceptedStore =
+                    returnFinalStores.contains(index);
+        }
+        if (returnFinalStores.contains(-1)) {
+            return result.fail(
+                "unresolved-branching-vptr-final-state",
+                "A normal return is reachable without any accepted vptr store.");
+        }
+        if (returnFinalStores.size() != 1) {
+            return result.fail(
+                "unresolved-branching-vptr-final-state",
+                "Normal return paths disagree about the final accepted vptr store.");
+        }
+
+        int selectedIndex = returnFinalStores.iterator().next();
+        AcceptedVptrStore selected = stores.get(selectedIndex);
+        result.status = "resolved-final-store";
+        result.resolutionBasis = "ordered-final-vptr-store";
+        result.selectedStore = selected;
+        result.selectedStoreAddress = selected.diagnostic.storeAddress;
+        result.selectedVtableName = selected.evidence.name;
+        result.selectedVtableAddress = formatAddress(selected.evidence.address);
+        result.failureReason = null;
+        result.evidence.add("all accepted candidates write receiver offset " + receiverOffset);
+        result.evidence.add(
+            "CFG state propagation found the selected store as the final accepted vptr write at every reachable normal return");
+        for (int index = 0; index < stores.size(); index++) {
+            AcceptedVptrStore store = stores.get(index);
+            if (index != selectedIndex) {
+                store.diagnostic.supersededByStoreAddress = selected.diagnostic.storeAddress;
+                result.supersededStores.add(store.summary());
+            }
+        }
+        return result;
     }
 
     private VtableEvidence vtableAtConstant(Varnode varnode) {
@@ -1801,7 +2038,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         rootSummary.put("address", address(root));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 1);
+        result.put("schemaVersion", 2);
         result.put("root", rootSummary);
         result.put("edges", edges);
         result.put("indirectEdges", indirectGraphEdges(root, indirectEdges));
@@ -1814,7 +2051,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         rootSummary.put("address", address(root));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 3);
+        result.put("schemaVersion", 4);
         result.put("rootFunction", rootSummary);
         result.put("pointerSize", currentProgram.getDefaultPointerSize());
         result.put("analysisCompleted", analysis.completed);
@@ -1860,6 +2097,9 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
             edge.put("receiverResolutionBasis", call.receiverResolution == null
                 ? null
                 : call.receiverResolution.resolutionBasis);
+            edge.put("vptrSelectionBasis", call.vptrSelection == null
+                ? null
+                : call.vptrSelection.resolutionBasis);
             edge.put("vtableName", call.vtableName);
             edge.put("vtableAddress", call.vtableAddress);
             edge.put("vtableByteOffset", call.vtableByteOffset);
@@ -2140,6 +2380,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         String receiverExpression;
         String receiverIdentity;
         ReceiverResolution receiverResolution;
+        VptrSelection vptrSelection;
         String vtableName;
         String vtableAddress;
         Long vtableByteOffset;
@@ -2413,6 +2654,7 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         String thisParameterIdentity;
         String analysisError;
         final List<VptrStoreDiagnostic> vptrStores = new ArrayList<>();
+        VptrSelection vptrSelection;
 
         InitializerCallDiagnostic(PcodeOp operation) {
             this.initializerCallSite = formatAddress(operation.getSeqnum().getTarget());
@@ -2429,9 +2671,102 @@ public class ExportFunctionNeighbourhood extends GhidraScript {
         boolean accepted;
         String acceptedVtableName;
         String rejectionReason;
+        String basicBlockStart;
+        Integer basicBlockIndex;
+        Integer orderWithinBlock;
+        final List<String> outgoingBasicBlocks = new ArrayList<>();
+        Boolean canReachNormalReturnWithoutAnotherAcceptedStore;
+        String supersededByStoreAddress;
 
         VptrStoreDiagnostic(PcodeOp operation) {
             this.storeAddress = formatAddress(operation.getSeqnum().getTarget());
+        }
+    }
+
+    private static final class AcceptedVptrStore {
+        final PcodeOp operation;
+        final VptrStoreDiagnostic diagnostic;
+        final long receiverOffset;
+        final VtableEvidence evidence;
+        transient PcodeBlockBasic block;
+
+        AcceptedVptrStore(
+                PcodeOp operation,
+                VptrStoreDiagnostic diagnostic,
+                long receiverOffset,
+                VtableEvidence evidence) {
+            this.operation = operation;
+            this.diagnostic = diagnostic;
+            this.receiverOffset = receiverOffset;
+            this.evidence = evidence;
+        }
+
+        Map<String, String> summary() {
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("storeAddress", diagnostic.storeAddress);
+            result.put("vtableName", evidence.name);
+            result.put("vtableAddress", formatAddress(evidence.address));
+            return result;
+        }
+    }
+
+    private static final class VptrAssignmentAnalysis {
+        final List<VtableEvidence> allCandidates;
+        final List<VtableEvidence> selectedCandidates;
+        final VptrSelection selection;
+
+        VptrAssignmentAnalysis(
+                List<VtableEvidence> allCandidates,
+                List<VtableEvidence> selectedCandidates,
+                VptrSelection selection) {
+            this.allCandidates = allCandidates;
+            this.selectedCandidates = selectedCandidates;
+            this.selection = selection;
+        }
+
+        static VptrAssignmentAnalysis withCandidates(
+                java.util.Collection<VtableEvidence> candidates) {
+            List<VtableEvidence> values = new ArrayList<>(candidates);
+            return new VptrAssignmentAnalysis(values, values, null);
+        }
+    }
+
+    private static final class VptrSelection {
+        String status = "unresolved-no-unique-final-vptr";
+        String resolutionBasis;
+        Long receiverOffset;
+        final int candidateCount;
+        String selectedStoreAddress;
+        String selectedVtableName;
+        String selectedVtableAddress;
+        final List<Map<String, String>> supersededStores = new ArrayList<>();
+        final Set<String> normalReturnAddresses = new TreeSet<>();
+        final List<String> evidence = new ArrayList<>();
+        String failureReason;
+        transient AcceptedVptrStore selectedStore;
+
+        VptrSelection(int candidateCount) {
+            this.candidateCount = candidateCount;
+        }
+
+        VptrSelection fail(String status, String reason) {
+            this.status = status;
+            this.failureReason = reason;
+            return this;
+        }
+
+        boolean isResolved() {
+            return "resolved-final-store".equals(status) && selectedStore != null;
+        }
+    }
+
+    private static final class VptrFlowState {
+        final PcodeBlockBasic block;
+        final int lastStoreIndex;
+
+        VptrFlowState(PcodeBlockBasic block, int lastStoreIndex) {
+            this.block = block;
+            this.lastStoreIndex = lastStoreIndex;
         }
     }
 

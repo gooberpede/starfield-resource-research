@@ -123,7 +123,11 @@ The stack-object rule uses `resolutionBasis: stack-object-address-vptr-match`. I
 
 This is dataflow evidence only: the script does not require the callee to be named or typed as a constructor. Matching uses structural constant-offset expressions and high-variable object identity within each decompilation, not decompiled C variable names or storage reuse alone. The serialized identity strings are diagnostics rather than the equality test. Matching is deliberately conservative and confined to argument 0.
 
-Every relevant `STORE` in a matched initializer is recorded in execution-address context with its destination identity, offset, stored address, symbol names, and acceptance or rejection reason. Repeated stores of the same vtable address are retained as provenance but collapse to one vtable candidate. If stores yield more than one distinct accepted vtable address, the result is `unresolved-ambiguous-vptr-stores`; the script does not assume that the first or last constructor store is the final dynamic type.
+Every relevant `STORE` in a matched initializer is recorded with its instruction address, destination identity, receiver offset, stored address, symbol names, and acceptance or rejection reason. Accepted stores also record their high-p-code basic-block start/index, order within that block, and outgoing block addresses. Repeated stores of the same vtable address are retained as provenance but collapse to one vtable-address candidate.
+
+C++ constructors commonly install a base-class vptr before base/member initialization and then replace it with the derived-class vptr. When an initializer contains more than one distinct accepted vtable, the exporter performs a bounded high-p-code CFG proof rather than treating decompiler or source display order as execution order. It propagates the identity of the last accepted same-offset store from the initializer entry block through `PcodeBlockBasic` outgoing edges. Within a block, `PcodeBlockBasic.getIterator()` supplies operation order. A candidate is selected only when every reachable normal high-p-code `RETURN` has that exact store as its final accepted write, every accepted candidate is reachable, and no reachable terminal block or indirect branch makes control flow unclear. Earlier candidates are then recorded as superseded by the selected store.
+
+The rule is deliberately conservative. A return with no accepted store, differing final stores on different return paths, an unassignable/unreachable store, an indirect branch, a non-basic-block edge, or a terminal block without `RETURN` preserves ambiguity with a specific failure status. The implementation does not infer class hierarchy, compare class-name specificity, or apply a global “last write wins” heuristic. Exception and unwind flow is not modeled; only normal decompiler `RETURN` operations are considered in this supported case.
 
 Once one vtable is identified, the script:
 
@@ -136,7 +140,7 @@ Once one vtable is identified, the script:
 
 This is not a general-purpose C++ devirtualizer. It does not perform whole-program points-to analysis, class-hierarchy recovery, symbolic execution, or speculative target enumeration. If receiver matching is absent or ambiguous, the call remains unresolved.
 
-Every computed call instruction in the root is retained in `indirect-calls.json`. Schema version 3 adds `receiverResolution` to the version-2 receiver, initializer, and provenance fields. For a stack-object match this object records `status: resolved-stack-object`, `resolutionBasis: stack-object-address-vptr-match`, argument index, argument and target stack offsets, sizes, equality, target defining-opcode/address metadata, evidence, and any failure reason. `initializerCandidates` contains the earlier matching call, thunk-resolution result, resolved implementation, normalized parameter-0 identity, inspected vptr stores, symbol evidence, and rejection reasons. A successful constructor-derived final result still uses top-level `resolutionBasis: constructor-vptr-store`; its `provenance` array identifies the earlier call, directly called function, resolved implementation, argument index, and offset-zero store. Unsupported or failed cases include a `failureReason`. Status values currently include:
+Every computed call instruction in the root is retained in `indirect-calls.json`. Schema version 4 adds final-vptr CFG selection evidence to the version-3 receiver, initializer, and provenance fields. For a stack-object match, `receiverResolution` records `status: resolved-stack-object`, `resolutionBasis: stack-object-address-vptr-match`, argument index, argument and target stack offsets, sizes, equality, target defining-opcode/address metadata, evidence, and any failure reason. `initializerCandidates` contains the earlier matching call, thunk-resolution result, resolved implementation, normalized parameter-0 identity, inspected vptr stores, symbol evidence, rejection reasons, and per-initializer `vptrSelection` when multiple distinct vtables require analysis. The call-level `vptrSelection` retains candidate count, receiver offset, normal return addresses, selected store/vtable, superseded stores, evidence, and failure reason. A successful selection uses `status: resolved-final-store` and `resolutionBasis: ordered-final-vptr-store`. A successful constructor-derived call still uses top-level `resolutionBasis: constructor-vptr-store`; its `provenance` array identifies the earlier call, directly called function, resolved implementation, argument index, and selected offset-zero store. `graph.json` schema version 2 adds `vptrSelectionBasis` to virtual edges without changing direct edges. Unsupported or failed cases include a `failureReason`. Status values currently include:
 
 ```text
 resolved-static-vtable
@@ -144,6 +148,9 @@ unresolved-receiver-provenance
 unresolved-no-initializer-call
 unresolved-no-vptr-store
 unresolved-ambiguous-vptr-stores
+unresolved-branching-vptr-final-state
+unresolved-no-unique-final-vptr
+unresolved-vptr-control-flow
 unresolved-vtable-symbol
 unresolved-nonconstant-offset
 unresolved-no-function-at-slot
@@ -182,6 +189,8 @@ exports/neighbourhoods/FUN_1431bc320__1431BC320/pcode-diagnostics.json
 ```
 
 Locate `CALLIND` at `1431BC350`. Inspect `callTarget.definitionTree` for the fixed `0x50` addition and the stack-backed vptr source. Then inspect `arguments[0].definitionTree`, `arguments[0].stackAddressProvenance`, `callTarget.stackStorageNodes`, and `receiverStorageCorrelation`. The expected receiver result in `indirect-calls.json` is `receiverResolution.status: resolved-stack-object`, `resolutionBasis: stack-object-address-vptr-match`, equal argument and target offsets of `-168`, and `sameStackObject: true`. The call should then progress into initializer/vptr provenance rather than fail at `unresolved-receiver-provenance`.
+
+For the ordered-final-store live test, use the same root and inspect `CALLIND` at `1431BC350`. The minimum acceptable result is either a unique `vptrSelection` or one of the more precise CFG failure statuses above instead of the former undifferentiated multiple-store ambiguity. If `FUN_140d7ce60` has the expected linear high-p-code CFG, the best-case result is `vptrSelection.status: resolved-final-store`, `resolutionBasis: ordered-final-vptr-store`, selected store `140D7CE87`, and selected vtable `TESContainer::vftable`; the call should then resolve slot byte offset `80` (index `10`) and export the resolved internal target's seven-file bundle. These names and addresses are live-test expectations only and are not hard-coded in the script.
 
 `graph.json` preserves its existing direct `edges` array and uses a separate `indirectEdges` array. Each virtual edge preserves the call-site address, receiver-resolution basis, vtable name/address, byte offset, slot index, and resolved target fields. Resolved targets are deduplicated with direct targets by function entry address, so a function bundle is written at most once per run.
 
@@ -241,7 +250,7 @@ For the targeted high-p-code diagnostic live test against `FUN_1431bc320`:
 9. Inspect `callTarget.stackStorageNodes` for a node with `stackOffset: -168`, `beforeConstantOffsetAddition: true`, and the path leading to it. If its defining opcode is `INDIRECT`, verify the nested metadata preserves the sequence/associated instruction near `1431BC331` and reports whether its output uses the same stack storage.
 10. Inspect `receiverStorageCorrelation`; the expected success indicators are `status: matched-stack-object`, equal argument and target offsets, and `sameStackObject: true`. Review `receiverComparisons` separately as the older value-identity diagnostics; they may remain false because the object address and stored vptr are different values.
 11. Confirm `pcode-diagnostics.json` has schema version 2, `manifest.json` reports `pcodeDiagnosticCount: 1`, and the normal direct-call bundles, `indirect-calls.json`, and graph outputs remain present.
-12. Confirm the call no longer has top-level status `unresolved-receiver-provenance`. The minimum successful next status is a specific initializer/vptr failure such as `unresolved-no-initializer-call`, `unresolved-no-vptr-store`, `unresolved-vtable-symbol`, `unresolved-ambiguous-vptr-stores`, or `unresolved-no-function-at-slot`. The best case is `resolved-static-vtable`, a populated virtual edge in `graph.json`, and a seven-file bundle for the resolved target.
+12. Confirm the call no longer has top-level status `unresolved-receiver-provenance`. For the known two-store initializer, the minimum acceptable next result is `resolved-final-store` or a precise CFG status such as `unresolved-branching-vptr-final-state`, `unresolved-no-unique-final-vptr`, or `unresolved-vptr-control-flow`. The best case is top-level `resolved-static-vtable`, a populated virtual edge in `graph.json`, and a seven-file bundle for the resolved target.
 13. Review the Ghidra undo/history state if desired; the script starts no transaction and intentionally changes no program state.
 
 If the call remains unresolved, use its precise status and `initializerCandidates` diagnostics to distinguish receiver matching, thunk resolution, parameter-0 recovery, offset-zero store recovery, constant-address recovery, vtable-symbol confidence, and slot lookup failures. Do not update the function register with a virtual target until this live output directly supports it.
@@ -250,7 +259,7 @@ Files with the same names are replaced when the same neighbourhood is exported a
 
 ### Compatibility and known limitations
 
-- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 and virtual-call detection paths have been live-tested; indirect-call schema version 3 and using the exact `1431BC350` stack-object correlation as receiver provenance require the live test above.
+- The script is written against Ghidra 11.x public program-model and decompiler APIs. The direct depth-1 and earlier virtual-call detection paths have been live-tested. Indirect-call schema version 4, including ordered final-vptr selection for the exact `1431BC350` stack-object receiver path, requires the live test above.
 - Direct callees come from Ghidra's `Function.getCalledFunctions` results and therefore depend on call references and defined functions in the current analysis database.
 - Thunk resolution depends on Ghidra having marked the forwarding function as a thunk and assigned its thunk target.
 - Only simple fixed-offset vtable dispatch is eligible for indirect resolution. All other computed calls are retained as unresolved records rather than being guessed or dropped.
