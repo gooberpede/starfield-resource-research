@@ -66,9 +66,22 @@ Export:
 ResourceViewWidget::OnApplySeed
     ↓
 FUN_1431bc320
-    ↓
-FUN_140e457b0
+    ├─ resolved TESContainer virtual slot +0x50 / index 10 → FUN_140e0aab0
+    └─ FUN_140e457b0
 ```
+
+Live `ExportFunctionNeighbourhood.java` output resolves the computed call at
+`0x1431BC350` through `TESContainer::vftable` slot byte offset `0x50` (index
+10) to `FUN_140e0aab0`. The third call argument is structurally represented in
+the root decompilation as:
+
+```text
+*(param_1 + 0xA0) + 0x20
+```
+
+This establishes the field/nested-offset relationship and call target. It does
+not establish the type of the object stored at `param_1 + 0xA0` or the semantic
+identity of its `+0x20` component.
 
 ### Current interpretation
 
@@ -99,6 +112,47 @@ export complete one-function analysis context for FUN_1431bc320
 ```
 
 Then inspect its immediate call neighbourhood.
+
+---
+
+## FUN_140e0aab0
+
+**Name:** `FUN_140e0aab0`
+
+**Address:** `0x140E0AAB0`
+
+**Proposed role:** generic `TESContainer` copy/clone-style component operation
+
+**Status:** confirmed resolved virtual target; semantics tentative
+
+**Confidence:** high for the call edge; medium for the generic copy/clone-style interpretation
+
+### Established relationship
+
+```text
+FUN_1431bc320 computed call at 0x1431BC350
+    ↓ TESContainer::vftable slot +0x50 / index 10
+FUN_140e0aab0
+```
+
+The source-like argument supplied by `FUN_1431bc320` is derived from:
+
+```text
+*(param_1 + 0xA0) + 0x20
+```
+
+### Important caution
+
+The resolved receiver is a temporary `TESContainer`, but that fact alone does
+not prove that the source object's `+0x20` component is an embedded
+`TESContainer`, a `BaseFormComponent` subobject, or a resource-specific type.
+
+### Next analysis
+
+- identify writes to the root object's `+0xA0` field;
+- trace the written pointer to an initializer or source argument;
+- inspect independent structural evidence for the nested `+0x20` component;
+- avoid semantic renaming until the object/component identity is established.
 
 ---
 

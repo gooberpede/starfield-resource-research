@@ -1,11 +1,12 @@
 # Ghidra tooling
 
-This directory currently provides two read-only exporters:
+This directory currently provides three read-only exporters:
 
 - `ExportSelectedFunctionContext.java` exports one selected function.
 - `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1. It also performs focused recovery of simple vtable-based indirect calls in the root.
+- `AnalyzeFieldProvenance.java` traces a selected parameter/member offset, ranks same-offset read/write candidates, performs bounded written-value and nested-offset analysis, and exports the strongest candidate functions.
 
-Both scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. Neither script starts a transaction or modifies the open program.
+All three scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. None starts a transaction or modifies the open program.
 
 ## ExportSelectedFunctionContext.java
 
@@ -272,3 +273,91 @@ Files with the same names are replaced when the same neighbourhood is exported a
 - The export is not atomic. Cancellation or an I/O failure can leave a partially written neighbourhood; the final manifest is written only after function processing completes.
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.
+
+## AnalyzeFieldProvenance.java
+
+`AnalyzeFieldProvenance.java` is a focused, read-only field-provenance exporter. It is intended for questions such as “where is the pointer later read from parameter 0 plus `0xA0` installed, and how is a nested `+0x20` expression used?” It does not assign semantic names or claim that equal offsets imply equal C++ types.
+
+The script accepts three analysis inputs:
+
+- base parameter index (default `0`);
+- field byte offset in decimal or hexadecimal (default `0xA0`);
+- optional nested byte offset (default `0x20`; blank disables nested tracing).
+
+It first decompiles the function containing the cursor and identifies `LOAD` operations whose pointer expression structurally reduces to the selected parameter plus the exact field offset. Identity is based on high-p-code varnodes/high variables and supported constant pointer arithmetic, not decompiled variable names. For each root load it records the instruction/sequence address, p-code operation, base and result varnodes, available datatype/high-variable metadata, and a bounded downstream-use chain. Calls in that chain include the p-code argument index and a direct callee when one is defined.
+
+The whole-program candidate pass uses instruction scalars only as a performance prefilter. A candidate is emitted only when high p-code then proves a `LOAD` or `STORE` address of the form parameter 0 plus the exact selected offset. This avoids treating every unrelated `0xA0` constant as a class match.
+
+Candidate relevance is ranked as follows:
+
+- 60 points when the function's full symbol or namespace contains `ResourceViewWidget`;
+- 40 points when it is the selected root or a direct caller/callee of the root;
+- 30 points for at least one direct write to the selected field;
+- 10 points for the required parameter-0 structural match.
+
+Scores of 70 or more are `high`, 40–69 are `medium`, and lower scores are `low`. The score is evidence prioritisation, not proof that all candidates share one object type. Each candidate includes the reasons for its score and whether it is already in known ResourceViewWidget context.
+
+Writes are distinguished directly from reads by high-p-code `STORE` versus `LOAD`. Null constants are retained as `clear`; call returns and constant addresses are classified as likely `initialization`; parameter or fixed-field copies are `assignment`; unsupported forms remain `unknown`. Written-value provenance is bounded to eight operations and supports:
+
+- direct constants or program addresses, with symbols when available;
+- function parameters;
+- direct or indirect call return values, plus same-function calls that consume that value before the field store as bounded initializer candidates;
+- loads from a fixed offset of parameter 0;
+- explicit unresolved status for `MULTIEQUAL`, unsupported operations, missing definitions, and the depth limit.
+
+This is diagnostic classification, not constructor or ownership proof.
+
+Each ranked candidate also records its full symbol name, direct callers, direct callees, and referenced strings. Strong candidate functions receive the normal seven-file bundle for fuller inspection.
+
+When a nested offset is supplied, the root trace follows uses of the loaded field value through copies, casts, fixed pointer arithmetic, and loads. It marks the exact nested-offset expression and downstream operations derived from it, including call arguments. Candidate writers that copy a function parameter into the field are also checked for same-function accesses at that parameter plus the nested offset. The script does not search a heap graph or infer aliases across arbitrary calls.
+
+### Usage and live test
+
+1. Open the analysed `CreationKit.exe` program in CodeBrowser and allow normal analysis to complete.
+2. Go to `1431BC320`, confirm the cursor is inside `FUN_1431bc320`, and run `AnalyzeFieldProvenance.java` from Script Manager.
+3. Enter base parameter index `0`, field offset `0xA0`, and nested offset `0x20`.
+4. Choose the repository's `exports` directory. Do not choose Ghidra project storage.
+5. Open `exports/field-provenance/FUN_1431bc320__1431BC320__field_A0/root-access.json` and confirm an exact field load is identified.
+6. Inspect its downstream uses for the `loaded + 0x20` expression and the call argument that consumes it.
+7. Review `candidate-writes.json` before `candidate-accesses.json`; high-confidence writer/initializer candidates should appear first. If no writer can be tied confidently, the files preserve that outcome rather than guessing.
+8. Inspect `provenance.json` and the bounded candidate bundles under `functions/`.
+9. Confirm the Ghidra undo/history state is unchanged; the script starts no transaction and intentionally changes no analysis state.
+
+The minimum successful result is an exact root access, exported same-field candidates, and either a ranked writer/initializer or explicit evidence that no writer could be tied confidently. The best case identifies the installed object's initializer/type evidence, structurally explains the nested `+0x20` component, and exposes resource-specific upstream data. Those best-case interpretations must come from live evidence; they are not encoded in the script.
+
+### Output structure
+
+```text
+exports/
+└─ field-provenance/
+   └─ FUN_1431bc320__1431BC320__field_A0/
+      ├─ manifest.json
+      ├─ root-access.json
+      ├─ candidate-accesses.json
+      ├─ candidate-writes.json
+      ├─ provenance.json
+      └─ functions/
+         └─ <candidate-name>__<address>/
+            ├─ metadata.json
+            ├─ decompiled.c
+            ├─ callers.json
+            ├─ callees.json
+            ├─ strings.json
+            ├─ globals.json
+            └─ constants.json
+```
+
+Candidate bundles are deduplicated by function entry and limited to the strongest ten writer functions, or the strongest ten access functions when no writer exists. Files with the same names are replaced on a repeat run; unrelated old candidate directories are not deleted. Treat the current manifest and candidate arrays as authoritative membership for that run.
+
+### Known limitations
+
+- The script uses public decompiler/program-model APIs, compiles against Ghidra 12.1.2, and requires completed normal analysis.
+- Instruction-scalar prefiltering can miss a compiler form that does not retain the requested byte offset as a scalar operand.
+- Same-field candidates require a parameter-0 expression but do not prove a shared class. Symbol/namespace and direct call-family context improve ranking only.
+- The bounded trace supports simple wrappers, fixed pointer arithmetic, loads, call returns, parameters, and constants. It does not implement arbitrary alias analysis, heap recovery, symbolic execution, class reconstruction, or recursive call tracing.
+- Nested-component evidence is structural. Passing `object + 0x20` to a known method is evidence, but is not by itself enough to assign a type.
+- Decompiler high-variable metadata depends on the current analysis database. Decompiled names are exported only as diagnostics and are never used as identity proof.
+- Whole-program decompilation can take time on a large program, though the scalar prefilter avoids decompiling functions without the selected offset.
+- Export is not atomic; cancellation or an I/O failure can leave partial files. The final manifest is written last.
+
+Like the other exporters, this script only reads Ghidra analysis state and writes external files. It starts no transaction and does not rename symbols/functions, create labels/comments, change signatures/types, or modify memory.
