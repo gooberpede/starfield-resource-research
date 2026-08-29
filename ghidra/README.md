@@ -386,12 +386,12 @@ The script scans the current symbol table for symbols containing the supplied cl
 - vtable/vftable candidates;
 - RTTI-related candidates;
 - the exact `ResourceViewWidget::OnApplySeed` method anchor;
-- functions structurally confirmed to write a discovered class vtable through parameter 0 at offset zero.
+- functions structurally confirmed to write a discovered class vtable through parameter 0 at any recoverable constant offset.
 
 Every candidate method has one of three confidence levels:
 
 - `strong`: exact class-qualified symbol, direct vtable slot, confirmed class-vtable writer, or a Ghidra-defined thunk/implementation relationship to one of those;
-- `medium`: a direct caller or callee has high-p-code evidence that parameter 0 flows as argument 0 between it and a strong method;
+- `medium`: a bounded outbound call from a strong anchor or receiver-family helper has high-p-code evidence that the unchanged parameter-0 receiver flows as callee argument 0;
 - `weak`: supporting context only. Weak evidence never establishes membership and weak candidates are not searched for the field.
 
 This model intentionally excludes the previous global rule that treated structural parameter-0 `+0xA0` matches as possible class evidence.
@@ -400,17 +400,39 @@ This model intentionally excludes the previous global rule that treated structur
 
 For each symbol whose full name contains both the exact class text and `vtable` or `vftable`, the script reads pointer-sized entries beginning at the symbol address. It records the slot index, byte offset, slot address, raw pointer, directly defined function, thunk hop count, and resolved implementation.
 
-Walking stops at the first null, unreadable, overflowed, or non-function slot, or after 256 slots. The bound and stop reason are exported. This is a deliberately conservative primary-vtable walk; it does not continue through arbitrary adjacent data or reconstruct secondary vtables and multiple inheritance layouts.
+Walking stops at the first null, unreadable, overflowed, or non-function slot, or after 256 slots. The bound and stop reason are exported. Each matching named vtable is walked independently. Slots record internal/external status, thunk resolution, and duplicate resolved implementations. The script does not continue through arbitrary adjacent data or infer multiple-inheritance semantics.
+
+### Vtable xrefs and structural vptr stores
+
+For every discovered vtable, `vtable-xrefs.json` records all Ghidra references and classifies them as `direct data reference`, `LOAD/use`, `STORE source`, `constant/address materialization`, `vptr-store`, or `other`. Code references include their containing function, instruction, Ghidra reference type, matching high-p-code operations, whether the vtable reaches a memory store, the destination expression, and receiver evidence.
+
+A `vptr-store` requires high-p-code evidence that the stored vtable value reaches a destination reducible to:
+
+```text
+parameter 0 + constant offset
+```
+
+Both zero and nonzero offsets are retained. Stores to a nonzero offset can support a secondary-subobject hypothesis, but the script does not assign a base-class identity or reconstruct an inheritance layout.
+
+The stored value does not need to expose the vtable address directly at the `STORE`. Before classification, the analyzer resolves the value backward through at most eight non-branching high-p-code definitions. Supported forms are `COPY`, `CAST`, `INT_ZEXT`, `INT_SEXT`, constant-form `PTRSUB`, constant-form `PTRADD`, and `INT_ADD` with one constant operand, including the common address-materialization form in which a zero base is combined with the vtable address. The final value must resolve uniquely to one discovered concrete class vtable and the STORE input must match the program pointer size.
+
+Resolution stops explicitly at `MULTIEQUAL`, `LOAD`, call returns, nonconstant arithmetic, missing or unsupported definitions, cycles, or the depth bound. This is bounded value propagation, not alias analysis or symbolic execution. Each accepted store retains the original xref address plus a separate `storeAddress`, `valueResolutionBasis`, `valueDefinitionPath`, and resolved STORE operation.
 
 ### Constructor/destructor candidates
 
-References to each concrete class-vtable address are used only as a prefilter. A function becomes a strong vtable-writer candidate only when high p-code proves:
+References to each concrete class-vtable address are used as a prefilter. A function becomes a strong vtable-writer candidate only when high p-code proves:
 
 ```text
-STORE ResourceViewWidget vtable address -> parameter 0 + 0
+STORE ResourceViewWidget vtable address -> parameter 0 + constant offset
 ```
 
-The export records the store address, whether it appears early/middle/late in high-p-code operation order, other vtable writes through the same receiver at offset zero, and whether any caller also calls a function with an allocation-like name. The result remains `constructor-or-destructor-candidate`: neither source name nor store position alone is used to decide constructor versus destructor.
+`lifecycle-candidates.json` records all class-vptr stores in operation order, their receiver offsets, surrounding class-vptr stores, callers, callees, return behavior, receiver-relative store count, and allocation context. It also reports `primaryVptrOffset` when offset zero is observed and collects every observed nonzero offset in `secondaryVptrOffsets`; those fields describe stores, not exact base-class identity. Classification is conservative: deallocation or teardown structure combined with vptr evidence can produce `destructor-like`; allocation context plus a non-late vptr store, or receiver return plus additional member stores, can produce `constructor-like`; otherwise a structural installer is `lifecycle-helper` or `unknown`. Neither a name hint nor store position is sufficient by itself, and no classification is presented as recovered C++ type information.
+
+### Receiver-preserving method family
+
+Starting from exact class symbols, internal vtable functions, thunk targets, and structural lifecycle candidates, the script follows outbound direct calls for at most two hops. A callee enters with `medium` confidence only when the caller passes its structurally unchanged parameter-0 receiver as callee argument 0 and the callee is internal code. `receiver-family.json` records the source function, call site, depth, receiver argument index, and the explicit caveat that this is receiver-family provenance rather than proof of literal C++ membership.
+
+`FUN_1431bc320` is independently recorded in `class-anchors.json`, including function-pointer references when available. It joins the class family only if the same bounded receiver-preserving rules connect it; otherwise the negative connection is preserved. This provides bounded callback evidence without general Qt meta-object reconstruction.
 
 ### Class-scoped field matching and provenance
 
@@ -442,7 +464,10 @@ exports/
    └─ ResourceViewWidget/
       ├─ manifest.json
       ├─ class-anchors.json
+      ├─ vtable-xrefs.json
+      ├─ lifecycle-candidates.json
       ├─ class-methods.json
+      ├─ receiver-family.json
       ├─ field-A0-accesses.json
       ├─ field-A0-writes.json
       ├─ provenance.json
@@ -457,9 +482,9 @@ exports/
             └─ constants.json
 ```
 
-`class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, and confirmed vtable-writer candidates. `class-methods.json` contains confidence and membership evidence for every bounded method candidate. The access file contains only strong/medium class candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects the detailed written-value traces.
+`class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, the independent `FUN_1431bc320` status, and lifecycle summaries. `vtable-xrefs.json` contains per-vtable xrefs and explicit negative results. `lifecycle-candidates.json` contains structural stores and conservative role classifications. `class-methods.json` contains confidence and membership evidence; `receiver-family.json` isolates bounded nonvirtual helpers. The access file contains only strong/medium candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects detailed written-value traces.
 
-Candidate function bundles are deduplicated and capped at 20. Priority is: class-vtable writers, field writers, methods with nested-offset evidence, other field readers, and remaining named/vtable methods. The current manifest and arrays, rather than leftover directories from an earlier run, are authoritative.
+Every internal function that directly references a discovered concrete class-vtable address is exported first and does not consume the ordinary quota. Candidate function bundles selected afterward are deduplicated and capped at 20 additional internal functions. Their priority groups are lifecycle candidates, internal vtable functions, `+0xA0` writers and other exact class anchors, then receiver-preserving internal helpers; field and nested-offset evidence break ties within those groups. External/inherited Qt functions are not exported and therefore cannot consume either group. Their slot metadata remains in `class-anchors.json`.
 
 ### Exact live test
 
@@ -468,23 +493,26 @@ Candidate function bundles are deduplicated and capped at 20. Priority is: class
 3. Run `AnalyzeClassFieldProvenance.java` from Script Manager.
 4. Enter `ResourceViewWidget`, `0xA0`, and `0x20` at the three prompts.
 5. Choose the repository's `exports` directory. Do not choose Ghidra project storage.
-6. Inspect `exports/class-provenance/ResourceViewWidget/class-anchors.json`. Confirm the exact anchor status and review every vtable candidate and its bounded stop reason.
-7. Inspect `class-methods.json`; confirm every searched function is `strong` or `medium` and has independent membership evidence.
-8. Inspect `field-A0-writes.json` before `field-A0-accesses.json`, then review `provenance.json` and the selected seven-file bundles.
-9. If a concrete vtable exists, check its slots and any `constructor-or-destructor-candidate` records rather than assuming a lifecycle role.
-10. Confirm `manifest.json` reports `readOnly: true`, the 256-slot vtable limit, the 20-function export limit, and either a writer count or the explicit negative result.
-11. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
+6. Inspect `exports/class-provenance/ResourceViewWidget/class-anchors.json`. Confirm that the discovered anchors include `0x148B7CFB0` and `0x148B7D170`, then review their slot counts, stop reasons, internal/external flags, thunks, and duplicates.
+7. Inspect `vtable-xrefs.json`; record the xref and structural-vptr-store count for each vtable. A zero count must appear as an explicit negative result.
+8. Confirm `FUN_1431e7d20` has recovered stores for the two concrete vtables at receiver offsets `0x0` and `0x10`. Verify that each record retains its xref address, resolved store address, and value-definition path.
+9. Inspect `lifecycle-candidates.json`; verify every classification against its vptr-store order, receiver offsets, callers, callees, allocation evidence, and limitations. `FUN_1431e7d20` is expected to become destructor-like from structural teardown evidence, but this result is not hard-coded. Treat offset `0x10` only as secondary-subobject evidence.
+10. Confirm both direct internal xref functions, `FUN_1431e7d20` and `FUN_1431e29f0`, are listed in the manifest's forced-xref export fields and have function bundles even if more than 20 ordinary candidates exist.
+11. Inspect `class-methods.json` and `receiver-family.json`; confirm that searched functions are `strong` or `medium`, receiver helpers have depth at most 2, and `FUN_1431bc320` is either structurally connected or explicitly preserved as unconnected.
+12. Inspect `field-A0-writes.json` before `field-A0-accesses.json`, then review `provenance.json`. The `+0xA0` matcher is unchanged; a negative result remains valid.
+13. Confirm `manifest.json` reports schema version 3, `readOnly: true`, the 256-slot vtable limit, depth 2, forced direct-xref export semantics, the 20-function ordinary quota, and explicit negative results where applicable.
+14. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
 
-The minimum successful live outcome is: anchors exported, at least one strong/medium class method, a field search confined to that method set, and an explicit result when no writer exists. The best case is a concrete `ResourceViewWidget` vtable, a vtable-writer candidate that also writes `this+0xA0`, written-value provenance identifying the source object, and independent structural evidence for its `+0x20` component. Resource-specific BIOM/RSGD/PNDT/RSCS or leveled-list evidence is recorded if encountered but is never forced.
+The minimum successful live outcome is: both known vtable anchors exported; `FUN_1431e7d20` rediscovered; its two vptr stores recognized at `0x0` and `0x10`; lifecycle classification progresses beyond no candidate; and `FUN_1431e29f0` is force-exported outside the ordinary quota. The best case is `FUN_1431e7d20` classified destructor-like, `FUN_1431e29f0` classified constructor-like from its own evidence, and the admitted constructor/family path revealing a `this+0xA0` write with useful provenance.
 
 ### Known limitations
 
 - The script targets Ghidra's public program-model and decompiler APIs and depends on completed analysis, current symbols, references, defined functions, and high p-code.
 - A concrete vtable cannot be inferred when it is unnamed; RTTI is recorded as supporting evidence but is not fully reconstructed.
 - The vtable walk assumes the named address is the first method slot and stops conservatively at the first invalid region.
-- Receiver-flow expansion is one direct strong-method boundary; it is not recursive class reconstruction.
+- Receiver-flow expansion is outbound-only and bounded to depth two; it is not recursive class reconstruction.
 - Vtable reference prefiltering can miss a compiler/decompiler form whose reference is absent from the current database.
-- Allocation-name evidence is diagnostic only. Constructor/destructor role, ownership, and cleanup semantics are not inferred from names.
+- Allocation, cleanup, and deallocation names are diagnostic inputs to conservative lifecycle classification; ownership and exact C++ semantics remain unresolved.
 - Nested analysis is bounded and same-function only. It does not traverse a heap graph or arbitrary aliases across calls.
 - Export is not atomic; cancellation or an I/O failure can leave partial files, while the manifest is written last.
 

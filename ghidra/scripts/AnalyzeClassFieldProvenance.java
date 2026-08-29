@@ -54,9 +54,11 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
 
     private static final int DECOMPILE_TIMEOUT_SECONDS = 60;
     private static final int MAX_TRACE_DEPTH = 8;
+    private static final int MAX_VTABLE_VALUE_DEPTH = 8;
     private static final int MAX_VTABLE_SLOTS = 256;
     private static final int MAX_THUNK_HOPS = 100;
     private static final int MAX_EXPORTED_FUNCTIONS = 20;
+    private static final int MAX_RECEIVER_FAMILY_DEPTH = 2;
     private static final String EXPECTED_ANCHOR_SUFFIX = "::OnApplySeed";
     private static final Gson JSON = new GsonBuilder()
         .setPrettyPrinting().disableHtmlEscaping().serializeNulls().create();
@@ -110,8 +112,10 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             }
 
             AnchorDiscovery anchors = discoverAnchors(className, selected);
-            Map<String, MethodCandidate> methods = discoverMethods(className, anchors);
-            addMediumReceiverFamily(methods);
+            VtableAnalysis vtableAnalysis = analyzeVtableReferences(anchors);
+            Map<String, MethodCandidate> methods = discoverMethods(className, anchors, vtableAnalysis);
+            addMediumReceiverFamily(methods, MAX_RECEIVER_FAMILY_DEPTH);
+            finalizeKnownRootConnection(anchors, methods);
             List<MethodCandidate> methodList = new ArrayList<>(methods.values());
             Collections.sort(methodList, MethodCandidate.ORDER);
 
@@ -126,9 +130,13 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
                 }
             }
 
-            List<Function> exported = exportStrongest(methodList, accesses, functionsOutput, generatedAt);
+            List<Function> exported = exportStrongest(
+                methodList, accesses, vtableAnalysis, functionsOutput, generatedAt);
             write(output.resolve("class-anchors.json"), json(anchors.document(className)));
+            write(output.resolve("vtable-xrefs.json"), json(vtableAnalysis.xrefDocument(className)));
+            write(output.resolve("lifecycle-candidates.json"), json(vtableAnalysis.lifecycleDocument(className)));
             write(output.resolve("class-methods.json"), json(methodDocument(className, methodList)));
+            write(output.resolve("receiver-family.json"), json(receiverFamilyDocument(className, methodList)));
             write(output.resolve("field-" + offsetLabel(fieldOffset) + "-accesses.json"),
                 json(accessDocument(className, fieldOffset, nestedOffset, accesses)));
             write(output.resolve("field-" + offsetLabel(fieldOffset) + "-writes.json"),
@@ -136,7 +144,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             write(output.resolve("provenance.json"), json(provenanceDocument(provenance)));
             write(output.resolve("manifest.json"), json(manifest(
                 className, selected, fieldOffset, nestedOffset, generatedAt,
-                anchors, methodList, accesses, writes, exported)));
+                anchors, vtableAnalysis, methodList, accesses, writes, exported)));
 
             println("Exported class-scoped field provenance to " + output.toAbsolutePath());
             if (!anchors.anchorResolvedExactly()) {
@@ -156,11 +164,21 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
     private AnchorDiscovery discoverAnchors(String className, Function selected) throws Exception {
         AnchorDiscovery result = new AnchorDiscovery(selected);
         String expectedAnchor = className + EXPECTED_ANCHOR_SUFFIX;
+        Set<String> discoveredVtableAddresses = new LinkedHashSet<>();
         SymbolIterator symbols = currentProgram.getSymbolTable().getAllSymbols(true);
         while (symbols.hasNext()) {
             monitor.checkCancelled();
             Symbol symbol = symbols.next();
             String fullName = symbol.getName(true);
+            if ("FUN_1431bc320".equals(symbol.getName())) {
+                Function knownRoot = functionForSymbol(symbol);
+                if (knownRoot != null && result.knownRootFunction == null) {
+                    result.knownRootFunction = knownRoot;
+                    result.knownRoot.put("function", functionSummary(knownRoot));
+                    result.knownRoot.put("status", "independently-known-root");
+                    result.knownRoot.put("references", functionPointerReferences(knownRoot));
+                }
+            }
             if (fullName == null || !containsIgnoreCase(fullName, className)) {
                 continue;
             }
@@ -179,9 +197,11 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
                 result.knownMethodAnchors.add(anchor);
             }
             if (isVtableName(fullName)) {
-                VtableCandidate vtable = new VtableCandidate(symbol);
-                enumerateVtable(vtable);
-                result.vtables.add(vtable);
+                if (discoveredVtableAddresses.add(formatAddress(symbol.getAddress()))) {
+                    VtableCandidate vtable = new VtableCandidate(symbol);
+                    enumerateVtable(vtable);
+                    result.vtables.add(vtable);
+                }
             }
             if (isRttiName(fullName)) {
                 Map<String, Object> rtti = new LinkedHashMap<>(record);
@@ -202,7 +222,353 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return result;
     }
 
-    private Map<String, MethodCandidate> discoverMethods(String className, AnchorDiscovery anchors)
+    private List<Map<String, Object>> functionPointerReferences(Function target) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        ReferenceIterator references = currentProgram.getReferenceManager().getReferencesTo(target.getEntryPoint());
+        while (references.hasNext()) {
+            Reference reference = references.next();
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("fromAddress", formatAddress(reference.getFromAddress()));
+            item.put("referenceType", reference.getReferenceType().toString());
+            Function containing = currentProgram.getFunctionManager().getFunctionContaining(reference.getFromAddress());
+            item.put("containingFunction", containing == null ? null : functionSummary(containing));
+            result.add(item);
+        }
+        return result;
+    }
+
+    private void finalizeKnownRootConnection(AnchorDiscovery anchors, Map<String, MethodCandidate> methods) {
+        if (anchors.knownRootFunction == null) {
+            anchors.knownRoot.put("status", "FUN_1431bc320-unresolved");
+            anchors.knownRoot.put("classFamilyConnection", "not-tested-no-defined-function");
+            return;
+        }
+        MethodCandidate candidate = methods.get(functionKey(anchors.knownRootFunction));
+        anchors.knownRoot.put("classFamilyConnection", candidate == null ? "not-connected" : "connected");
+        anchors.knownRoot.put("classFamilyConfidence", candidate == null ? null : candidate.confidence);
+        anchors.knownRoot.put("receiverFamilyDepth", candidate == null ? null : candidate.receiverFamilyDepth);
+        anchors.knownRoot.put("limitation", candidate == null ?
+            "Preserved as an independently known root; no bounded receiver-preserving class-family path was found." : null);
+    }
+
+    private VtableAnalysis analyzeVtableReferences(AnchorDiscovery anchors) throws Exception {
+        VtableAnalysis result = new VtableAnalysis();
+        Map<String, LifecycleCandidate> lifecycleByFunction = new LinkedHashMap<>();
+        Map<String, VtableCandidate> knownVtables = new LinkedHashMap<>();
+        for (VtableCandidate vtable : anchors.vtables)
+            if (!vtable.slots.isEmpty()) knownVtables.put(vtable.address, vtable);
+        for (VtableCandidate vtable : anchors.vtables) {
+            VtableReferenceGroup group = new VtableReferenceGroup(vtable);
+            result.groups.add(group);
+            ReferenceIterator references = currentProgram.getReferenceManager().getReferencesTo(vtable.rawAddress);
+            while (references.hasNext()) {
+                monitor.checkCancelled();
+                Reference reference = references.next();
+                VtableReference record = analyzeVtableReference(vtable, reference, knownVtables);
+                group.references.add(record);
+                if (!vtable.slots.isEmpty() && isInternal(record.function)) {
+                    result.directInternalXrefFunctions.put(functionKey(record.function), record.function);
+                }
+                if (!"vptr-store".equals(record.referenceKind) || record.function == null ||
+                        record.receiverOffset == null) {
+                    continue;
+                }
+                String key = functionKey(record.function);
+                LifecycleCandidate lifecycle = lifecycleByFunction.get(key);
+                if (lifecycle == null) {
+                    lifecycle = new LifecycleCandidate(record.function);
+                    lifecycleByFunction.put(key, lifecycle);
+                }
+                boolean duplicate = false;
+                for (VptrWrite existing : lifecycle.vptrStores) {
+                    duplicate |= existing.storeAddress.equals(record.storeAddress) &&
+                        existing.vtableAddress.equals(record.vtableAddress) &&
+                        existing.receiverOffset == record.receiverOffset.longValue();
+                }
+                if (!duplicate) lifecycle.vptrStores.add(record.toVptrWrite());
+            }
+            group.finalizeCounts();
+        }
+        for (LifecycleCandidate candidate : lifecycleByFunction.values()) {
+            Collections.sort(candidate.vptrStores, new Comparator<VptrWrite>() {
+                @Override public int compare(VptrWrite left, VptrWrite right) {
+                    return Integer.compare(left.operationIndex, right.operationIndex);
+                }
+            });
+            for (VptrWrite write : candidate.vptrStores) {
+                if (write.receiverOffset == 0) candidate.primaryVptrOffset = Long.valueOf(0);
+                else candidate.secondaryVptrOffsets.add(Long.valueOf(write.receiverOffset));
+            }
+            for (VptrWrite selected : candidate.vptrStores) {
+                for (VptrWrite other : candidate.vptrStores) {
+                    if (selected == other) continue;
+                    Map<String, Object> context = new LinkedHashMap<>();
+                    context.put("storeAddress", other.storeAddress);
+                    context.put("vtableName", other.vtableName);
+                    context.put("vtableAddress", other.vtableAddress);
+                    context.put("receiverOffset", other.receiverOffset);
+                    context.put("receiverOffsetHex", other.receiverOffsetHex);
+                    context.put("relativeOrder", other.operationIndex < selected.operationIndex ? "before" : "after");
+                    selected.otherVptrWrites.add(context);
+                }
+            }
+            classifyLifecycle(candidate);
+            result.lifecycleCandidates.add(candidate);
+            anchors.constructorCandidates.add(candidate.toLegacyMap());
+        }
+        Collections.sort(result.lifecycleCandidates, LifecycleCandidate.ORDER);
+        return result;
+    }
+
+    private VtableReference analyzeVtableReference(VtableCandidate vtable, Reference reference,
+            Map<String, VtableCandidate> knownVtables) {
+        Address from = reference.getFromAddress();
+        Function function = currentProgram.getFunctionManager().getFunctionContaining(from);
+        VtableReference result = new VtableReference(vtable, reference, function);
+        if (function == null || function.isExternal()) {
+            return result;
+        }
+        Decompilation decompilation = decompile(function);
+        if (decompilation.highFunction == null) {
+            result.analysisError = decompilation.error;
+            return result;
+        }
+        HighParam receiver = highParam(decompilation.highFunction, 0);
+        Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+        List<PcodeOp> operationList = new ArrayList<>();
+        Iterator<? extends PcodeOp> operationIterator = decompilation.highFunction.getPcodeOps();
+        while (operationIterator.hasNext()) operationList.add(operationIterator.next());
+        for (int operationIndex = 0; operationIndex < operationList.size(); operationIndex++) {
+            PcodeOp operation = operationList.get(operationIndex);
+            if (!from.equals(operation.getSeqnum().getTarget()) || !operationMentionsAddress(operation, vtable.rawAddress)) {
+                continue;
+            }
+            result.pcodeOperations.add(operationSummary(operation));
+            result.pcodeOp = operation.getMnemonic();
+            if (operation.getOpcode() == PcodeOp.LOAD) {
+                result.referenceKind = "LOAD/use";
+            }
+            else {
+                result.referenceKind = "constant/address materialization";
+            }
+        }
+        if (!"vptr-store".equals(result.referenceKind) && receiverNode != null) {
+            for (int operationIndex = 0; operationIndex < operationList.size(); operationIndex++) {
+                PcodeOp operation = operationList.get(operationIndex);
+                if (operation.getOpcode() != PcodeOp.STORE || operation.getNumInputs() < 3) continue;
+                VtableValueResolution valueResolution = resolveKnownVtableValue(
+                    operation.getInput(2), knownVtables);
+                if (!valueResolution.resolved || valueResolution.vtable != vtable) continue;
+                Long receiverOffset = offsetFromBase(operation.getInput(1), receiverNode, 0);
+                if (receiverOffset == null) continue;
+                if (operation.getInput(2).getSize() != currentProgram.getDefaultPointerSize()) continue;
+                result.referenceKind = "vptr-store";
+                result.confidence = "strong";
+                result.writtenToMemory = true;
+                result.storeAddress = sequenceAddress(operation);
+                result.resolvedStoreOperation = operationSummary(operation);
+                result.destinationExpression = varnode(operation.getInput(1));
+                result.receiverOffset = receiverOffset;
+                result.valueResolutionBasis = valueResolution.basis;
+                result.valueDefinitionPath.addAll(valueResolution.definitionPath);
+                result.operationIndex = operationIndex;
+                result.operationCount = operationList.size();
+                result.position = operationIndex * 4 <= operationList.size() ? "early" :
+                    operationIndex * 4 >= operationList.size() * 3 ? "late" : "middle";
+                result.receiverEvidence.add("Vtable materialization reaches a STORE whose destination reduces to parameter 0 plus " +
+                    unsignedHex(receiverOffset.longValue()) + ".");
+                result.pcodeOperations.add(operationSummary(operation));
+                break;
+            }
+        }
+        return result;
+    }
+
+    private VtableValueResolution resolveKnownVtableValue(Varnode input,
+            Map<String, VtableCandidate> knownVtables) {
+        VtableValueResolution result = new VtableValueResolution();
+        result.maximumDepth = MAX_VTABLE_VALUE_DEPTH;
+        if (input == null || input.getSize() != currentProgram.getDefaultPointerSize()) {
+            result.status = "unresolved-pointer-size-mismatch";
+            return result;
+        }
+        NumericResolution numeric = resolveAddressValue(input, 0,
+            Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>()));
+        result.definitionPath.addAll(numeric.definitionPath);
+        if (!numeric.resolved) {
+            result.status = numeric.status;
+            return result;
+        }
+        Address address;
+        try {
+            address = currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(numeric.value);
+        }
+        catch (RuntimeException exception) {
+            result.status = "unresolved-address-conversion";
+            return result;
+        }
+        VtableCandidate vtable = knownVtables.get(formatAddress(address));
+        if (vtable == null) {
+            result.status = "resolved-address-not-known-vtable";
+            result.resolvedAddress = formatAddress(address);
+            return result;
+        }
+        result.resolved = true;
+        result.status = "resolved-known-vtable";
+        result.basis = "resolved-vtable-through-pcode";
+        result.resolvedAddress = vtable.address;
+        result.vtable = vtable;
+        result.definitionPath.add("CONSTANT_ADDRESS " + vtable.address);
+        return result;
+    }
+
+    private NumericResolution resolveAddressValue(Varnode input, int depth, Set<Varnode> visited) {
+        NumericResolution result = new NumericResolution();
+        if (input == null) return result.fail("unresolved-null-varnode");
+        if (depth > MAX_VTABLE_VALUE_DEPTH) return result.fail("unresolved-depth-limit");
+        if (!visited.add(input)) return result.fail("unresolved-cycle");
+        if (input.isConstant()) {
+            result.resolved = true; result.value = input.getOffset();
+            result.status = "resolved-constant";
+            return result;
+        }
+        if (input.isAddress() && input.getAddress().isMemoryAddress()) {
+            result.resolved = true; result.value = input.getAddress().getOffset();
+            result.status = "resolved-program-address";
+            return result;
+        }
+        PcodeOp definition = input.getDef();
+        if (definition == null) return result.fail("unresolved-no-definition");
+        int opcode = definition.getOpcode();
+        result.definitionPath.add(definition.getMnemonic() + " at " + sequenceAddress(definition));
+        if (isWrapper(opcode) && definition.getNumInputs() == 1) {
+            return result.merge(resolveAddressValue(definition.getInput(0), depth + 1, visited));
+        }
+        if (opcode == PcodeOp.MULTIEQUAL) return result.fail("unresolved-multiequal");
+        if (opcode == PcodeOp.LOAD) return result.fail("unresolved-load-derived");
+        if (opcode == PcodeOp.CALL || opcode == PcodeOp.CALLIND)
+            return result.fail("unresolved-call-result");
+        if ((opcode == PcodeOp.PTRSUB || opcode == PcodeOp.INT_ADD) && definition.getNumInputs() == 2) {
+            Varnode left = definition.getInput(0), right = definition.getInput(1);
+            if (right.isConstant()) {
+                NumericResolution base = resolveAddressValue(left, depth + 1, visited);
+                if (!base.resolved) return result.merge(base);
+                result.definitionPath.addAll(base.definitionPath);
+                result.definitionPath.add("CONSTANT_ADDEND " + unsignedHex(right.getOffset()));
+                result.resolved = true; result.status = "resolved-constant-arithmetic";
+                result.value = base.value + right.getOffset(); return result;
+            }
+            if (opcode == PcodeOp.INT_ADD && left.isConstant()) {
+                NumericResolution base = resolveAddressValue(right, depth + 1, visited);
+                if (!base.resolved) return result.merge(base);
+                result.definitionPath.addAll(base.definitionPath);
+                result.definitionPath.add("CONSTANT_ADDEND " + unsignedHex(left.getOffset()));
+                result.resolved = true; result.status = "resolved-constant-arithmetic";
+                result.value = base.value + left.getOffset(); return result;
+            }
+            return result.fail("unresolved-nonconstant-arithmetic");
+        }
+        if (opcode == PcodeOp.PTRADD && definition.getNumInputs() == 3) {
+            Varnode index = definition.getInput(1), size = definition.getInput(2);
+            if (!index.isConstant() || !size.isConstant())
+                return result.fail("unresolved-nonconstant-ptradd");
+            NumericResolution base = resolveAddressValue(definition.getInput(0), depth + 1, visited);
+            if (!base.resolved) return result.merge(base);
+            result.definitionPath.addAll(base.definitionPath);
+            result.definitionPath.add("CONSTANT_PTRADD " + unsignedHex(index.getOffset()) + " * " +
+                unsignedHex(size.getOffset()));
+            result.resolved = true; result.status = "resolved-constant-arithmetic";
+            result.value = base.value + index.getOffset() * size.getOffset(); return result;
+        }
+        return result.fail("unresolved-unsupported-opcode-" + definition.getMnemonic());
+    }
+
+    private boolean operationMentionsAddress(PcodeOp operation, Address expected) {
+        for (int index = 0; index < operation.getNumInputs(); index++) {
+            if (expected.equals(addressFromVarnode(stripWrappers(operation.getInput(index))))) return true;
+        }
+        return false;
+    }
+
+    private void classifyLifecycle(LifecycleCandidate candidate) throws CancelledException {
+        candidate.calledFromAllocationPattern = calledFromAllocationPattern(candidate.function);
+        candidate.callers.addAll(functionSummaries(sortedFunctions(candidate.function.getCallingFunctions(monitor))));
+        candidate.callees.addAll(functionSummaries(sortedFunctions(candidate.function.getCalledFunctions(monitor))));
+        boolean cleanup = false;
+        boolean deallocation = false;
+        boolean teardownAfterVptr = false;
+        int latestVptrStoreIndex = -1;
+        for (VptrWrite write : candidate.vptrStores)
+            latestVptrStoreIndex = Math.max(latestVptrStoreIndex, write.operationIndex);
+        Decompilation decompilation = decompile(candidate.function);
+        if (decompilation.highFunction != null) {
+            HighParam receiver = highParam(decompilation.highFunction, 0);
+            Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+            Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
+            int operationIndex = 0;
+            while (operations.hasNext()) {
+                PcodeOp operation = operations.next();
+                if (operation.getOpcode() == PcodeOp.RETURN && operation.getNumInputs() >= 2 &&
+                        receiverNode != null && Long.valueOf(0).equals(
+                            offsetFromBase(operation.getInput(1), receiverNode, 0))) {
+                    candidate.returnBehavior = "returns-receiver";
+                }
+                if (operation.getOpcode() == PcodeOp.STORE && operation.getNumInputs() >= 3 && receiverNode != null) {
+                    Long offset = offsetFromBase(operation.getInput(1), receiverNode, 0);
+                    if (offset != null) candidate.receiverRelativeStoreCount++;
+                }
+                if (operation.getOpcode() == PcodeOp.CALL) {
+                    Function callee = directCalledFunction(operation);
+                    String lower = callee == null ? "" : fullName(callee).toLowerCase(Locale.ROOT);
+                    boolean teardownCall = lower.contains("::~") || lower.contains("destruct") ||
+                        lower.contains("destroy") || lower.contains("cleanup");
+                    if (teardownCall && operationIndex > latestVptrStoreIndex) teardownAfterVptr = true;
+                }
+                operationIndex++;
+            }
+        }
+        for (Function callee : candidate.function.getCalledFunctions(monitor)) {
+            String lower = fullName(callee).toLowerCase(Locale.ROOT);
+            cleanup |= lower.contains("::~") || lower.contains("destruct") ||
+                lower.contains("destroy") || lower.contains("cleanup");
+            deallocation |= lower.contains("operator delete") || lower.contains("dealloc") || lower.contains("free");
+        }
+        boolean lateStore = false;
+        boolean earlyOrMiddleStore = false;
+        for (VptrWrite write : candidate.vptrStores) {
+            lateStore |= "late".equals(write.position);
+            earlyOrMiddleStore |= !"late".equals(write.position);
+        }
+        candidate.teardownCallAfterVptr = teardownAfterVptr;
+        if (deallocation || teardownAfterVptr || (cleanup && lateStore)) {
+            candidate.classification = "destructor-like";
+            candidate.confidence = deallocation || teardownAfterVptr ? "strong" : "medium";
+            candidate.evidence.add(deallocation ? "Calls a deallocation/delete-named function." :
+                teardownAfterVptr ? "Restores class vptrs before a destructor/teardown call." :
+                "Has cleanup/destruction-named callees and a late class-vptr store.");
+        }
+        else if ((candidate.calledFromAllocationPattern && earlyOrMiddleStore) ||
+                ("returns-receiver".equals(candidate.returnBehavior) && earlyOrMiddleStore &&
+                 candidate.receiverRelativeStoreCount > candidate.vptrStores.size())) {
+            candidate.classification = "constructor-like";
+            candidate.confidence = candidate.calledFromAllocationPattern ? "strong" : "medium";
+            candidate.evidence.add(candidate.calledFromAllocationPattern ?
+                "A direct caller has allocation/new context and the function installs a non-late class vptr." :
+                "Returns the receiver, performs additional receiver-relative stores, and installs a non-late class vptr.");
+        }
+        else if (!candidate.vptrStores.isEmpty()) {
+            candidate.classification = "lifecycle-helper";
+            candidate.confidence = "medium";
+            candidate.evidence.add("Structurally installs a class vptr, but constructor/destructor indicators are inconclusive.");
+        }
+        else {
+            candidate.limitations.add("No structural class-vptr store was recovered.");
+        }
+        candidate.limitations.add("Classification is structural and conservative; it is not recovered C++ type information.");
+    }
+
+    private Map<String, MethodCandidate> discoverMethods(String className, AnchorDiscovery anchors,
+            VtableAnalysis vtableAnalysis)
             throws Exception {
         Map<String, MethodCandidate> result = new LinkedHashMap<>();
 
@@ -232,41 +598,28 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             }
         }
 
-        for (VtableCandidate vtable : anchors.vtables) {
-            ReferenceIterator references = currentProgram.getReferenceManager().getReferencesTo(vtable.rawAddress);
-            Set<String> inspectedFunctions = new LinkedHashSet<>();
-            while (references.hasNext()) {
-                monitor.checkCancelled();
-                Reference reference = references.next();
-                Function function = currentProgram.getFunctionManager().getFunctionContaining(reference.getFromAddress());
-                if (function == null || function.isExternal() || !inspectedFunctions.add(functionKey(function))) {
-                    continue;
-                }
-                List<VptrWrite> writes = findVptrWrites(function, vtable);
-                for (VptrWrite write : writes) {
-                    addEvidence(result, function, "strong", "vtable-writer",
-                        "Stores " + vtable.name + " through parameter 0 at offset zero", null, null);
-                    MethodCandidate candidate = result.get(functionKey(function));
-                    candidate.vptrWrites.add(write);
-                    Map<String, Object> constructor = write.toMap();
-                    constructor.put("function", functionSummary(function));
-                    constructor.put("calledFromAllocationPattern", calledFromAllocationPattern(function));
-                    constructor.put("lifecycleRole", "constructor-or-destructor-candidate");
-                    constructor.put("confidence", "strong-class-membership; lifecycle-role-unresolved");
-                    anchors.constructorCandidates.add(constructor);
-                }
-            }
+        for (LifecycleCandidate lifecycle : vtableAnalysis.lifecycleCandidates) {
+            addEvidence(result, lifecycle.function, "strong", "vtable-writer",
+                "Structurally stores a ResourceViewWidget vtable through parameter 0.", null, null);
+            MethodCandidate candidate = result.get(functionKey(lifecycle.function));
+            candidate.vptrWrites.addAll(lifecycle.vptrStores);
         }
         return result;
     }
 
-    private void addMediumReceiverFamily(Map<String, MethodCandidate> methods) throws Exception {
-        List<MethodCandidate> strongSnapshot = new ArrayList<>(methods.values());
-        for (MethodCandidate strong : strongSnapshot) {
-            if (!"strong".equals(strong.confidence)) {
-                continue;
+    private void addMediumReceiverFamily(Map<String, MethodCandidate> methods, int maximumDepth) throws Exception {
+        List<MethodCandidate> frontier = new ArrayList<>();
+        for (MethodCandidate method : methods.values()) {
+            if ("strong".equals(method.confidence) && isInternal(method.function)) {
+                method.receiverFamilyDepth = 0;
+                frontier.add(method);
             }
-            Decompilation decompilation = decompile(strong.function);
+        }
+        for (int depth = 1; depth <= maximumDepth && !frontier.isEmpty(); depth++) {
+            List<MethodCandidate> next = new ArrayList<>();
+            Set<String> queued = new LinkedHashSet<>();
+            for (MethodCandidate source : frontier) {
+            Decompilation decompilation = decompile(source.function);
             if (decompilation.highFunction != null) {
                 HighParam receiver = highParam(decompilation.highFunction, 0);
                 if (receiver != null && receiver.getRepresentative() != null) {
@@ -274,35 +627,32 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
                     while (operations.hasNext()) {
                         PcodeOp operation = operations.next();
                         if (operation.getOpcode() != PcodeOp.CALL || operation.getNumInputs() < 2 ||
-                                !sameIdentity(operation.getInput(1), receiver.getRepresentative())) {
+                                !Long.valueOf(0).equals(offsetFromBase(
+                                    operation.getInput(1), receiver.getRepresentative(), 0))) {
                             continue;
                         }
                         Function callee = directCalledFunction(operation);
                         if (isInternal(callee)) {
                             addEvidence(methods, callee, "medium", "matching-receiver-callee",
-                                "Strong class method passes its parameter 0 as callee argument 0 at " +
+                                "Receiver-family function at depth " + (depth - 1) +
+                                " passes its parameter 0 as callee argument 0 at " +
                                 sequenceAddress(operation), null, null);
+                            MethodCandidate added = methods.get(functionKey(callee));
+                            if (added.receiverFamilyDepth == null || depth < added.receiverFamilyDepth.intValue()) {
+                                added.receiverFamilyDepth = depth;
+                                added.receiverFamilySourceFunction = source.functionName;
+                                added.receiverFamilySourceAddress = source.functionAddress;
+                                added.receiverFamilyCallSite = sequenceAddress(operation);
+                                added.receiverArgumentIndex = 0;
+                                added.relationship = "receiver-preserving-callee";
+                                if (depth < maximumDepth && queued.add(functionKey(callee))) next.add(added);
+                            }
                         }
                     }
                 }
             }
-
-            for (Function caller : strong.function.getCallingFunctions(monitor)) {
-                if (!isInternal(caller)) {
-                    continue;
-                }
-                Decompilation callerDecompilation = decompile(caller);
-                HighParam callerReceiver = callerDecompilation.highFunction == null
-                    ? null : highParam(callerDecompilation.highFunction, 0);
-                if (callerReceiver == null || callerReceiver.getRepresentative() == null) {
-                    continue;
-                }
-                if (callsTargetWithReceiver(callerDecompilation.highFunction, strong.function,
-                        callerReceiver.getRepresentative())) {
-                    addEvidence(methods, caller, "medium", "matching-receiver-caller",
-                        "Calls a strong class method with its own parameter 0 as argument 0.", null, null);
-                }
             }
+            frontier = next;
         }
     }
 
@@ -312,7 +662,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             PcodeOp operation = operations.next();
             if (operation.getOpcode() == PcodeOp.CALL && operation.getNumInputs() >= 2 &&
                     target.equals(directCalledFunction(operation)) &&
-                    sameIdentity(operation.getInput(1), receiver)) {
+                    Long.valueOf(0).equals(offsetFromBase(operation.getInput(1), receiver, 0))) {
                 return true;
             }
         }
@@ -323,7 +673,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             long fieldOffset, Long nestedOffset) throws Exception {
         List<FieldAccess> result = new ArrayList<>();
         for (MethodCandidate method : methods) {
-            if ("weak".equals(method.confidence)) {
+            if ("weak".equals(method.confidence) || !isInternal(method.function)) {
                 continue;
             }
             Decompilation decompilation = decompile(method.function);
@@ -400,10 +750,11 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             if (operation.getOpcode() == PcodeOp.STORE && operation.getNumInputs() >= 3) {
                 Long offset = offsetFromBase(operation.getInput(1), receiver.getRepresentative(), 0);
                 Address stored = addressFromVarnode(stripWrappers(operation.getInput(2)));
-                if (Long.valueOf(0).equals(offset) && vtable.rawAddress.equals(stored)) {
+                if (offset != null && vtable.rawAddress.equals(stored)) {
                     String position = operationIndex * 4 <= operations.size() ? "early" :
                         operationIndex * 4 >= operations.size() * 3 ? "late" : "middle";
-                    VptrWrite write = new VptrWrite(operation, vtable, position, operationIndex, operations.size());
+                    VptrWrite write = new VptrWrite(operation, vtable, offset.longValue(), position,
+                        operationIndex, operations.size());
                     write.otherVptrWrites.addAll(findOtherVptrWrites(
                         operations, receiver.getRepresentative(), operation));
                     result.add(write);
@@ -419,7 +770,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         List<Map<String, Object>> result = new ArrayList<>();
         for (PcodeOp operation : operations) {
             if (operation == selected || operation.getOpcode() != PcodeOp.STORE || operation.getNumInputs() < 3 ||
-                    !Long.valueOf(0).equals(offsetFromBase(operation.getInput(1), receiver, 0))) {
+                    offsetFromBase(operation.getInput(1), receiver, 0) == null) {
                 continue;
             }
             Address stored = addressFromVarnode(stripWrappers(operation.getInput(2)));
@@ -433,6 +784,9 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
                 item.put("storeAddress", sequenceAddress(operation));
                 item.put("vtableAddress", formatAddress(stored));
                 item.put("symbolNames", symbols);
+                Long receiverOffset = offsetFromBase(operation.getInput(1), receiver, 0);
+                item.put("receiverOffset", receiverOffset);
+                item.put("receiverOffsetHex", receiverOffset == null ? null : unsignedHex(receiverOffset.longValue()));
                 result.add(item);
             }
         }
@@ -459,6 +813,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             candidate.stopReason = "invalid-program-pointer-size";
             return;
         }
+        Map<String, Long> firstResolvedSlot = new LinkedHashMap<>();
         for (int index = 0; index < MAX_VTABLE_SLOTS; index++) {
             monitor.checkCancelled();
             Address slotAddress;
@@ -490,11 +845,23 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             }
             ThunkResolution thunk = resolveThunk(slotFunction);
             Function resolved = thunk.resolvedFunction;
-            candidate.slots.add(new VtableSlot(
-                index, (long) index * pointerSize, slotAddress, pointer, slotFunction, resolved, thunk));
+            VtableSlot slot = new VtableSlot(
+                index, (long) index * pointerSize, slotAddress, pointer, slotFunction, resolved, thunk);
+            if (resolved != null) {
+                String key = functionKey(resolved);
+                slot.duplicateOfSlot = firstResolvedSlot.get(key);
+                if (slot.duplicateOfSlot == null) firstResolvedSlot.put(key, Long.valueOf(index));
+            }
+            candidate.slots.add(slot);
         }
         if (candidate.stopReason == null) {
             candidate.stopReason = "maximum-slot-limit";
+        }
+        candidate.discoveredSlotCount = candidate.slots.size();
+        for (VtableSlot slot : candidate.slots) {
+            if (slot.internal) candidate.internalFunctionCount++;
+            if (slot.external) candidate.externalFunctionCount++;
+            if (slot.duplicateOfSlot != null) candidate.duplicateResolvedFunctionCount++;
         }
     }
 
@@ -718,26 +1085,29 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
     }
 
     private List<Function> exportStrongest(List<MethodCandidate> methods, List<FieldAccess> accesses,
-            Path directory, Instant generatedAt) throws Exception {
+            VtableAnalysis vtableAnalysis, Path directory, Instant generatedAt) throws Exception {
         final Map<String, Integer> priority = new LinkedHashMap<>();
         for (MethodCandidate method : methods) {
-            int score = method.vptrWrites.isEmpty() ? 0 : 500;
-            score += "strong".equals(method.confidence) ? 100 : 50;
-            if (method.functionFullName.contains("::")) {
-                score += 10;
-            }
+            if (!isInternal(method.function)) continue;
+            int score = !method.vptrWrites.isEmpty() ? 6000 :
+                method.vtableSlotIndex != null ? 5000 :
+                "strong".equals(method.confidence) ? 3000 : 1000;
             priority.put(functionKey(method.function), score);
         }
         for (FieldAccess access : accesses) {
             String key = functionKey(access.method.function);
-            int score = priority.containsKey(key) ? priority.get(key) : 0;
-            score += "write".equals(access.accessType) ? 400 : 100;
+            if (!priority.containsKey(key)) continue;
+            int score = priority.get(key);
+            score += "write".equals(access.accessType) ? 500 : 100;
             if (!access.nestedEvidence.isEmpty()) {
                 score += 200;
             }
             priority.put(key, score);
         }
         List<MethodCandidate> ordered = new ArrayList<>(methods);
+        for (Iterator<MethodCandidate> iterator = ordered.iterator(); iterator.hasNext();) {
+            if (!priority.containsKey(functionKey(iterator.next().function))) iterator.remove();
+        }
         Collections.sort(ordered, new Comparator<MethodCandidate>() {
             @Override public int compare(MethodCandidate left, MethodCandidate right) {
                 int compared = Integer.compare(priority.get(functionKey(right.function)),
@@ -746,12 +1116,21 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             }
         });
         List<Function> result = new ArrayList<>();
+        Set<String> exportedKeys = new LinkedHashSet<>();
+        for (Function function : vtableAnalysis.directInternalXrefFunctions.values()) {
+            exportFunctionBundle(function, directory.resolve(safeFunctionName(function)), generatedAt);
+            result.add(function);
+            exportedKeys.add(functionKey(function));
+        }
+        int ordinaryExportCount = 0;
         for (MethodCandidate candidate : ordered) {
-            if (result.size() >= MAX_EXPORTED_FUNCTIONS) {
+            if (ordinaryExportCount >= MAX_EXPORTED_FUNCTIONS) {
                 break;
             }
+            if (!exportedKeys.add(functionKey(candidate.function))) continue;
             exportFunctionBundle(candidate.function, directory.resolve(safeFunctionName(candidate.function)), generatedAt);
             result.add(candidate.function);
+            ordinaryExportCount++;
         }
         return result;
     }
@@ -1083,10 +1462,25 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
 
     private Map<String, Object> methodDocument(String className, List<MethodCandidate> methods) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 1);
+        result.put("schemaVersion", 2);
         result.put("className", className);
         result.put("confidenceModel", confidenceModel());
         result.put("methods", methods);
+        return result;
+    }
+
+    private Map<String, Object> receiverFamilyDocument(String className, List<MethodCandidate> methods) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 2);
+        result.put("className", className);
+        result.put("maximumDepth", MAX_RECEIVER_FAMILY_DEPTH);
+        result.put("semantics", "Receiver-family provenance; medium entries are not proven C++ member methods.");
+        List<MethodCandidate> family = new ArrayList<>();
+        for (MethodCandidate method : methods) {
+            if (method.receiverFamilyDepth != null && method.receiverFamilyDepth.intValue() > 0) family.add(method);
+        }
+        result.put("members", family);
+        result.put("negativeResult", family.isEmpty() ? "no-receiver-preserving-helper-found" : null);
         return result;
     }
 
@@ -1095,7 +1489,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("schemaVersion", 1);
         result.put("className", className);
-        result.put("scope", "Only strong/medium class-method candidates are searched.");
+        result.put("scope", "Only internal strong/medium class-method and receiver-family candidates are searched.");
         result.put("fieldOffset", fieldOffset);
         result.put("fieldOffsetHex", unsignedHex(fieldOffset));
         result.put("nestedOffset", nestedOffset);
@@ -1129,11 +1523,11 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
     }
 
     private Map<String, Object> manifest(String className, Function selected, long fieldOffset,
-            Long nestedOffset, Instant generatedAt, AnchorDiscovery anchors,
+            Long nestedOffset, Instant generatedAt, AnchorDiscovery anchors, VtableAnalysis vtableAnalysis,
             List<MethodCandidate> methods, List<FieldAccess> accesses,
             List<FieldAccess> writes, List<Function> exported) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("schemaVersion", 1);
+        result.put("schemaVersion", 3);
         result.put("generatedAtUtc", generatedAt.toString());
         result.put("programName", currentProgram.getName());
         result.put("className", className);
@@ -1150,13 +1544,23 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         result.put("fieldWriterCount", writes.size());
         result.put("negativeWriterResult", writes.isEmpty() ? "no-class-scoped-writer-found" : null);
         result.put("vtableSlotLimit", MAX_VTABLE_SLOTS);
+        result.put("vtableValueMaximumDepth", MAX_VTABLE_VALUE_DEPTH);
+        result.put("vtableReferenceCount", vtableAnalysis.totalReferenceCount());
+        result.put("lifecycleCandidateCount", vtableAnalysis.lifecycleCandidates.size());
+        result.put("receiverFamilyMaximumDepth", MAX_RECEIVER_FAMILY_DEPTH);
         result.put("exportLimit", MAX_EXPORTED_FUNCTIONS);
+        result.put("directInternalVtableXrefExportCount", vtableAnalysis.directInternalXrefFunctions.size());
+        result.put("directInternalVtableXrefExports", functionSummaries(
+            new ArrayList<>(vtableAnalysis.directInternalXrefFunctions.values())));
+        result.put("exportLimitSemantics",
+            "Direct internal vtable-xref functions are forced first and do not consume the ordinary internal-function quota.");
         result.put("exportedFunctions", functionSummaries(exported));
         result.put("readOnly", true);
         result.put("limitations", new String[] {
             "Depends on symbols, defined functions, references, memory, and high p-code in the current analysis database.",
-            "Vtable walking stops at the first null, unreadable, or non-function slot and does not model secondary vtables.",
-            "Medium membership requires direct parameter-0 receiver flow to or from a strong method; raw proximity and offset reuse are excluded.",
+            "Each concrete vtable symbol is walked independently; observed nonzero vptr offsets are reported without inferring exact inheritance semantics.",
+            "Vtable STORE values are resolved only through bounded, non-branching wrappers and constant arithmetic; LOAD, CALL, MULTIEQUAL, and ambiguous forms stop resolution.",
+            "Medium membership requires bounded outbound parameter-0 receiver flow from a strong anchor; raw proximity and offset reuse are excluded.",
             "No general alias analysis, class hierarchy reconstruction, symbolic execution, or heap graph traversal is performed.",
             "Lifecycle role and nested-component type remain unresolved unless independently supported by exported evidence."
         });
@@ -1194,7 +1598,8 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
     }
 
     private static boolean isExactClassQualifiedFunction(String fullName, String className) {
-        return fullName != null && fullName.startsWith(className + "::") && !isVtableName(fullName);
+        return fullName != null && (fullName.startsWith(className + "::") ||
+            fullName.contains("::" + className + "::")) && !isVtableName(fullName);
     }
 
     private static boolean isInternal(Function function) {
@@ -1283,6 +1688,8 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         final List<Map<String, Object>> rttiCandidates = new ArrayList<>();
         final List<Map<String, Object>> knownMethodAnchors = new ArrayList<>();
         final List<Map<String, Object>> constructorCandidates = new ArrayList<>();
+        final Map<String, Object> knownRoot = new LinkedHashMap<>();
+        transient Function knownRootFunction;
         AnchorDiscovery(Function selected) { this.selected = selected; }
         boolean anchorResolvedExactly() {
             for (Map<String, Object> anchor : knownMethodAnchors)
@@ -1298,6 +1705,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             result.put("rttiCandidates", rttiCandidates);
             result.put("knownMethodAnchors", knownMethodAnchors);
             result.put("constructorCandidates", constructorCandidates);
+            result.put("knownRootFUN_1431bc320", knownRoot);
             return result;
         }
     }
@@ -1313,6 +1721,10 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         int maximumSlots;
         String stopReason;
         String stopDetail;
+        int discoveredSlotCount;
+        int internalFunctionCount;
+        int externalFunctionCount;
+        int duplicateResolvedFunctionCount;
         final List<VtableSlot> slots = new ArrayList<>();
         VtableCandidate(Symbol symbol) {
             name = symbol.getName(); fullName = symbol.getName(true);
@@ -1332,6 +1744,9 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         final String resolvedFunctionAddress;
         final int thunkHopCount;
         final String thunkError;
+        final boolean internal;
+        final boolean external;
+        Long duplicateOfSlot;
         transient final Function resolvedFunction;
         VtableSlot(long slotIndex, long byteOffset, Address slotAddress, Address pointer,
                 Function slotFunction, Function resolved, ThunkResolution thunk) {
@@ -1341,6 +1756,8 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             this.resolvedFunctionName = resolved == null ? null : resolved.getName();
             this.resolvedFunctionAddress = resolved == null ? null : address(resolved);
             this.thunkHopCount = thunk.hops; this.thunkError = thunk.error; this.resolvedFunction = resolved;
+            this.internal = isInternal(resolved);
+            this.external = resolved != null && resolved.isExternal();
         }
     }
 
@@ -1360,6 +1777,12 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         Long vtableSlotIndex;
         Long vtableByteOffset;
         final List<VptrWrite> vptrWrites = new ArrayList<>();
+        Integer receiverFamilyDepth;
+        String relationship;
+        String receiverFamilySourceFunction;
+        String receiverFamilySourceAddress;
+        String receiverFamilyCallSite;
+        Integer receiverArgumentIndex;
         String analysisError;
         MethodCandidate(Function function) {
             this.function = function; functionName = function.getName();
@@ -1434,23 +1857,187 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         final String storeAddress;
         final String vtableName;
         final String vtableAddress;
-        final long receiverOffset = 0;
+        final long receiverOffset;
+        final String receiverOffsetHex;
         final String position;
         final int operationIndex;
         final int operationCount;
+        final String valueResolutionBasis;
+        final List<String> valueDefinitionPath;
         final List<Map<String, Object>> otherVptrWrites = new ArrayList<>();
-        VptrWrite(PcodeOp operation, VtableCandidate vtable, String position, int operationIndex, int operationCount) {
+        VptrWrite(PcodeOp operation, VtableCandidate vtable, long receiverOffset,
+                String position, int operationIndex, int operationCount) {
             storeAddress = sequenceAddress(operation); vtableName = vtable.fullName;
-            vtableAddress = vtable.address; this.position = position;
+            vtableAddress = vtable.address; this.receiverOffset = receiverOffset;
+            receiverOffsetHex = unsignedHex(receiverOffset); this.position = position;
             this.operationIndex = operationIndex; this.operationCount = operationCount;
+            valueResolutionBasis = "direct-vtable-address";
+            valueDefinitionPath = Collections.singletonList("CONSTANT_ADDRESS " + vtable.address);
+        }
+        VptrWrite(VtableReference reference) {
+            storeAddress = reference.storeAddress; vtableName = reference.vtableName;
+            vtableAddress = reference.vtableAddress; receiverOffset = reference.receiverOffset.longValue();
+            receiverOffsetHex = unsignedHex(receiverOffset); position = reference.position;
+            operationIndex = reference.operationIndex; operationCount = reference.operationCount;
+            valueResolutionBasis = reference.valueResolutionBasis;
+            valueDefinitionPath = new ArrayList<>(reference.valueDefinitionPath);
         }
         Map<String, Object> toMap() {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("storeAddress", storeAddress); result.put("vtableName", vtableName);
             result.put("vtableAddress", vtableAddress); result.put("receiverOffset", receiverOffset);
+            result.put("receiverOffsetHex", receiverOffsetHex);
             result.put("position", position); result.put("operationIndex", operationIndex);
-            result.put("operationCount", operationCount); result.put("otherVptrWrites", otherVptrWrites);
+            result.put("operationCount", operationCount);
+            result.put("valueResolutionBasis", valueResolutionBasis);
+            result.put("valueDefinitionPath", valueDefinitionPath);
+            result.put("otherVptrWrites", otherVptrWrites);
             return result;
+        }
+    }
+
+    private static final class VtableAnalysis {
+        final List<VtableReferenceGroup> groups = new ArrayList<>();
+        final List<LifecycleCandidate> lifecycleCandidates = new ArrayList<>();
+        transient final Map<String, Function> directInternalXrefFunctions = new LinkedHashMap<>();
+        int totalReferenceCount() {
+            int count = 0;
+            for (VtableReferenceGroup group : groups) count += group.references.size();
+            return count;
+        }
+        Map<String, Object> xrefDocument(String className) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("schemaVersion", 3); result.put("className", className);
+            result.put("vtables", groups);
+            result.put("negativeResult", totalReferenceCount() == 0 ? "no-vtable-references" : null);
+            return result;
+        }
+        Map<String, Object> lifecycleDocument(String className) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("schemaVersion", 3); result.put("className", className);
+            result.put("classifications", new String[] {
+                "constructor-like", "destructor-like", "lifecycle-helper", "unknown"
+            });
+            result.put("candidates", lifecycleCandidates);
+            result.put("negativeResult", lifecycleCandidates.isEmpty() ? "no-structural-vptr-store" : null);
+            return result;
+        }
+    }
+
+    private static final class VtableReferenceGroup {
+        final String vtableName;
+        final String vtableAddress;
+        final int discoveredSlotCount;
+        final List<VtableReference> references = new ArrayList<>();
+        int referenceCount;
+        int structuralVptrStoreCount;
+        String negativeResult;
+        VtableReferenceGroup(VtableCandidate vtable) {
+            vtableName = vtable.fullName; vtableAddress = vtable.address;
+            discoveredSlotCount = vtable.slots.size();
+        }
+        void finalizeCounts() {
+            referenceCount = references.size();
+            Set<String> stores = new LinkedHashSet<>();
+            for (VtableReference reference : references) {
+                if ("vptr-store".equals(reference.referenceKind)) stores.add(
+                    reference.functionAddress + ":" + reference.storeAddress + ":" + reference.receiverOffset);
+            }
+            structuralVptrStoreCount = stores.size();
+            negativeResult = references.isEmpty() ? "no-vtable-references" :
+                structuralVptrStoreCount == 0 ? "no-structural-vptr-stores" : null;
+        }
+    }
+
+    private static final class VtableReference {
+        final String vtableName;
+        final String vtableAddress;
+        final String fromAddress;
+        String instructionAddress;
+        final String ghidraReferenceType;
+        String referenceKind;
+        String confidence = "supporting";
+        String functionName;
+        String functionAddress;
+        transient final Function function;
+        String pcodeOp;
+        boolean writtenToMemory;
+        String storeAddress;
+        Map<String, Object> resolvedStoreOperation;
+        Map<String, Object> destinationExpression;
+        Long receiverOffset;
+        String valueResolutionBasis;
+        final List<String> valueDefinitionPath = new ArrayList<>();
+        final List<String> receiverEvidence = new ArrayList<>();
+        final List<Map<String, Object>> pcodeOperations = new ArrayList<>();
+        int operationIndex;
+        int operationCount;
+        String position;
+        String analysisError;
+        VtableReference(VtableCandidate vtable, Reference reference, Function function) {
+            vtableName = vtable.fullName; vtableAddress = vtable.address;
+            fromAddress = formatAddress(reference.getFromAddress()); instructionAddress = fromAddress;
+            ghidraReferenceType = reference.getReferenceType().toString(); this.function = function;
+            referenceKind = reference.getReferenceType().isData() ? "direct data reference" : "other";
+            if (function != null) { functionName = function.getName(); functionAddress = address(function); }
+        }
+        VptrWrite toVptrWrite() { return new VptrWrite(this); }
+    }
+
+    private static final class LifecycleCandidate {
+        static final Comparator<LifecycleCandidate> ORDER = new Comparator<LifecycleCandidate>() {
+            @Override public int compare(LifecycleCandidate left, LifecycleCandidate right) {
+                return left.functionAddress.compareTo(right.functionAddress);
+            }
+        };
+        transient final Function function;
+        final String functionName;
+        final String functionAddress;
+        String classification = "unknown";
+        String confidence = "supporting";
+        boolean calledFromAllocationPattern;
+        boolean teardownCallAfterVptr;
+        String returnBehavior = "not-observed";
+        int receiverRelativeStoreCount;
+        Long primaryVptrOffset;
+        final Set<Long> secondaryVptrOffsets = new TreeSet<>();
+        final List<VptrWrite> vptrStores = new ArrayList<>();
+        final List<Map<String, Object>> callers = new ArrayList<>();
+        final List<Map<String, Object>> callees = new ArrayList<>();
+        final List<String> evidence = new ArrayList<>();
+        final List<String> limitations = new ArrayList<>();
+        LifecycleCandidate(Function function) {
+            this.function = function; functionName = function.getName(); functionAddress = address(function);
+        }
+        Map<String, Object> toLegacyMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("function", functionName); result.put("functionAddress", functionAddress);
+            result.put("classification", classification); result.put("confidence", confidence);
+            result.put("vptrStores", vptrStores); result.put("evidence", evidence);
+            result.put("limitations", limitations); return result;
+        }
+    }
+
+    private static final class VtableValueResolution {
+        boolean resolved;
+        String status;
+        String basis;
+        String resolvedAddress;
+        int maximumDepth;
+        final List<String> definitionPath = new ArrayList<>();
+        transient VtableCandidate vtable;
+    }
+
+    private static final class NumericResolution {
+        boolean resolved;
+        long value;
+        String status;
+        final List<String> definitionPath = new ArrayList<>();
+        NumericResolution fail(String value) { status = value; resolved = false; return this; }
+        NumericResolution merge(NumericResolution child) {
+            definitionPath.addAll(child.definitionPath);
+            resolved = child.resolved; value = child.value; status = child.status;
+            return this;
         }
     }
 
