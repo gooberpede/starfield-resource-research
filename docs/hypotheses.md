@@ -4,7 +4,7 @@ This file contains working models and unproven explanations.
 
 None of the statements below should be treated as established engine behaviour unless they are later moved to `known-facts.md` with supporting evidence.
 
-## H1 — One ordinary inorganic resource family per biome
+## H1 - One ordinary inorganic resource family per biome
 
 ### Working hypothesis
 
@@ -55,7 +55,7 @@ Biome B: Aluminum + Neodymium
 
 Status: strongly supported, not proven.
 
-## H2 — Resource-family allocation occurs before member/branch selection
+## H2 - Resource-family allocation occurs before member/branch selection
 
 ### Working hypothesis
 
@@ -84,7 +84,7 @@ This model naturally explains:
 
 Status: plausible structural model.
 
-## H3 — The family root is guaranteed rather than independently rolled
+## H3 - The family root is guaranteed rather than independently rolled
 
 ### Working hypothesis
 
@@ -104,7 +104,7 @@ Static analysis is needed to distinguish explicit root insertion from an equival
 
 Status: strongly supported outcome; implementation mechanism unknown.
 
-## H4 — Intermediate family members are selectable rather than mandatory ancestors
+## H4 - Intermediate family members are selectable rather than mandatory ancestors
 
 ### Working hypothesis
 
@@ -122,7 +122,7 @@ This behaviour is established at the planet level; the unknown part is the exact
 
 Status: outcome established, mechanism unknown.
 
-## H5 — RSCS contributes to deterministic selection
+## H5 - RSCS contributes to deterministic selection
 
 ### Working hypothesis
 
@@ -148,7 +148,7 @@ Earlier Ghidra work suggested an RSCS-derived value may instead enter generic le
 
 Status: involvement strongly supported; exact semantics unresolved.
 
-## H6 — RSGD defines the possibility space, not necessarily the final set
+## H6 - RSGD defines the possibility space, not necessarily the final set
 
 ### Working hypothesis
 
@@ -166,7 +166,7 @@ It is not yet known how much of the branch/family structure is encoded directly 
 
 Status: strongly supported at a high level.
 
-## H7 — Unique inorganic resources are endpoints of ordinary families
+## H7 - Unique inorganic resources are endpoints of ordinary families
 
 ### Working hypothesis
 
@@ -187,7 +187,7 @@ Treating Indicite or Vytinium as separate families creates violations of the obs
 
 Status: strongly supported for the family model.
 
-## H8 — The Creation Kit Apply Seed path contains or approaches the target algorithm
+## H8 - The Creation Kit Apply Seed path contains or approaches the target algorithm
 
 ### Working hypothesis
 
@@ -221,7 +221,7 @@ The Creation Kit may wrap, simulate, or partially duplicate game-runtime logic r
 
 Status: promising investigative lead.
 
-## H9 — SurveyAggregator is an oracle, not the allocator
+## H9 - SurveyAggregator is an oracle, not the allocator
 
 ### Working hypothesis
 
@@ -249,7 +249,7 @@ This is a planning heuristic, not a statement that every family maps globally to
 
 Biome-boundary hunting should be treated as an exception rather than the default planning assumption.
 
-## Superseded static-analysis wording — `ResourceViewWidget +0xA0` / `+0x20`
+## Superseded static-analysis wording - `ResourceViewWidget +0xA0` / `+0x20`
 
 The earlier shorthand that described:
 
@@ -272,3 +272,28 @@ The current strong interpretation is narrower:
 
 Status: source-component copy behavior strongly supported; exact concrete class
 layout and semantic method name unresolved.
+
+## H10 - Resource families are represented by ordinary entries plus nested leveled lists
+
+### Working hypothesis
+
+The CK source component may contain an ordinary family-root entry and one or
+more `TESLevItem` entries whose descendants represent optional family members
+or branches. The seed-derived 16-bit selector would control descendant
+resolution through the generic leveled-list evaluator.
+
+### Static evidence and limitation
+
+`FUN_140e457b0` distinguishes ordinary input entries from entries whose form
+pointer dynamically casts to `TESLevItem`. It copies ordinary entries to a new
+output `TESContainer` and evaluates leveled entries through `FUN_140dddba0`.
+This proves the generic resolver can process a mixed input. It does not prove
+the live resource-preview input is mixed, that any leaf is an `IRES`, or that
+the nesting matches a resource family.
+
+A live CK capture must compare the source, copied temporary input, and resolved
+output for a known family and correlate the source with BIOM/RSGD candidates.
+Until then Models 1, 2, and 3 remain unresolved.
+
+Status: structurally plausible but untested against live container contents;
+neither strengthened nor rejected by this static-only experiment.

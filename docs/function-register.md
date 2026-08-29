@@ -213,6 +213,39 @@ FUN_140e457b0
 generic leveled-list evaluator
 ```
 
+The direct call in `FUN_1431bc320` is at `0x1431BC375` and targets the thunk at
+`0x14013A471`, which resolves to `FUN_140e457b0`. Its Windows x64 arguments are:
+
+```text
+RCX = &temporary TESContainer at call-site RSP+0x20
+RDX = &resolved-container output slot at call-site RSP+0xD0
+R8  = *(ResourceViewWidget + 0x30)
+R9W = low 16 bits of QSpinBox::value(*(ResourceViewWidget + 0x98))
+```
+
+`MOVZX R9D,AX` at `0x1431BC360` performs the narrowing; this caller applies no
+further arithmetic transform. The resolver allocates a separate
+`TESContainer`, stores it through RDX, copies ordinary entries, and resolves
+`TESLevItem` entries through `FUN_140dddba0`. Immediately after return at
+`0x1431BC37A`, RAX points to the output slot. Thus the temporary input is not
+the post-resolution container.
+
+The input layout used mechanically by the copy/resolver path is:
+
+```text
+container +0x40 : 32-bit entry count
+container +0x44 : 32-bit capacity
+container +0x48 : entry-array pointer
+entry size      : 0x18
+entry +0x00     : signed quantity/count
+entry +0x08     : TESBoundObject/form pointer
+entry +0x10     : metadata pointer
+```
+
+The resolver dynamically casts the form pointer from `TESBoundObject` to
+`TESLevItem`; on success it passes `object+0x340` to `FUN_140dddba0`. These
+facts do not establish any live form identity or resource-family topology.
+
 ### Important caution
 
 Reaching leveled-list machinery does not establish that this function itself assigns resource families to biomes.
@@ -229,11 +262,9 @@ It may instead be a generic selector used by a higher-level resource-specific al
 
 ### Next analysis
 
-Use the automated exporter to:
-- enumerate all callers;
-- identify caller clusters;
-- inspect constant/offset patterns;
-- locate resource-specific callers distinct from generic leveled-list use.
+Use `ExportResourceResolutionEvidence.java` to prepare a live observation-only
+capture, then record source, temporary input, selector, and the separately
+allocated resolved output for one known CK family case.
 
 ---
 

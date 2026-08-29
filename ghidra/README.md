@@ -182,7 +182,7 @@ Definition traversal has a maximum depth of 8. The target and each argument use 
 
 Stack-address provenance is deliberately narrower than alias analysis. It recognizes the configured stack-pointer register plus constant `INT_ADD`, `PTRSUB`, or constant-index `PTRADD` arithmetic, with `COPY`, `CAST`, and integer-extension wrappers. Status is `resolved-stack-address`, `unresolved-stack-address`, or `unsupported-stack-address-pattern`. Stack offsets are emitted as signed decimal values, signed hexadecimal strings such as `-0xA8`, and readable labels such as `stack[-0xA8]`. A stack-space varnode in the target tree is treated as stored contents, not as proof that an argument is its address.
 
-`receiverStorageCorrelation` preserves the detailed evidence for the address/storage relationship—argument 0 is the address of a stack object while the target expression reads contents from the same stack offset. It does not compare the argument value to the vptr value. When stronger receiver normalization is unavailable, the resolver now applies the same conservative exact-offset relationship to establish the receiver and then reuses the existing initializer/constructor provenance path. An `INDIRECT` definition remains supporting side-effect evidence only; it is not proof that an earlier call is a constructor.
+`receiverStorageCorrelation` preserves the detailed evidence for the address/storage relationship-argument 0 is the address of a stack object while the target expression reads contents from the same stack offset. It does not compare the argument value to the vptr value. When stronger receiver normalization is unavailable, the resolver now applies the same conservative exact-offset relationship to establish the receiver and then reuses the existing initializer/constructor provenance path. An `INDIRECT` definition remains supporting side-effect evidence only; it is not proof that an earlier call is a constructor.
 
 For the current diagnostic target, navigate to `FUN_1431bc320` at `1431BC320`, run the exporter, and open:
 
@@ -323,6 +323,45 @@ and does not rename symbols, apply types, change signatures, create labels or
 comments, modify memory, or intentionally alter analysis state. Candidate
 same-initializer/slot calls remain comparison leads unless receiver/vtable
 provenance independently attributes them to `TESContainer`.
+
+## ExportResourceResolutionEvidence.java
+
+`ExportResourceResolutionEvidence.java` is the focused, read-only setup exporter
+for the pre-/post-resolution family-container experiment. Static Ghidra does not
+contain Creation Kit heap objects, so the script exports an exact runtime
+capture contract rather than presenting static memory as a live observation.
+It records the copy, resolver-entry, and resolver-return addresses and RVAs;
+caller/resolver code; the supported container layout; selector provenance; and
+explicitly marked empty runtime-stage templates.
+
+Headless arguments are:
+
+```text
+ExportResourceResolutionEvidence.java \
+  <export-root> [case-name] [caller] [copy-call] [resolver] [max-depth] \
+  [expected-BIOM] [expected-RSGD] [expected-family]
+```
+
+Defaults are caller `1431BC320`, copy call `1431BC350`, resolver `140E457B0`,
+and maximum recursive depth 8. Example:
+
+```text
+analyzeHeadless <scratch-project-directory> StarfieldCK \
+  -process CreationKit.exe -readOnly -noanalysis \
+  -scriptPath <repository>/ghidra/scripts \
+  -postScript ExportResourceResolutionEvidence.java \
+  <repository>/exports nickel-linear 1431BC320 1431BC350 140E457B0 8 \
+  FrozenNoLife09 FrozenBarrenDefaultRes03 Nickel
+```
+
+Output is written to `exports/resource-resolution/<case-name>/`. On the
+currently analysed CK build the script resolves the resolver call at
+`0x1431BC375` and its return instruction at `0x1431BC37A`. Runtime consumers
+must use the exported RVAs plus the live module base.
+
+The stage files begin with `captureStatus: not-captured`; empty entry arrays are
+placeholders, not evidence. The script starts no transaction and does not
+rename, type, comment, patch, or otherwise modify the Ghidra program.
 
 ## AnalyzeFieldProvenance.java
 
