@@ -275,6 +275,55 @@ Files with the same names are replaced when the same neighbourhood is exported a
 
 Like the single-function exporter, this script is non-destructive with respect to Ghidra: it starts no transaction and does not rename symbols, change signatures, create labels or comments, apply types, modify memory, or intentionally change analysis state.
 
+## ExportCallSignatureEvidence.java
+
+`ExportCallSignatureEvidence.java` is a focused, read-only exporter for reconciling
+the indirect call at `FUN_1431bc320` address `0x1431BC350` with resolved target
+`FUN_140e0aab0`. It exports the call-site disassembly and low p-code, the complete
+high-p-code `CALLIND` inputs and bounded definition trees, Windows x64 argument
+mapping, callee entry/signature/parameter storage, bounded first uses of every
+callee parameter, direct-caller results, candidate calls from other users of the
+same TESContainer initializer, and representative component-vtable slot-10 data.
+
+The default GUI run prompts only for an export root. Headless use accepts:
+
+```text
+ExportCallSignatureEvidence.java <export-root> [caller] [call-site] [callee] [window-start] [window-end]
+```
+
+All addresses are hexadecimal. Defaults are:
+
+```text
+caller       1431BC320
+call-site    1431BC350
+callee       140E0AAB0
+window-start 1431BC320
+window-end   1431BC370
+```
+
+Example headless invocation against an existing project copy:
+
+```text
+analyzeHeadless <project-directory> <project-name> \
+  -process CreationKit.exe -readOnly -noanalysis \
+  -scriptPath <repository>/ghidra/scripts \
+  -postScript ExportCallSignatureEvidence.java <repository>/exports
+```
+
+Output is written beneath:
+
+```text
+exports/call-signatures/FUN_1431bc320__1431BC320__call_1431BC350/
+```
+
+The script reads the current program's listing, symbols, references, function
+signatures, decompiler high p-code, and instruction low p-code. It writes only
+plain evidence files under the selected export root. It starts no transaction
+and does not rename symbols, apply types, change signatures, create labels or
+comments, modify memory, or intentionally alter analysis state. Candidate
+same-initializer/slot calls remain comparison leads unless receiver/vtable
+provenance independently attributes them to `TESContainer`.
+
 ## AnalyzeFieldProvenance.java
 
 `AnalyzeFieldProvenance.java` is a focused, read-only field-provenance exporter. It is intended for questions such as “where is the pointer later read from parameter 0 plus `0xA0` installed, and how is a nested `+0x20` expression used?” It does not assign semantic names or claim that equal offsets imply equal C++ types.

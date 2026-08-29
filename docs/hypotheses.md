@@ -248,3 +248,27 @@ number of distinct required resource families
 This is a planning heuristic, not a statement that every family maps globally to exactly one biome.
 
 Biome-boundary hunting should be treated as an exception rather than the default planning assumption.
+
+## Superseded static-analysis wording — `ResourceViewWidget +0xA0` / `+0x20`
+
+The earlier shorthand that described:
+
+```text
+*(ResourceViewWidget + 0xA0) + 0x20
+```
+
+as either an unexplained pointer into a plain `QTreeWidget` or, conversely, as
+proof that Qt's `QTreeWidget` directly embeds a `TESContainer` is superseded.
+
+The current strong interpretation is narrower:
+
+- `ResourceViewWidget +0xA0` holds a `QTreeWidget *`-compatible pointer;
+- the concrete pointed-to UI object exposes a polymorphic component-compatible
+  subobject at adjusted address `+0x20`;
+- `FUN_140e0aab0` type-checks and reads that adjusted subobject as its source
+  while copying entries into a temporary `TESContainer` destination;
+- the concrete UI subclass and whether the subobject arises through multiple
+  inheritance or containment remain unknown.
+
+Status: source-component copy behavior strongly supported; exact concrete class
+layout and semantic method name unresolved.

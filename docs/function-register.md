@@ -72,16 +72,28 @@ FUN_1431bc320
 
 Live `ExportFunctionNeighbourhood.java` output resolves the computed call at
 `0x1431BC350` through `TESContainer::vftable` slot byte offset `0x50` (index
-10) to `FUN_140e0aab0`. The third call argument is structurally represented in
-the root decompilation as:
+10), via `thunk_FUN_140e0aab0` at `0x1400904FD`, to `FUN_140e0aab0`.
+
+Machine code and high p-code now establish the three actual arguments as:
 
 ```text
-*(param_1 + 0xA0) + 0x20
+RCX = &temporary TESContainer at caller stack offset -0xA8
+RDX = *(ResourceViewWidget + 0x30)
+R8  = *(ResourceViewWidget + 0xA0) + 0x20
 ```
 
-This establishes the field/nested-offset relationship and call target. It does
-not establish the type of the object stored at `param_1 + 0xA0` or the semantic
-identity of its `+0x20` component.
+There is no fourth or stack argument. `R9` is not defined as an argument at the
+call; its physical value is caller-saved residue after the preceding constructor
+call. High-p-code `CALLIND` input 0 is the target and inputs 1, 2, and 3 map to
+the three values above.
+
+The `+0x20` operation is literal pointer adjustment after the single load from
+`ResourceViewWidget + 0xA0`; no hidden extra dereference occurs at the call
+site. The callee immediately dereferences the adjusted pointer as a polymorphic
+object and invokes its vtable slot `+0x30`. This strongly supports that the
+concrete QTreeWidget-compatible object has a component-compatible subobject at `+0x20`.
+It does not place that subobject in Qt's plain `QTreeWidget` layout or identify
+the concrete multiple-inheritance/containment declaration.
 
 ### Current interpretation
 
@@ -121,11 +133,11 @@ Then inspect its immediate call neighbourhood.
 
 **Address:** `0x140E0AAB0`
 
-**Proposed role:** generic `TESContainer` copy/clone-style component operation
+**Proposed role:** generic `TESContainer` source-to-destination component copy operation
 
 **Status:** confirmed resolved virtual target; semantics tentative
 
-**Confidence:** high for the call edge; medium for the generic copy/clone-style interpretation
+**Confidence:** high for the call edge and source/destination dataflow; medium for a semantic `CopyComponent` name
 
 ### Established relationship
 
@@ -141,18 +153,39 @@ The source-like argument supplied by `FUN_1431bc320` is derived from:
 *(param_1 + 0xA0) + 0x20
 ```
 
+### Confirmed ABI and first-use facts
+
+`FUN_140e0aab0` has three analyzed `__fastcall` parameters stored in `RCX`,
+`RDX`, and `R8`. At entry it preserves them as destination, context/owner, and
+source candidates respectively. It first uses the `R8` value by loading its
+vptr and calling virtual slot `+0x30`, compares the returned identity against
+the identity value used by this TESContainer routine, and returns without copying on a
+mismatch. On a match it:
+
+- prepares the `RCX` destination with the `RDX` value;
+- reads source count/capacity at source `+0x40`;
+- reads the source element pointer at source `+0x48`;
+- grows and writes the destination array at destination `+0x40/+0x48`;
+- copies 0x18-byte source elements through a helper that also receives `RDX`.
+
+This is strong source-to-destination component-copy behavior. The exact engine
+method name remains unknown.
+
 ### Important caution
 
-The resolved receiver is a temporary `TESContainer`, but that fact alone does
-not prove that the source object's `+0x20` component is an embedded
-`TESContainer`, a `BaseFormComponent` subobject, or a resource-specific type.
+The resolved receiver is a temporary `TESContainer`. The callee's vptr dispatch,
+identity gate, and subsequent source-field reads establish that the adjusted
+`+0x20` value is a compatible polymorphic component subobject, not an opaque
+address. Current evidence does not determine whether the concrete
+QTreeWidget-compatible type obtains that subobject through multiple inheritance
+or containment, nor does it justify calling the enclosing UI object itself a
+`TESContainer`.
 
 ### Next analysis
 
-- identify writes to the root object's `+0xA0` field;
-- trace the written pointer to an initializer or source argument;
-- inspect independent structural evidence for the nested `+0x20` component;
-- avoid semantic renaming until the object/component identity is established.
+- identify the concrete QTreeWidget-compatible class stored at
+  `ResourceViewWidget + 0xA0` and recover its `+0x20` subobject layout;
+- avoid semantic renaming until that class/layout identity is established.
 
 ---
 
