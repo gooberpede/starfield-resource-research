@@ -454,6 +454,30 @@ The bounded written-value trace has a maximum depth of eight. It supports consta
 
 For a read from the selected field, downstream high-p-code uses are followed through simple wrappers, loads, and fixed pointer arithmetic to identify the requested nested offset. For a write sourced directly from another function parameter, same-function loads/stores at that parameter plus the nested offset are also recorded. Calls consuming the derived component include argument indices and direct callee metadata where available. This is structural evidence only and does not force the nested component to be `TESContainer` or any other type.
 
+### Member-object usage and constructor callbacks
+
+The same run now performs a focused second stage for the object loaded from the selected field. Each structural `LOAD [parameter 0 + offset]` in the strong/medium class family and constructor callback family gets a bounded use tree in `member-A0-object-usage.json`. The record retains the load address, output varnode, HighVariable, decompiler datatype, null checks, arithmetic, call argument positions and adjustments, field reads/writes through the loaded object, direct/thunk-resolved callees, and recoverable indirect vtable slot metadata. Use expansion stops at depth eight, cycles, merged values, and non-alias-producing operations.
+
+For every structurally `constructor-like` lifecycle function, the analyzer examines call arguments for internal function addresses that occur after a proven ResourceViewWidget receiver/context argument. These conservative candidates are written to `callback-bindings.json`, including the registration call, source-object varnode, connection API when direct, raw and thunk-resolved callback, receiver/context positions and adjustments, and bounded symbol/string context. This rule is designed to separate a signal function pointer occurring before the receiver from a slot/callback function pointer occurring after it; opaque metadata-table and load-derived callbacks are not decoded.
+
+Each resolved internal callback seeds an independent callback family. `callback-family.json` follows direct internal calls for at most two hops and admits a helper only when callback parameter 0 is passed unchanged as callee argument 0. `callback-A0-accesses.json` then distinguishes:
+
+- pointer assignment and pointer clear/null at `this+0xA0`;
+- a read of the pointer;
+- calls on or with the loaded object;
+- field reads and writes through the loaded object;
+- uses of the requested nested offset.
+
+The receiver rule is deliberately conservative and exported as evidence. It does not prove that every callback ABI exposes ResourceViewWidget as parameter 0.
+
+### Object mutation, type evidence, and `obj+0x20`
+
+`object-mutations.json` treats a `STORE` through the loaded object as a mutation. A call receiving the object is recorded separately as an `unknown mutation candidate`, because high p-code alone does not establish constness or side effects. This keeps pointer assignment distinct from mutation of the already-referenced object.
+
+`object-plus20-usage.json` selects operations whose address, call receiver, argument adjustment, or recovered indirect-dispatch receiver is structurally `obj+0x20`. It reports reads, writes, direct or indirect calls, vptr loads and slot offsets where recoverable, but does not assign a type to the embedded component.
+
+`type-evidence.json` scores evidence independently of the decompiler guess. A HighVariable datatype such as `QTreeWidget *` is weak. A resolved API/constructor/destructor containing the concrete Qt type is strong; a compatible `QAbstractItemView`, `QWidget`, or `QObject` API is medium and supports only the base relationship. The script never applies the proposed type. `resource-signals.json` scans the focused functions and one internal call edge for BIOM, RSGD, PNDT, RSCS, TESLevItem, TESContainer, resource text, and the two registered resource-path functions. A generic TESContainer match is explicitly not sufficient by itself.
+
 ### Output structure
 
 For the default target, the output is:
@@ -471,6 +495,14 @@ exports/
       ├─ field-A0-accesses.json
       ├─ field-A0-writes.json
       ├─ provenance.json
+      ├─ member-A0-object-usage.json
+      ├─ callback-bindings.json
+      ├─ callback-family.json
+      ├─ callback-A0-accesses.json
+      ├─ object-mutations.json
+      ├─ object-plus20-usage.json
+      ├─ type-evidence.json
+      ├─ resource-signals.json
       └─ functions/
          └─ <function-name>__<entry-address>/
             ├─ metadata.json
@@ -482,9 +514,9 @@ exports/
             └─ constants.json
 ```
 
-`class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, the independent `FUN_1431bc320` status, and lifecycle summaries. `vtable-xrefs.json` contains per-vtable xrefs and explicit negative results. `lifecycle-candidates.json` contains structural stores and conservative role classifications. `class-methods.json` contains confidence and membership evidence; `receiver-family.json` isolates bounded nonvirtual helpers. The access file contains only strong/medium candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects detailed written-value traces.
+`class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, the independent `FUN_1431bc320` status, and lifecycle summaries. `vtable-xrefs.json` contains per-vtable xrefs and explicit negative results. `lifecycle-candidates.json` contains structural stores and conservative role classifications. `class-methods.json` contains confidence and membership evidence; `receiver-family.json` isolates bounded nonvirtual helpers. The access file contains only strong/medium candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects detailed written-value traces. Every new focused report likewise preserves an explicit negative result rather than silently omitting an empty discovery.
 
-Every internal function that directly references a discovered concrete class-vtable address is exported first and does not consume the ordinary quota. Candidate function bundles selected afterward are deduplicated and capped at 20 additional internal functions. Their priority groups are lifecycle candidates, internal vtable functions, `+0xA0` writers and other exact class anchors, then receiver-preserving internal helpers; field and nested-offset evidence break ties within those groups. External/inherited Qt functions are not exported and therefore cannot consume either group. Their slot metadata remains in `class-anchors.json`.
+Every internal function that directly references a discovered concrete class-vtable address is exported first. The ordinary class-family selection is capped at 30 functions. Focused member-object readers, constructor callbacks, callback-family functions, internal loaded-object callees, and the structurally rediscovered acceptance target `FUN_1431ef760` plus its resolved internal thunk target are then forced and deduplicated, so the actual total can exceed 30. `manifest.json` records both the configured ordinary cap and actual total. External/inherited Qt functions are not exported. Their call metadata remains in the JSON reports.
 
 ### Exact live test
 
@@ -497,13 +529,18 @@ Every internal function that directly references a discovered concrete class-vta
 7. Inspect `vtable-xrefs.json`; record the xref and structural-vptr-store count for each vtable. A zero count must appear as an explicit negative result.
 8. Confirm `FUN_1431e7d20` has recovered stores for the two concrete vtables at receiver offsets `0x0` and `0x10`. Verify that each record retains its xref address, resolved store address, and value-definition path.
 9. Inspect `lifecycle-candidates.json`; verify every classification against its vptr-store order, receiver offsets, callers, callees, allocation evidence, and limitations. `FUN_1431e7d20` is expected to become destructor-like from structural teardown evidence, but this result is not hard-coded. Treat offset `0x10` only as secondary-subobject evidence.
-10. Confirm both direct internal xref functions, `FUN_1431e7d20` and `FUN_1431e29f0`, are listed in the manifest's forced-xref export fields and have function bundles even if more than 20 ordinary candidates exist.
+10. Confirm both direct internal xref functions, `FUN_1431e7d20` and `FUN_1431e29f0`, are listed in the manifest's forced-xref export fields and have function bundles.
 11. Inspect `class-methods.json` and `receiver-family.json`; confirm that searched functions are `strong` or `medium`, receiver helpers have depth at most 2, and `FUN_1431bc320` is either structurally connected or explicitly preserved as unconnected.
 12. Inspect `field-A0-writes.json` before `field-A0-accesses.json`, then review `provenance.json`. The `+0xA0` matcher is unchanged; a negative result remains valid.
-13. Confirm `manifest.json` reports schema version 3, `readOnly: true`, the 256-slot vtable limit, depth 2, forced direct-xref export semantics, the 20-function ordinary quota, and explicit negative results where applicable.
-14. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
+13. Inspect `member-A0-object-usage.json`. Locate the structurally rediscovered `FUN_1431ef760` entry, verify each load address/HighVariable/datatype, and follow the depth-bounded uses. Confirm `manifest.json.memberUsageAcceptance` reports whether the known acceptance name was rediscovered without using it for discovery. Confirm its function bundle and any internal thunk target bundle exist.
+14. Inspect `callback-bindings.json`. Verify the constructor is `FUN_1431e29f0` from lifecycle evidence, then check source-object, receiver/context, connection call, raw callback, resolved callback, and evidence. Confirm the observed callback family around `thunk_FUN_1431f10b0`, `thunk_FUN_1431f0fe0`, and any text-change callback is either rediscovered structurally or absent with an explicit negative result; those names are not discovery seeds.
+15. Inspect `callback-family.json`; verify depth never exceeds 2 and every helper has unchanged receiver evidence. Then inspect `callback-A0-accesses.json`, explicitly separating pointer assignment/clear from loaded-object calls and field mutations.
+16. Inspect `object-mutations.json`. Treat stores as observed mutations and calls only as candidates. Inspect `object-plus20-usage.json` for `obj+0x20` reads/writes/calls, receiver adjustments, vptr loads, and recovered slots.
+17. Inspect `type-evidence.json`. Do not promote `QTreeWidget *` beyond weak unless an independent concrete Qt API, constructor/destructor, RTTI, or vtable relationship is present. Inspect `resource-signals.json` and validate every resource-related match against its referenced symbol/string/callee; one generic TESContainer match is insufficient.
+18. Confirm `manifest.json` reports schema version 3, `readOnly: true`, the 256-slot vtable limit, receiver/callback depth 2, the 30-function configured cap plus documented forced-export exceptions, report counts, and explicit negative results where applicable.
+19. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
 
-The minimum successful live outcome is: both known vtable anchors exported; `FUN_1431e7d20` rediscovered; its two vptr stores recognized at `0x0` and `0x10`; lifecycle classification progresses beyond no candidate; and `FUN_1431e29f0` is force-exported outside the ordinary quota. The best case is `FUN_1431e7d20` classified destructor-like, `FUN_1431e29f0` classified constructor-like from its own evidence, and the admitted constructor/family path revealing a `this+0xA0` write with useful provenance.
+The minimum successful live outcome for this iteration is: `FUN_1431ef760` is structurally rediscovered and exported with a recorded `+0xA0` use tree; constructor-wired internal callbacks are enumerated; callback-family expansion completes to depth two; callback-family `+0xA0` accesses are reported; concrete type evidence is separated from the weak Ghidra datatype; and `obj+0x20` use is recorded when observed. The best case is independent identification of the member-object type, a constructor callback that mutates or populates it, structural identification of the `+0x20` component, and a multi-signal path into resource-specific container/list generation.
 
 ### Known limitations
 
@@ -511,6 +548,11 @@ The minimum successful live outcome is: both known vtable anchors exported; `FUN
 - A concrete vtable cannot be inferred when it is unnamed; RTTI is recorded as supporting evidence but is not fully reconstructed.
 - The vtable walk assumes the named address is the first method slot and stops conservatively at the first invalid region.
 - Receiver-flow expansion is outbound-only and bounded to depth two; it is not recursive class reconstruction.
+- Constructor callback extraction sees only function-pointer arguments that reduce to defined internal addresses and follow a proven receiver/context argument. It does not decode arbitrary Qt metadata or heap-allocated functors.
+- Callback-family expansion assumes parameter 0 carries ResourceViewWidget and deliberately rejects adjusted, merged, indirect, or otherwise ambiguous receiver flow.
+- Object use trees follow wrappers and constant pointer arithmetic only. Calls are mutation candidates unless a write is independently recovered.
+- Indirect vtable recovery can report a slot and receiver adjustment without identifying the concrete runtime vtable/type.
+- Resource-signal scanning is name/string/type based and bounded to one internal call edge; it is a prioritization aid rather than semantic proof.
 - Vtable reference prefiltering can miss a compiler/decompiler form whose reference is absent from the current database.
 - Allocation, cleanup, and deallocation names are diagnostic inputs to conservative lifecycle classification; ownership and exact C++ semantics remain unresolved.
 - Nested analysis is bounded and same-function only. It does not traverse a heap graph or arbitrary aliases across calls.

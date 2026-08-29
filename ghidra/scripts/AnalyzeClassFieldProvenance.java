@@ -1,4 +1,4 @@
-// Discover a bounded class method family and analyze one this-relative field without modifying the program.
+// Analyze a bounded class field, its loaded object, and constructor-wired callbacks without modifying the program.
 // @category Starfield Research
 // @keybinding
 // @menupath
@@ -57,9 +57,12 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
     private static final int MAX_VTABLE_VALUE_DEPTH = 8;
     private static final int MAX_VTABLE_SLOTS = 256;
     private static final int MAX_THUNK_HOPS = 100;
-    private static final int MAX_EXPORTED_FUNCTIONS = 20;
+    private static final int MAX_EXPORTED_FUNCTIONS = 30;
     private static final int MAX_RECEIVER_FAMILY_DEPTH = 2;
+    private static final int MAX_CALLBACK_FAMILY_DEPTH = 2;
     private static final String EXPECTED_ANCHOR_SUFFIX = "::OnApplySeed";
+    // Acceptance-only name: discovery and analysis never depend on this value.
+    private static final String EXPECTED_MEMBER_USAGE_ACCEPTANCE_NAME = "FUN_1431ef760";
     private static final Gson JSON = new GsonBuilder()
         .setPrettyPrinting().disableHtmlEscaping().serializeNulls().create();
 
@@ -130,8 +133,24 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
                 }
             }
 
+            List<CallbackBinding> callbackBindings = extractCallbackBindings(vtableAnalysis, className);
+            List<CallbackFamilyMember> callbackFamily = expandCallbackFamily(
+                callbackBindings, MAX_CALLBACK_FAMILY_DEPTH);
+            List<MemberObjectLoad> memberObjectLoads = analyzeMemberObjectLoads(
+                methodList, callbackFamily, fieldOffset, nestedOffset);
+            List<CallbackFieldAccess> callbackAccesses = analyzeCallbackFieldAccesses(
+                callbackFamily, fieldOffset, nestedOffset);
+            List<ObjectMutation> objectMutations = collectObjectMutations(memberObjectLoads);
+            List<Map<String, Object>> plusOffsetUsage = collectNestedObjectUsage(
+                memberObjectLoads, nestedOffset);
+            List<TypeEvidence> typeEvidence = collectTypeEvidence(memberObjectLoads, className);
+            List<Map<String, Object>> resourceSignals = collectResourceSignals(
+                memberObjectLoads, callbackFamily, objectMutations);
+
             List<Function> exported = exportStrongest(
                 methodList, accesses, vtableAnalysis, functionsOutput, generatedAt);
+            exportFocusedFunctions(methodList, memberObjectLoads, callbackBindings, callbackFamily,
+                objectMutations, plusOffsetUsage, exported, functionsOutput, generatedAt);
             write(output.resolve("class-anchors.json"), json(anchors.document(className)));
             write(output.resolve("vtable-xrefs.json"), json(vtableAnalysis.xrefDocument(className)));
             write(output.resolve("lifecycle-candidates.json"), json(vtableAnalysis.lifecycleDocument(className)));
@@ -142,9 +161,29 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             write(output.resolve("field-" + offsetLabel(fieldOffset) + "-writes.json"),
                 json(writeDocument(className, fieldOffset, writes)));
             write(output.resolve("provenance.json"), json(provenanceDocument(provenance)));
+            write(output.resolve("member-" + offsetLabel(fieldOffset) + "-object-usage.json"),
+                json(memberObjectDocument(className, fieldOffset, memberObjectLoads)));
+            write(output.resolve("callback-bindings.json"),
+                json(callbackBindingsDocument(className, callbackBindings)));
+            write(output.resolve("callback-family.json"),
+                json(callbackFamilyDocument(className, callbackFamily)));
+            write(output.resolve("callback-" + offsetLabel(fieldOffset) + "-accesses.json"),
+                json(callbackAccessDocument(className, fieldOffset, callbackAccesses)));
+            write(output.resolve("object-mutations.json"),
+                json(objectMutationDocument(className, fieldOffset, objectMutations)));
+            write(output.resolve("object-plus" +
+                    (nestedOffset == null ? "disabled" : offsetLabel(nestedOffset.longValue())) +
+                    "-usage.json"),
+                json(nestedObjectDocument(className, fieldOffset, nestedOffset, plusOffsetUsage)));
+            write(output.resolve("type-evidence.json"),
+                json(typeEvidenceDocument(className, fieldOffset, typeEvidence)));
+            write(output.resolve("resource-signals.json"),
+                json(resourceSignalsDocument(className, resourceSignals)));
             write(output.resolve("manifest.json"), json(manifest(
                 className, selected, fieldOffset, nestedOffset, generatedAt,
-                anchors, vtableAnalysis, methodList, accesses, writes, exported)));
+                anchors, vtableAnalysis, methodList, accesses, writes, exported,
+                callbackBindings, callbackFamily, memberObjectLoads, objectMutations,
+                typeEvidence, resourceSignals)));
 
             println("Exported class-scoped field provenance to " + output.toAbsolutePath());
             if (!anchors.anchorResolvedExactly()) {
@@ -732,6 +771,587 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return result;
     }
 
+    private List<CallbackBinding> extractCallbackBindings(
+            VtableAnalysis vtableAnalysis, String className) throws Exception {
+        List<CallbackBinding> result = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (LifecycleCandidate lifecycle : vtableAnalysis.lifecycleCandidates) {
+            if (!"constructor-like".equals(lifecycle.classification)) continue;
+            Decompilation decompilation = decompile(lifecycle.function);
+            if (decompilation.highFunction == null) continue;
+            HighParam receiver = highParam(decompilation.highFunction, 0);
+            Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+            Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
+            while (operations.hasNext()) {
+                monitor.checkCancelled();
+                PcodeOp operation = operations.next();
+                if ((operation.getOpcode() != PcodeOp.CALL && operation.getOpcode() != PcodeOp.CALLIND) ||
+                        operation.getNumInputs() < 2) continue;
+                Function connection = directCalledFunction(operation);
+                List<Integer> contextArguments = new ArrayList<>();
+                List<Long> contextAdjustments = new ArrayList<>();
+                for (int contextIndex = 1; contextIndex < operation.getNumInputs(); contextIndex++) {
+                    Long adjustment = receiverNode == null ? null : offsetFromBase(
+                        operation.getInput(contextIndex), receiverNode, 0);
+                    if (adjustment != null) {
+                        contextArguments.add(contextIndex - 1);
+                        contextAdjustments.add(adjustment);
+                    }
+                }
+                for (int index = 1; index < operation.getNumInputs(); index++) {
+                    NumericResolution pointer = resolveAddressValue(operation.getInput(index), 0,
+                        Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>()));
+                    if (!pointer.resolved || pointer.value == 0) continue;
+                    Address callbackAddress = defaultAddress(pointer.value);
+                    Function callback = callbackAddress == null ? null :
+                        currentProgram.getFunctionManager().getFunctionAt(callbackAddress);
+                    if (!isInternal(callback) || callback.equals(connection) ||
+                            callback.equals(lifecycle.function)) continue;
+                    boolean followsReceiverContext = false;
+                    for (Integer contextIndex : contextArguments)
+                        followsReceiverContext |= contextIndex.intValue() < index - 1;
+                    if (!followsReceiverContext) continue;
+                    ThunkResolution thunk = resolveThunk(callback);
+                    Function resolved = thunk.resolvedFunction == null ? callback : thunk.resolvedFunction;
+                    String key = address(lifecycle.function) + ":" + sequenceAddress(operation) + ":" +
+                        index + ":" + address(callback);
+                    if (!seen.add(key)) continue;
+                    CallbackBinding binding = new CallbackBinding(lifecycle.function, operation,
+                        connection, callback, resolved, index - 1, pointer);
+                    binding.receiverContextArgumentIndexes.addAll(contextArguments);
+                    binding.receiverAdjustments.addAll(contextAdjustments);
+                    binding.evidence.add("An argument at the constructor call site resolves to a defined internal function address.");
+                    if (!binding.receiverContextArgumentIndexes.isEmpty()) {
+                        binding.evidence.add("The ResourceViewWidget constructor receiver is also structurally passed at the registration site.");
+                    }
+                    if (callback.isThunk()) {
+                        binding.evidence.add("Callback thunk resolves to " + fullName(resolved) +
+                            " at " + address(resolved) + ".");
+                    }
+                    binding.nearbyContext.addAll(callbackContext(resolved));
+                    result.add(binding);
+                }
+            }
+        }
+        Collections.sort(result, CallbackBinding.ORDER);
+        return result;
+    }
+
+    private List<CallbackFamilyMember> expandCallbackFamily(
+            List<CallbackBinding> bindings, int maximumDepth) throws Exception {
+        Map<String, CallbackFamilyMember> family = new LinkedHashMap<>();
+        List<CallbackFamilyMember> frontier = new ArrayList<>();
+        for (CallbackBinding binding : bindings) {
+            Function function = binding.resolvedCallback;
+            if (!isInternal(function)) continue;
+            CallbackFamilyMember member = family.get(functionKey(function));
+            if (member == null) {
+                member = new CallbackFamilyMember(function, binding, 0,
+                    "constructor-wired-callback", "strong");
+                member.evidence.add("Function pointer recovered from constructor registration at " +
+                    binding.callSite + ".");
+                family.put(functionKey(function), member);
+                frontier.add(member);
+            }
+        }
+        for (int depth = 1; depth <= maximumDepth && !frontier.isEmpty(); depth++) {
+            List<CallbackFamilyMember> next = new ArrayList<>();
+            for (CallbackFamilyMember source : frontier) {
+                Decompilation decompilation = decompile(source.function);
+                if (decompilation.highFunction == null) continue;
+                HighParam receiver = highParam(decompilation.highFunction, 0);
+                Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+                if (receiverNode == null) continue;
+                Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
+                while (operations.hasNext()) {
+                    PcodeOp operation = operations.next();
+                    if (operation.getOpcode() != PcodeOp.CALL || operation.getNumInputs() < 2 ||
+                            !Long.valueOf(0).equals(offsetFromBase(
+                                operation.getInput(1), receiverNode, 0))) continue;
+                    Function callee = directCalledFunction(operation);
+                    if (!isInternal(callee)) continue;
+                    ThunkResolution thunk = resolveThunk(callee);
+                    Function resolved = thunk.resolvedFunction == null ? callee : thunk.resolvedFunction;
+                    CallbackFamilyMember member = family.get(functionKey(resolved));
+                    if (member == null) {
+                        member = new CallbackFamilyMember(resolved, source.sourceBinding, depth,
+                            "receiver-preserving-callee", "medium");
+                        member.sourceFunction = source.functionName;
+                        member.sourceFunctionAddress = source.functionAddress;
+                        member.callSite = sequenceAddress(operation);
+                        member.evidence.add("Caller parameter 0 is passed as callee argument 0 without adjustment.");
+                        family.put(functionKey(resolved), member);
+                        if (depth < maximumDepth) next.add(member);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        List<CallbackFamilyMember> result = new ArrayList<>(family.values());
+        Collections.sort(result, CallbackFamilyMember.ORDER);
+        return result;
+    }
+
+    private List<MemberObjectLoad> analyzeMemberObjectLoads(List<MethodCandidate> methods,
+            List<CallbackFamilyMember> callbackFamily, long fieldOffset, Long nestedOffset) throws Exception {
+        Map<String, FunctionScope> scope = new LinkedHashMap<>();
+        for (MethodCandidate method : methods) {
+            if (!"weak".equals(method.confidence) && isInternal(method.function)) {
+                scope.put(functionKey(method.function), new FunctionScope(
+                    method.function, "class-family", method.confidence));
+            }
+        }
+        for (CallbackFamilyMember member : callbackFamily) {
+            FunctionScope existing = scope.get(functionKey(member.function));
+            if (existing == null) scope.put(functionKey(member.function), new FunctionScope(
+                member.function, "callback-family", member.confidence));
+            else existing.scope = "class-and-callback-family";
+        }
+        List<MemberObjectLoad> result = new ArrayList<>();
+        for (FunctionScope item : scope.values()) {
+            Decompilation decompilation = decompile(item.function);
+            if (decompilation.highFunction == null) continue;
+            HighParam receiver = highParam(decompilation.highFunction, 0);
+            Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+            if (receiverNode == null) continue;
+            Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
+            while (operations.hasNext()) {
+                PcodeOp operation = operations.next();
+                if (operation.getOpcode() != PcodeOp.LOAD || operation.getNumInputs() < 2 ||
+                        !Long.valueOf(fieldOffset).equals(offsetFromBase(
+                            operation.getInput(1), receiverNode, 0))) continue;
+                MemberObjectLoad load = new MemberObjectLoad(item, operation, fieldOffset);
+                traceObjectUses(operation.getOutput(), operation.getOutput(), 0,
+                    Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>()), load.uses);
+                for (ObjectUse use : load.uses) {
+                    load.nullChecked |= "null-check".equals(use.kind);
+                    load.arithmeticApplied |= "arithmetic".equals(use.kind);
+                    if (nestedOffset != null && Long.valueOf(nestedOffset).equals(use.relativeOffset))
+                        load.nestedOffsetObserved = true;
+                }
+                result.add(load);
+            }
+        }
+        Collections.sort(result, MemberObjectLoad.ORDER);
+        return result;
+    }
+
+    private void traceObjectUses(Varnode value, Varnode root, int depth, Set<Varnode> visited,
+            List<ObjectUse> result) throws Exception {
+        if (value == null || depth > MAX_TRACE_DEPTH || !visited.add(value)) return;
+        Iterator<PcodeOp> descendants = value.getDescendants();
+        while (descendants.hasNext()) {
+            PcodeOp use = descendants.next();
+            ObjectUse record = classifyObjectUse(use, root, depth);
+            if (record != null) result.add(record);
+            if (use.getOutput() != null && isObjectAliasOperation(use.getOpcode())) {
+                traceObjectUses(use.getOutput(), root, depth + 1, visited, result);
+            }
+        }
+    }
+
+    private ObjectUse classifyObjectUse(PcodeOp operation, Varnode root, int depth) throws Exception {
+        int opcode = operation.getOpcode();
+        ObjectUse result = new ObjectUse(operation, depth);
+        if (opcode == PcodeOp.INT_EQUAL || opcode == PcodeOp.INT_NOTEQUAL) {
+            for (int index = 0; index < operation.getNumInputs(); index++) {
+                Varnode input = stripWrappers(operation.getInput(index));
+                if (input != null && input.isConstant() && input.getOffset() == 0) {
+                    result.kind = "null-check";
+                    return result;
+                }
+            }
+        }
+        if (opcode == PcodeOp.INT_ADD || opcode == PcodeOp.PTRADD || opcode == PcodeOp.PTRSUB) {
+            result.kind = "arithmetic";
+            result.relativeOffset = operation.getOutput() == null ? null :
+                offsetFromBase(operation.getOutput(), root, 0);
+            return result;
+        }
+        if ((opcode == PcodeOp.LOAD || opcode == PcodeOp.STORE) && operation.getNumInputs() >= 2) {
+            result.relativeOffset = offsetFromBase(operation.getInput(1), root, 0);
+            if (result.relativeOffset != null) {
+                result.kind = opcode == PcodeOp.LOAD ? "loaded-object-field-read" :
+                    "loaded-object-field-write";
+                if (opcode == PcodeOp.STORE && operation.getNumInputs() >= 3)
+                    result.value = varnode(operation.getInput(2));
+                return result;
+            }
+        }
+        if (opcode == PcodeOp.CALL || opcode == PcodeOp.CALLIND) {
+            for (int index = 1; index < operation.getNumInputs(); index++) {
+                Long adjustment = offsetFromBase(operation.getInput(index), root, 0);
+                if (adjustment != null) {
+                    result.argumentIndexes.add(index - 1);
+                    result.argumentAdjustments.add(adjustment);
+                }
+            }
+            if (!result.argumentIndexes.isEmpty()) {
+                result.kind = result.argumentIndexes.contains(Integer.valueOf(0)) ?
+                    "call-receiver" : "call-argument";
+                result.indirect = opcode == PcodeOp.CALLIND;
+                Function callee = opcode == PcodeOp.CALL ? directCalledFunction(operation) : null;
+                if (callee != null) {
+                    ThunkResolution thunk = resolveThunk(callee);
+                    result.callee = functionSummary(callee);
+                    result.resolvedCallee = functionSummary(
+                        thunk.resolvedFunction == null ? callee : thunk.resolvedFunction);
+                    result.callClassification = classifyObjectCall(
+                        thunk.resolvedFunction == null ? callee : thunk.resolvedFunction);
+                    result.nearbyContext.addAll(callbackContext(
+                        thunk.resolvedFunction == null ? callee : thunk.resolvedFunction));
+                }
+                else {
+                    result.callClassification = "unknown";
+                    result.vtableDispatch = recoverVtableDispatch(operation, root);
+                }
+                return result;
+            }
+        }
+        if (isWrapper(opcode)) {
+            result.kind = "alias";
+            return result;
+        }
+        result.kind = "other-use";
+        return result;
+    }
+
+    private boolean isObjectAliasOperation(int opcode) {
+        return isWrapper(opcode) || opcode == PcodeOp.INT_ADD || opcode == PcodeOp.PTRSUB ||
+            opcode == PcodeOp.PTRADD;
+    }
+
+    private Map<String, Object> recoverVtableDispatch(PcodeOp call, Varnode root) {
+        if (call.getOpcode() != PcodeOp.CALLIND || call.getNumInputs() == 0) return null;
+        Varnode target = stripWrappers(call.getInput(0));
+        PcodeOp targetLoad = target == null ? null : target.getDef();
+        if (targetLoad == null || targetLoad.getOpcode() != PcodeOp.LOAD ||
+                targetLoad.getNumInputs() < 2) return null;
+        OffsetExpression slotExpression = extractBasePlusConstant(targetLoad.getInput(1));
+        if (slotExpression == null)
+            slotExpression = new OffsetExpression(stripWrappers(targetLoad.getInput(1)), 0);
+        Varnode vptr = stripWrappers(slotExpression.base);
+        PcodeOp vptrLoad = vptr == null ? null : vptr.getDef();
+        if (vptrLoad == null || vptrLoad.getOpcode() != PcodeOp.LOAD ||
+                vptrLoad.getNumInputs() < 2) return null;
+        Long receiverAdjustment = offsetFromBase(vptrLoad.getInput(1), root, 0);
+        if (receiverAdjustment == null) return null;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("receiverAdjustment", receiverAdjustment);
+        result.put("receiverAdjustmentHex", unsignedHex(receiverAdjustment));
+        result.put("vtableByteOffset", slotExpression.offset);
+        result.put("vtableByteOffsetHex", unsignedHex(slotExpression.offset));
+        int pointerSize = currentProgram.getDefaultPointerSize();
+        result.put("vtableSlot", pointerSize > 0 && slotExpression.offset % pointerSize == 0 ?
+            Long.valueOf(slotExpression.offset / pointerSize) : null);
+        result.put("targetLoadSite", sequenceAddress(targetLoad));
+        result.put("vptrLoadSite", sequenceAddress(vptrLoad));
+        result.put("evidence", "Recovered from nested LOADs feeding CALLIND; no concrete runtime vtable address is assumed.");
+        return result;
+    }
+
+    private String classifyObjectCall(Function function) {
+        if (function == null) return "unknown";
+        String name = fullName(function).toLowerCase(Locale.ROOT);
+        if (name.contains("qtreewidget")) return "QTreeWidget method";
+        if (name.contains("qabstractitemview")) return "QAbstractItemView method";
+        if (name.contains("qobject")) return "QObject method";
+        if (name.contains("qwidget") || name.startsWith("qt") || name.contains("qt5") ||
+                name.contains("qt6")) return "Qt/external method";
+        return isInternal(function) ? "internal wrapper/helper" : "unknown external";
+    }
+
+    private List<Map<String, Object>> callbackContext(Function function) throws Exception {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (function == null) return result;
+        Map<String, Object> symbol = new LinkedHashMap<>();
+        symbol.put("kind", "callee-symbol");
+        symbol.put("name", fullName(function));
+        symbol.put("address", address(function));
+        result.add(symbol);
+        if (isInternal(function)) {
+            ReferenceContext references = collectReferences(function);
+            int count = 0;
+            for (Map<String, Object> string : references.strings) {
+                if (count++ >= 8) break;
+                Map<String, Object> item = new LinkedHashMap<>(string);
+                item.put("kind", "referenced-string");
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    private List<CallbackFieldAccess> analyzeCallbackFieldAccesses(
+            List<CallbackFamilyMember> callbackFamily, long fieldOffset, Long nestedOffset)
+            throws Exception {
+        List<CallbackFieldAccess> result = new ArrayList<>();
+        for (CallbackFamilyMember member : callbackFamily) {
+            Decompilation decompilation = decompile(member.function);
+            if (decompilation.highFunction == null) continue;
+            HighParam receiver = highParam(decompilation.highFunction, 0);
+            Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+            if (receiverNode == null) continue;
+            Iterator<? extends PcodeOp> operations = decompilation.highFunction.getPcodeOps();
+            while (operations.hasNext()) {
+                PcodeOp operation = operations.next();
+                if (operation.getOpcode() == PcodeOp.LOAD && operation.getNumInputs() >= 2 &&
+                        Long.valueOf(fieldOffset).equals(offsetFromBase(
+                            operation.getInput(1), receiverNode, 0))) {
+                    List<ObjectUse> uses = new ArrayList<>();
+                    traceObjectUses(operation.getOutput(), operation.getOutput(), 0,
+                        Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>()), uses);
+                    if (uses.isEmpty()) {
+                        result.add(new CallbackFieldAccess(member, operation, "pointer read", null, null));
+                    }
+                    for (ObjectUse use : uses) {
+                        String kind = callbackAccessKind(use, nestedOffset);
+                        if (kind != null) result.add(new CallbackFieldAccess(
+                            member, operation, kind, use.instructionAddress, use));
+                    }
+                }
+                else if (operation.getOpcode() == PcodeOp.STORE && operation.getNumInputs() >= 3 &&
+                        Long.valueOf(fieldOffset).equals(offsetFromBase(
+                            operation.getInput(1), receiverNode, 0))) {
+                    Varnode written = stripWrappers(operation.getInput(2));
+                    String kind = written != null && written.isConstant() && written.getOffset() == 0 ?
+                        "pointer clear/null" : "pointer assignment";
+                    CallbackFieldAccess access = new CallbackFieldAccess(
+                        member, operation, kind, sequenceAddress(operation), null);
+                    access.writtenValue = varnode(operation.getInput(2));
+                    result.add(access);
+                }
+            }
+        }
+        Collections.sort(result, CallbackFieldAccess.ORDER);
+        return result;
+    }
+
+    private String callbackAccessKind(ObjectUse use, Long nestedOffset) {
+        if ("call-receiver".equals(use.kind)) return "loaded-object method call";
+        if ("loaded-object-field-write".equals(use.kind)) return "loaded-object field write";
+        if ("loaded-object-field-read".equals(use.kind)) return "loaded-object field read";
+        if ("call-argument".equals(use.kind)) return "unknown mutation";
+        if (nestedOffset != null && Long.valueOf(nestedOffset).equals(use.relativeOffset))
+            return "nested-object offset use";
+        return null;
+    }
+
+    private List<ObjectMutation> collectObjectMutations(List<MemberObjectLoad> loads) throws Exception {
+        List<ObjectMutation> result = new ArrayList<>();
+        for (MemberObjectLoad load : loads) {
+            Decompilation decompilation = decompile(load.function);
+            HighParam receiver = decompilation.highFunction == null ? null :
+                highParam(decompilation.highFunction, 0);
+            Varnode receiverNode = receiver == null ? null : receiver.getRepresentative();
+            for (ObjectUse use : load.uses) {
+                if ("loaded-object-field-write".equals(use.kind)) {
+                    ObjectMutation mutation = new ObjectMutation(load, use, "store");
+                    mutation.objectFieldOffset = use.relativeOffset;
+                    mutation.valueProvenance = decompilation.highFunction == null ||
+                            use.rawOperation == null || use.rawOperation.getNumInputs() < 3 ?
+                        use.value : traceWrittenValue(decompilation.highFunction,
+                            use.rawOperation.getInput(2), receiverNode, 0,
+                            Collections.newSetFromMap(new IdentityHashMap<Varnode, Boolean>()));
+                    mutation.evidence.add("STORE destination reduces to the loaded member object plus a constant offset.");
+                    result.add(mutation);
+                }
+                else if ("call-receiver".equals(use.kind) || "call-argument".equals(use.kind)) {
+                    ObjectMutation mutation = new ObjectMutation(load, use, "call");
+                    mutation.callee = use.resolvedCallee == null ? use.callee : use.resolvedCallee;
+                    mutation.classification = "unknown mutation candidate";
+                    mutation.evidence.add("The loaded member object flows to a call; constness and mutation are not proven.");
+                    result.add(mutation);
+                }
+            }
+        }
+        Collections.sort(result, ObjectMutation.ORDER);
+        return result;
+    }
+
+    private List<Map<String, Object>> collectNestedObjectUsage(
+            List<MemberObjectLoad> loads, Long nestedOffset) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (nestedOffset == null) return result;
+        for (MemberObjectLoad load : loads) {
+            for (ObjectUse use : load.uses) {
+                boolean exact = Long.valueOf(nestedOffset).equals(use.relativeOffset);
+                boolean argumentMatch = false;
+                for (Long adjustment : use.argumentAdjustments)
+                    argumentMatch |= Long.valueOf(nestedOffset).equals(adjustment);
+                Map<String, Object> dispatch = use.vtableDispatch;
+                boolean dispatchMatch = dispatch != null && Long.valueOf(nestedOffset).equals(
+                    numberAsLong(dispatch.get("receiverAdjustment")));
+                if (!exact && !argumentMatch && !dispatchMatch) continue;
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("resourceViewWidgetFunction", load.functionName);
+                record.put("functionAddress", load.functionAddress);
+                record.put("objectLoadSite", load.instructionAddress);
+                record.put("nestedOffset", nestedOffset);
+                record.put("nestedOffsetHex", unsignedHex(nestedOffset));
+                record.put("site", use.instructionAddress);
+                record.put("operationKind", use.kind);
+                record.put("callee", use.resolvedCallee == null ? use.callee : use.resolvedCallee);
+                record.put("callClassification", use.callClassification);
+                record.put("vtableDispatch", use.vtableDispatch);
+                record.put("evidence", "Use contains an address or call receiver structurally derived as object plus the requested nested offset.");
+                result.add(record);
+            }
+        }
+        return result;
+    }
+
+    private List<TypeEvidence> collectTypeEvidence(
+            List<MemberObjectLoad> loads, String className) {
+        List<TypeEvidence> result = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (MemberObjectLoad load : loads) {
+            if (load.dataType != null && !load.dataType.isEmpty()) {
+                addTypeEvidence(result, seen, new TypeEvidence(load.dataType, "weak",
+                    "Decompiler HighVariable datatype on LOAD at " + load.instructionAddress +
+                    "; this is propagated analysis state, not independent proof."));
+            }
+            for (ObjectUse use : load.uses) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> callee = use.resolvedCallee == null ? use.callee : use.resolvedCallee;
+                if (callee == null) continue;
+                String name = String.valueOf(callee.get("functionFullName"));
+                String signature = String.valueOf(callee.get("signature"));
+                String combined = name + " " + signature;
+                if (containsIgnoreCase(combined, "QTreeWidget")) {
+                    addTypeEvidence(result, seen, new TypeEvidence("QTreeWidget *", "strong",
+                        "Loaded object is passed to a directly resolved function whose name/signature contains QTreeWidget at " +
+                        use.instructionAddress + "."));
+                }
+                else if (containsIgnoreCase(combined, "QAbstractItemView")) {
+                    addTypeEvidence(result, seen, new TypeEvidence("QAbstractItemView-compatible object", "medium",
+                        "Resolved direct call is typed/named for QAbstractItemView at " + use.instructionAddress + "."));
+                }
+                else if (containsIgnoreCase(combined, "QWidget") ||
+                        containsIgnoreCase(combined, "QObject")) {
+                    addTypeEvidence(result, seen, new TypeEvidence("generic Qt widget/object", "medium",
+                        "Resolved direct call supports only a generic Qt base at " + use.instructionAddress + "."));
+                }
+            }
+        }
+        if (result.isEmpty()) {
+            result.add(new TypeEvidence("unknown", "weak",
+                "No independent RTTI, vtable, constructor, destructor, or typed API evidence was recovered."));
+        }
+        return result;
+    }
+
+    private void addTypeEvidence(List<TypeEvidence> result, Set<String> seen, TypeEvidence evidence) {
+        String key = evidence.typeCandidate + ":" + evidence.confidence + ":" + evidence.evidence;
+        if (seen.add(key)) result.add(evidence);
+    }
+
+    private List<Map<String, Object>> collectResourceSignals(List<MemberObjectLoad> loads,
+            List<CallbackFamilyMember> callbackFamily, List<ObjectMutation> mutations) throws Exception {
+        Map<String, Function> functions = new LinkedHashMap<>();
+        for (MemberObjectLoad load : loads) functions.put(functionKey(load.function), load.function);
+        for (CallbackFamilyMember member : callbackFamily)
+            functions.put(functionKey(member.function), member.function);
+        for (ObjectMutation mutation : mutations) {
+            Map<String, Object> summary = mutation.callee;
+            Function function = functionFromSummary(summary);
+            if (isInternal(function)) functions.put(functionKey(function), function);
+        }
+        List<Function> seeds = new ArrayList<>(functions.values());
+        for (Function seed : seeds) {
+            for (Function callee : seed.getCalledFunctions(monitor))
+                if (isInternal(callee)) functions.put(functionKey(callee), callee);
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        String[] terms = new String[] { "BIOM", "RSGD", "PNDT", "RSCS", "TESLevItem",
+            "TESContainer", "resource", "FUN_140e457b0", "FUN_140e0aab0" };
+        for (Function function : functions.values()) {
+            List<String> matches = new ArrayList<>();
+            String searchable = fullName(function) + " " + function.getPrototypeString(true, true);
+            for (String term : terms) if (containsIgnoreCase(searchable, term)) matches.add(term);
+            ReferenceContext references = collectReferences(function);
+            List<Map<String, Object>> matchingReferences = new ArrayList<>();
+            for (Map<String, Object> item : references.strings) {
+                String value = String.valueOf(item.get("value"));
+                for (String term : terms) if (containsIgnoreCase(value, term)) {
+                    matches.add(term); matchingReferences.add(item); break;
+                }
+            }
+            for (Map<String, Object> item : references.globals) {
+                String value = String.valueOf(item.get("symbol")) + " " + String.valueOf(item.get("dataType"));
+                for (String term : terms) if (containsIgnoreCase(value, term)) {
+                    matches.add(term); matchingReferences.add(item); break;
+                }
+            }
+            List<Map<String, Object>> matchingCallees = new ArrayList<>();
+            for (Function callee : function.getCalledFunctions(monitor)) {
+                String value = fullName(callee) + " " + callee.getPrototypeString(true, true);
+                for (String term : terms) if (containsIgnoreCase(value, term)) {
+                    matches.add(term); matchingCallees.add(functionSummary(callee)); break;
+                }
+            }
+            if (matches.isEmpty()) continue;
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("function", functionSummary(function));
+            record.put("matchedTerms", new TreeSet<String>(matches));
+            record.put("matchingReferences", matchingReferences);
+            record.put("matchingCallees", matchingCallees);
+            record.put("interpretation", "Structural/name evidence only; a generic TESContainer hit alone does not establish a resource-specific path.");
+            result.add(record);
+        }
+        return result;
+    }
+
+    private void exportFocusedFunctions(List<MethodCandidate> methods, List<MemberObjectLoad> loads,
+            List<CallbackBinding> bindings, List<CallbackFamilyMember> family,
+            List<ObjectMutation> mutations, List<Map<String, Object>> plusOffsetUsage,
+            List<Function> alreadyExported, Path directory, Instant generatedAt) throws Exception {
+        Map<String, Function> requiredAcceptance = new LinkedHashMap<>();
+        for (MethodCandidate method : methods) {
+            if (!isMemberUsageAcceptanceFunction(method.function)) continue;
+            requiredAcceptance.put(functionKey(method.function), method.function);
+            ThunkResolution thunk = resolveThunk(method.function);
+            if (isInternal(thunk.resolvedFunction))
+                requiredAcceptance.put(functionKey(thunk.resolvedFunction), thunk.resolvedFunction);
+        }
+        Map<String, Function> priority = new LinkedHashMap<>();
+        for (MemberObjectLoad load : loads) priority.put(functionKey(load.function), load.function);
+        for (CallbackBinding binding : bindings)
+            if (isInternal(binding.resolvedCallback))
+                priority.put(functionKey(binding.resolvedCallback), binding.resolvedCallback);
+        for (CallbackFamilyMember member : family)
+            priority.put(functionKey(member.function), member.function);
+        for (ObjectMutation mutation : mutations) {
+            Function function = functionFromSummary(mutation.callee);
+            if (isInternal(function)) priority.put(functionKey(function), function);
+        }
+        Set<String> exportedKeys = new LinkedHashSet<>();
+        for (Function function : alreadyExported) exportedKeys.add(functionKey(function));
+        for (Function function : requiredAcceptance.values()) {
+            if (!exportedKeys.add(functionKey(function))) continue;
+            exportFunctionBundle(function, directory.resolve(safeFunctionName(function)), generatedAt);
+            alreadyExported.add(function);
+        }
+        for (Function function : priority.values()) {
+            if (!exportedKeys.add(functionKey(function))) continue;
+            exportFunctionBundle(function, directory.resolve(safeFunctionName(function)), generatedAt);
+            alreadyExported.add(function);
+        }
+    }
+
+    private static Long numberAsLong(Object value) {
+        return value instanceof Number ? Long.valueOf(((Number) value).longValue()) : null;
+    }
+
+    private Address defaultAddress(long offset) {
+        try {
+            return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset);
+        }
+        catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
     private List<VptrWrite> findVptrWrites(Function function, VtableCandidate vtable) {
         List<VptrWrite> result = new ArrayList<>();
         Decompilation decompilation = decompile(function);
@@ -763,6 +1383,14 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             operationIndex++;
         }
         return result;
+    }
+
+    private boolean isMemberUsageAcceptanceFunction(Function function) {
+        if (function == null) return false;
+        if (EXPECTED_MEMBER_USAGE_ACCEPTANCE_NAME.equals(function.getName())) return true;
+        ThunkResolution thunk = resolveThunkUnchecked(function);
+        return thunk.resolvedFunction != null &&
+            EXPECTED_MEMBER_USAGE_ACCEPTANCE_NAME.equals(thunk.resolvedFunction.getName());
     }
 
     private List<Map<String, Object>> findOtherVptrWrites(
@@ -1329,11 +1957,12 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return result;
     }
 
-    private Map<String, Object> functionSummary(Function function) {
+    private static Map<String, Object> functionSummary(Function function) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("functionName", function.getName());
         result.put("functionFullName", fullName(function));
         result.put("functionAddress", address(function));
+        result.put("signature", function.getPrototypeString(true, true));
         result.put("external", function.isExternal());
         result.put("thunk", function.isThunk());
         return result;
@@ -1353,7 +1982,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return "selected-function-not-anchor-or-direct-neighbour";
     }
 
-    private Map<String, Object> operationSummary(PcodeOp operation) {
+    private static Map<String, Object> operationSummary(PcodeOp operation) {
         if (operation == null) return null;
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("opcode", operation.getMnemonic());
@@ -1371,7 +2000,7 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return result;
     }
 
-    private Map<String, Object> varnode(Varnode value) {
+    private static Map<String, Object> varnode(Varnode value) {
         if (value == null) return null;
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("encoded", value.encodePiece());
@@ -1522,10 +2151,120 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         return result;
     }
 
+    private Map<String, Object> memberObjectDocument(String className, long fieldOffset,
+            List<MemberObjectLoad> loads) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("fieldOffset", fieldOffset);
+        result.put("fieldOffsetHex", unsignedHex(fieldOffset));
+        result.put("maximumUseDepth", MAX_TRACE_DEPTH);
+        result.put("scope", "Strong/medium class family plus constructor-wired callback family.");
+        result.put("loads", loads);
+        result.put("negativeResult", loads.isEmpty() ? "no-structural-member-object-load-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> callbackBindingsDocument(String className,
+            List<CallbackBinding> bindings) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("discovery", "Internal function-pointer arguments at structurally classified constructor registration calls.");
+        result.put("bindings", bindings);
+        result.put("negativeResult", bindings.isEmpty() ? "no-constructor-wired-internal-callback-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> callbackFamilyDocument(String className,
+            List<CallbackFamilyMember> family) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("maximumDepth", MAX_CALLBACK_FAMILY_DEPTH);
+        result.put("receiverRule", "Only direct internal calls passing callback parameter 0 unchanged as callee argument 0 are admitted.");
+        result.put("members", family);
+        result.put("negativeResult", family.isEmpty() ? "no-callback-family-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> callbackAccessDocument(String className, long fieldOffset,
+            List<CallbackFieldAccess> accesses) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("fieldOffset", fieldOffset);
+        result.put("fieldOffsetHex", unsignedHex(fieldOffset));
+        result.put("classifications", new String[] { "pointer assignment", "pointer clear/null",
+            "pointer read", "loaded-object method call", "loaded-object field write",
+            "loaded-object field read", "unknown mutation", "nested-object offset use" });
+        result.put("accesses", accesses);
+        result.put("negativeResult", accesses.isEmpty() ? "no-callback-family-field-access-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> objectMutationDocument(String className, long fieldOffset,
+            List<ObjectMutation> mutations) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("memberPointerOffset", fieldOffset);
+        result.put("memberPointerOffsetHex", unsignedHex(fieldOffset));
+        result.put("semantics", "Stores through the loaded object are mutations; calls are candidates because constness is not recovered.");
+        result.put("mutations", mutations);
+        result.put("negativeResult", mutations.isEmpty() ? "no-loaded-object-mutation-candidate-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> nestedObjectDocument(String className, long fieldOffset,
+            Long nestedOffset, List<Map<String, Object>> uses) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("memberPointerOffset", fieldOffset);
+        result.put("memberPointerOffsetHex", unsignedHex(fieldOffset));
+        result.put("nestedOffset", nestedOffset);
+        result.put("nestedOffsetHex", nestedOffset == null ? null : unsignedHex(nestedOffset));
+        result.put("uses", uses);
+        result.put("negativeResult", nestedOffset == null ? "nested-offset-disabled" :
+            uses.isEmpty() ? "no-structural-nested-offset-use-found" : null);
+        return result;
+    }
+
+    private Map<String, Object> typeEvidenceDocument(String className, long fieldOffset,
+            List<TypeEvidence> evidence) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("fieldOffset", fieldOffset);
+        result.put("fieldOffsetHex", unsignedHex(fieldOffset));
+        result.put("confidenceRules", new String[] {
+            "strong: concrete Qt type in a resolved constructor/destructor/API/vtable relationship",
+            "medium: compatible Qt base API without concrete derived-type proof",
+            "weak: decompiler datatype/name only or absence of independent evidence" });
+        result.put("evidence", evidence);
+        return result;
+    }
+
+    private Map<String, Object> resourceSignalsDocument(String className,
+            List<Map<String, Object>> signals) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", 1);
+        result.put("className", className);
+        result.put("scope", "One internal call edge from member-object, callback-family, and mutator functions.");
+        result.put("signals", signals);
+        result.put("caution", "A single generic TESContainer match is not sufficient to establish resource specificity.");
+        result.put("negativeResult", signals.isEmpty() ? "no-resource-specific-signal-found" : null);
+        return result;
+    }
+
     private Map<String, Object> manifest(String className, Function selected, long fieldOffset,
             Long nestedOffset, Instant generatedAt, AnchorDiscovery anchors, VtableAnalysis vtableAnalysis,
             List<MethodCandidate> methods, List<FieldAccess> accesses,
-            List<FieldAccess> writes, List<Function> exported) {
+            List<FieldAccess> writes, List<Function> exported,
+            List<CallbackBinding> callbackBindings, List<CallbackFamilyMember> callbackFamily,
+            List<MemberObjectLoad> memberObjectLoads, List<ObjectMutation> objectMutations,
+            List<TypeEvidence> typeEvidence, List<Map<String, Object>> resourceSignals) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("schemaVersion", 3);
         result.put("generatedAtUtc", generatedAt.toString());
@@ -1548,12 +2287,21 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         result.put("vtableReferenceCount", vtableAnalysis.totalReferenceCount());
         result.put("lifecycleCandidateCount", vtableAnalysis.lifecycleCandidates.size());
         result.put("receiverFamilyMaximumDepth", MAX_RECEIVER_FAMILY_DEPTH);
+        result.put("callbackBindingCount", callbackBindings.size());
+        result.put("callbackFamilyCount", callbackFamily.size());
+        result.put("callbackFamilyMaximumDepth", MAX_CALLBACK_FAMILY_DEPTH);
+        result.put("memberObjectLoadCount", memberObjectLoads.size());
+        result.put("memberUsageAcceptance", memberUsageAcceptance(methods, memberObjectLoads));
+        result.put("objectMutationCandidateCount", objectMutations.size());
+        result.put("typeEvidenceCount", typeEvidence.size());
+        result.put("resourceSignalCount", resourceSignals.size());
         result.put("exportLimit", MAX_EXPORTED_FUNCTIONS);
+        result.put("actualExportCount", exported.size());
         result.put("directInternalVtableXrefExportCount", vtableAnalysis.directInternalXrefFunctions.size());
         result.put("directInternalVtableXrefExports", functionSummaries(
             new ArrayList<>(vtableAnalysis.directInternalXrefFunctions.values())));
         result.put("exportLimitSemantics",
-            "Direct internal vtable-xref functions are forced first and do not consume the ordinary internal-function quota.");
+            "Direct internal vtable-xref functions and focused member/callback/mutator functions are forced and may exceed the ordinary 30-function quota; all exports are deduplicated.");
         result.put("exportedFunctions", functionSummaries(exported));
         result.put("readOnly", true);
         result.put("limitations", new String[] {
@@ -1561,9 +2309,36 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
             "Each concrete vtable symbol is walked independently; observed nonzero vptr offsets are reported without inferring exact inheritance semantics.",
             "Vtable STORE values are resolved only through bounded, non-branching wrappers and constant arithmetic; LOAD, CALL, MULTIEQUAL, and ambiguous forms stop resolution.",
             "Medium membership requires bounded outbound parameter-0 receiver flow from a strong anchor; raw proximity and offset reuse are excluded.",
+            "Callback extraction requires a constructor argument to reduce to a defined internal function address; opaque Qt metadata tables and LOAD-derived member pointers are not decoded.",
+            "Callback-family expansion assumes callback parameter 0 is the ResourceViewWidget receiver and admits only unchanged argument-0 flow.",
+            "A call receiving the loaded object is an unknown mutation candidate unless a STORE through the object is recovered.",
+            "Concrete Qt type evidence is reported separately from weak decompiler datatypes and is never applied to the program.",
             "No general alias analysis, class hierarchy reconstruction, symbolic execution, or heap graph traversal is performed.",
             "Lifecycle role and nested-component type remain unresolved unless independently supported by exported evidence."
         });
+        return result;
+    }
+
+    private Map<String, Object> memberUsageAcceptance(List<MethodCandidate> methods,
+            List<MemberObjectLoad> loads) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("expectedName", EXPECTED_MEMBER_USAGE_ACCEPTANCE_NAME);
+        result.put("discoveryDependsOnExpectedName", false);
+        List<Map<String, Object>> discovered = new ArrayList<>();
+        for (MethodCandidate method : methods) {
+            if (!isMemberUsageAcceptanceFunction(method.function)) continue;
+            Map<String, Object> record = functionSummary(method.function);
+            ThunkResolution thunk = resolveThunkUnchecked(method.function);
+            record.put("resolvedThunkTarget", thunk.resolvedFunction == null ? null :
+                functionSummary(thunk.resolvedFunction));
+            int loadCount = 0;
+            for (MemberObjectLoad load : loads)
+                if (load.functionAddress.equals(method.functionAddress)) loadCount++;
+            record.put("memberObjectLoadCount", loadCount);
+            discovered.add(record);
+        }
+        result.put("status", discovered.isEmpty() ? "not-rediscovered-structurally" : "rediscovered-structurally");
+        result.put("matches", discovered);
         return result;
     }
 
@@ -1680,6 +2455,216 @@ public class AnalyzeClassFieldProvenance extends GhidraScript {
         Files.write(path, contents.getBytes(StandardCharsets.UTF_8));
     }
     private static String json(Object value) { return JSON.toJson(value) + "\n"; }
+
+    private static final class FunctionScope {
+        transient final Function function;
+        String scope;
+        final String confidence;
+        FunctionScope(Function function, String scope, String confidence) {
+            this.function = function; this.scope = scope; this.confidence = confidence;
+        }
+    }
+
+    private static final class CallbackBinding {
+        static final Comparator<CallbackBinding> ORDER = new Comparator<CallbackBinding>() {
+            @Override public int compare(CallbackBinding left, CallbackBinding right) {
+                int compared = left.constructorFunctionAddress.compareTo(right.constructorFunctionAddress);
+                if (compared != 0) return compared;
+                compared = left.callSite.compareTo(right.callSite);
+                return compared != 0 ? compared : left.callbackFunctionAddress.compareTo(right.callbackFunctionAddress);
+            }
+        };
+        final String constructorFunction;
+        final String constructorFunctionAddress;
+        final String callSite;
+        final Map<String, Object> connectionApi;
+        final boolean indirectRegistrationCall;
+        final int sourceObjectArgumentIndex;
+        final Map<String, Object> sourceObject;
+        final int callbackArgumentIndex;
+        final String callbackFunction;
+        final String callbackFunctionAddress;
+        final String resolvedCallbackFunction;
+        final String resolvedCallbackFunctionAddress;
+        final List<Integer> receiverContextArgumentIndexes = new ArrayList<>();
+        final List<Long> receiverAdjustments = new ArrayList<>();
+        final List<String> pointerDefinitionPath;
+        final List<String> evidence = new ArrayList<>();
+        final List<Map<String, Object>> nearbyContext = new ArrayList<>();
+        transient final Function resolvedCallback;
+        CallbackBinding(Function constructor, PcodeOp operation, Function connection,
+                Function callback, Function resolved, int callbackArgumentIndex,
+                NumericResolution pointer) {
+            constructorFunction = constructor.getName();
+            constructorFunctionAddress = address(constructor);
+            callSite = sequenceAddress(operation);
+            connectionApi = connection == null ? null : functionSummary(connection);
+            indirectRegistrationCall = operation.getOpcode() == PcodeOp.CALLIND;
+            sourceObjectArgumentIndex = 0;
+            sourceObject = operation.getNumInputs() > 1 ? varnode(operation.getInput(1)) : null;
+            this.callbackArgumentIndex = callbackArgumentIndex;
+            callbackFunction = callback.getName(); callbackFunctionAddress = address(callback);
+            resolvedCallbackFunction = resolved.getName();
+            resolvedCallbackFunctionAddress = address(resolved);
+            pointerDefinitionPath = new ArrayList<>(pointer.definitionPath);
+            resolvedCallback = resolved;
+        }
+    }
+
+    private static final class CallbackFamilyMember {
+        static final Comparator<CallbackFamilyMember> ORDER = new Comparator<CallbackFamilyMember>() {
+            @Override public int compare(CallbackFamilyMember left, CallbackFamilyMember right) {
+                int compared = Integer.compare(left.depth, right.depth);
+                return compared != 0 ? compared : left.functionAddress.compareTo(right.functionAddress);
+            }
+        };
+        transient final Function function;
+        final String functionName;
+        final String functionAddress;
+        final String sourceCallback;
+        final String sourceCallbackAddress;
+        final int depth;
+        final String relationship;
+        final String confidence;
+        String sourceFunction;
+        String sourceFunctionAddress;
+        String callSite;
+        final List<String> evidence = new ArrayList<>();
+        transient final CallbackBinding sourceBinding;
+        CallbackFamilyMember(Function function, CallbackBinding binding, int depth,
+                String relationship, String confidence) {
+            this.function = function; functionName = function.getName(); functionAddress = address(function);
+            sourceCallback = binding.resolvedCallbackFunction;
+            sourceCallbackAddress = binding.resolvedCallbackFunctionAddress;
+            this.depth = depth; this.relationship = relationship; this.confidence = confidence;
+            sourceBinding = binding;
+        }
+    }
+
+    private static final class MemberObjectLoad {
+        static final Comparator<MemberObjectLoad> ORDER = new Comparator<MemberObjectLoad>() {
+            @Override public int compare(MemberObjectLoad left, MemberObjectLoad right) {
+                int compared = left.functionAddress.compareTo(right.functionAddress);
+                return compared != 0 ? compared : left.instructionAddress.compareTo(right.instructionAddress);
+            }
+        };
+        transient final Function function;
+        final String functionName;
+        final String functionAddress;
+        final String scope;
+        final String confidence;
+        final long fieldOffset;
+        final String fieldOffsetHex;
+        final String instructionAddress;
+        final Map<String, Object> loadResultVarnode;
+        final Map<String, Object> highVariable;
+        final String dataType;
+        boolean nullChecked;
+        boolean arithmeticApplied;
+        boolean nestedOffsetObserved;
+        final List<ObjectUse> uses = new ArrayList<>();
+        MemberObjectLoad(FunctionScope scope, PcodeOp load, long fieldOffset) {
+            function = scope.function; functionName = function.getName(); functionAddress = address(function);
+            this.scope = scope.scope; confidence = scope.confidence;
+            this.fieldOffset = fieldOffset; fieldOffsetHex = unsignedHex(fieldOffset);
+            instructionAddress = sequenceAddress(load);
+            Varnode output = load.getOutput();
+            loadResultVarnode = varnode(output);
+            HighVariable high = output == null ? null : output.getHigh();
+            if (high == null) {
+                highVariable = null; dataType = null;
+            }
+            else {
+                highVariable = new LinkedHashMap<>();
+                highVariable.put("name", high.getName());
+                highVariable.put("class", high.getClass().getName());
+                DataType type = high.getDataType();
+                dataType = type == null ? null : type.getDisplayName();
+                highVariable.put("dataType", dataType);
+            }
+        }
+    }
+
+    private static final class ObjectUse {
+        transient final PcodeOp rawOperation;
+        String kind;
+        final String instructionAddress;
+        final int depth;
+        final Map<String, Object> operation;
+        Long relativeOffset;
+        Map<String, Object> value;
+        boolean indirect;
+        final List<Integer> argumentIndexes = new ArrayList<>();
+        final List<Long> argumentAdjustments = new ArrayList<>();
+        Map<String, Object> callee;
+        Map<String, Object> resolvedCallee;
+        String callClassification;
+        Map<String, Object> vtableDispatch;
+        final List<Map<String, Object>> nearbyContext = new ArrayList<>();
+        ObjectUse(PcodeOp operation, int depth) {
+            rawOperation = operation;
+            instructionAddress = sequenceAddress(operation); this.depth = depth;
+            this.operation = operationSummary(operation);
+        }
+    }
+
+    private static final class CallbackFieldAccess {
+        static final Comparator<CallbackFieldAccess> ORDER = new Comparator<CallbackFieldAccess>() {
+            @Override public int compare(CallbackFieldAccess left, CallbackFieldAccess right) {
+                int compared = left.functionAddress.compareTo(right.functionAddress);
+                return compared != 0 ? compared : left.fieldAccessSite.compareTo(right.fieldAccessSite);
+            }
+        };
+        final String functionName;
+        final String functionAddress;
+        final String sourceCallback;
+        final int callbackFamilyDepth;
+        final String fieldAccessSite;
+        final String accessKind;
+        final String downstreamSite;
+        final ObjectUse downstreamUse;
+        Map<String, Object> writtenValue;
+        CallbackFieldAccess(CallbackFamilyMember member, PcodeOp fieldAccess,
+                String accessKind, String downstreamSite, ObjectUse downstreamUse) {
+            functionName = member.functionName; functionAddress = member.functionAddress;
+            sourceCallback = member.sourceCallback; callbackFamilyDepth = member.depth;
+            fieldAccessSite = sequenceAddress(fieldAccess); this.accessKind = accessKind;
+            this.downstreamSite = downstreamSite; this.downstreamUse = downstreamUse;
+        }
+    }
+
+    private static final class ObjectMutation {
+        static final Comparator<ObjectMutation> ORDER = new Comparator<ObjectMutation>() {
+            @Override public int compare(ObjectMutation left, ObjectMutation right) {
+                int compared = left.functionAddress.compareTo(right.functionAddress);
+                return compared != 0 ? compared : left.site.compareTo(right.site);
+            }
+        };
+        final String resourceViewWidgetFunction;
+        final String functionAddress;
+        final String objectLoadSite;
+        Long objectFieldOffset;
+        final String mutationKind;
+        final String site;
+        Map<String, Object> callee;
+        Map<String, Object> valueProvenance;
+        String classification;
+        final List<String> evidence = new ArrayList<>();
+        ObjectMutation(MemberObjectLoad load, ObjectUse use, String mutationKind) {
+            resourceViewWidgetFunction = load.functionName; functionAddress = load.functionAddress;
+            objectLoadSite = load.instructionAddress; this.mutationKind = mutationKind;
+            site = use.instructionAddress;
+        }
+    }
+
+    private static final class TypeEvidence {
+        final String typeCandidate;
+        final String confidence;
+        final String evidence;
+        TypeEvidence(String typeCandidate, String confidence, String evidence) {
+            this.typeCandidate = typeCandidate; this.confidence = confidence; this.evidence = evidence;
+        }
+    }
 
     private static final class AnchorDiscovery {
         transient final Function selected;
