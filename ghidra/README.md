@@ -1,12 +1,13 @@
 # Ghidra tooling
 
-This directory currently provides three read-only exporters:
+This directory currently provides four read-only exporters:
 
 - `ExportSelectedFunctionContext.java` exports one selected function.
 - `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1. It also performs focused recovery of simple vtable-based indirect calls in the root.
 - `AnalyzeFieldProvenance.java` traces a selected parameter/member offset, ranks same-offset read/write candidates, performs bounded written-value and nested-offset analysis, and exports the strongest candidate functions.
+- `AnalyzeClassFieldProvenance.java` discovers a bounded method family for one named class and searches only strong/medium class members for a selected `this`-relative field.
 
-All three scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. None starts a transaction or modifies the open program.
+All four scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. None starts a transaction or modifies the open program.
 
 ## ExportSelectedFunctionContext.java
 
@@ -361,3 +362,130 @@ Candidate bundles are deduplicated by function entry and limited to the stronges
 - Export is not atomic; cancellation or an I/O failure can leave partial files. The final manifest is written last.
 
 Like the other exporters, this script only reads Ghidra analysis state and writes external files. It starts no transaction and does not rename symbols/functions, create labels/comments, change signatures/types, or modify memory.
+
+## AnalyzeClassFieldProvenance.java
+
+`AnalyzeClassFieldProvenance.java` is the focused follow-up to the whole-program offset scan. It answers a narrower question: which functions have independent evidence tying them to a named class, and which of those functions access one exact `this`-relative field? Offset reuse, nearby addresses, generic Qt relationships, and raw caller proximity do not establish class membership.
+
+The initial target and defaults are:
+
+```text
+class name: ResourceViewWidget
+field offset: 0xA0
+nested offset: 0x20
+exact root anchor: ResourceViewWidget::OnApplySeed
+```
+
+The class name, field offset, and optional nested offset are prompted at run time. The exact root-anchor suffix is deliberately fixed to `::OnApplySeed` for this focused iteration. If the exact full symbol does not resolve, the export records `anchor-unresolved`; it never substitutes a similarly named symbol.
+
+### Anchor discovery and confidence
+
+The script scans the current symbol table for symbols containing the supplied class text and separates:
+
+- exact class-qualified functions;
+- vtable/vftable candidates;
+- RTTI-related candidates;
+- the exact `ResourceViewWidget::OnApplySeed` method anchor;
+- functions structurally confirmed to write a discovered class vtable through parameter 0 at offset zero.
+
+Every candidate method has one of three confidence levels:
+
+- `strong`: exact class-qualified symbol, direct vtable slot, confirmed class-vtable writer, or a Ghidra-defined thunk/implementation relationship to one of those;
+- `medium`: a direct caller or callee has high-p-code evidence that parameter 0 flows as argument 0 between it and a strong method;
+- `weak`: supporting context only. Weak evidence never establishes membership and weak candidates are not searched for the field.
+
+This model intentionally excludes the previous global rule that treated structural parameter-0 `+0xA0` matches as possible class evidence.
+
+### Vtable enumeration
+
+For each symbol whose full name contains both the exact class text and `vtable` or `vftable`, the script reads pointer-sized entries beginning at the symbol address. It records the slot index, byte offset, slot address, raw pointer, directly defined function, thunk hop count, and resolved implementation.
+
+Walking stops at the first null, unreadable, overflowed, or non-function slot, or after 256 slots. The bound and stop reason are exported. This is a deliberately conservative primary-vtable walk; it does not continue through arbitrary adjacent data or reconstruct secondary vtables and multiple inheritance layouts.
+
+### Constructor/destructor candidates
+
+References to each concrete class-vtable address are used only as a prefilter. A function becomes a strong vtable-writer candidate only when high p-code proves:
+
+```text
+STORE ResourceViewWidget vtable address -> parameter 0 + 0
+```
+
+The export records the store address, whether it appears early/middle/late in high-p-code operation order, other vtable writes through the same receiver at offset zero, and whether any caller also calls a function with an allocation-like name. The result remains `constructor-or-destructor-candidate`: neither source name nor store position alone is used to decide constructor versus destructor.
+
+### Class-scoped field matching and provenance
+
+Only strong and medium method candidates are decompiled for field analysis. A read or write is accepted only when high-p-code pointer arithmetic reduces structurally to:
+
+```text
+parameter 0 + exact requested field offset
+```
+
+`LOAD` and `STORE` are reported separately. Writes are conservatively classified as:
+
+- `clear/null` for a direct zero constant;
+- `initialization` for a direct call return;
+- `assignment` for a function parameter;
+- `copy` for a load expression;
+- `unknown` otherwise.
+
+The bounded written-value trace has a maximum depth of eight. It supports constants/program addresses and symbols, function parameters, direct or indirect call returns, fixed-offset loads, and simple constant address arithmetic. Allocator/factory-looking names are emitted only as name-based hints. `MULTIEQUAL`, cycles, unsupported operations, and the depth limit are explicit unresolved states; the script does not choose branches or perform alias analysis.
+
+For a read from the selected field, downstream high-p-code uses are followed through simple wrappers, loads, and fixed pointer arithmetic to identify the requested nested offset. For a write sourced directly from another function parameter, same-function loads/stores at that parameter plus the nested offset are also recorded. Calls consuming the derived component include argument indices and direct callee metadata where available. This is structural evidence only and does not force the nested component to be `TESContainer` or any other type.
+
+### Output structure
+
+For the default target, the output is:
+
+```text
+exports/
+└─ class-provenance/
+   └─ ResourceViewWidget/
+      ├─ manifest.json
+      ├─ class-anchors.json
+      ├─ class-methods.json
+      ├─ field-A0-accesses.json
+      ├─ field-A0-writes.json
+      ├─ provenance.json
+      └─ functions/
+         └─ <function-name>__<entry-address>/
+            ├─ metadata.json
+            ├─ decompiled.c
+            ├─ callers.json
+            ├─ callees.json
+            ├─ strings.json
+            ├─ globals.json
+            └─ constants.json
+```
+
+`class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, and confirmed vtable-writer candidates. `class-methods.json` contains confidence and membership evidence for every bounded method candidate. The access file contains only strong/medium class candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects the detailed written-value traces.
+
+Candidate function bundles are deduplicated and capped at 20. Priority is: class-vtable writers, field writers, methods with nested-offset evidence, other field readers, and remaining named/vtable methods. The current manifest and arrays, rather than leftover directories from an earlier run, are authoritative.
+
+### Exact live test
+
+1. Open the normally analysed `CreationKit.exe` program in CodeBrowser.
+2. Go to `ResourceViewWidget::OnApplySeed` if its exact symbol is available. Otherwise go to `FUN_1431bc320` at `1431BC320`, which is the known direct downstream context; the script still requires and separately verifies the exact named anchor.
+3. Run `AnalyzeClassFieldProvenance.java` from Script Manager.
+4. Enter `ResourceViewWidget`, `0xA0`, and `0x20` at the three prompts.
+5. Choose the repository's `exports` directory. Do not choose Ghidra project storage.
+6. Inspect `exports/class-provenance/ResourceViewWidget/class-anchors.json`. Confirm the exact anchor status and review every vtable candidate and its bounded stop reason.
+7. Inspect `class-methods.json`; confirm every searched function is `strong` or `medium` and has independent membership evidence.
+8. Inspect `field-A0-writes.json` before `field-A0-accesses.json`, then review `provenance.json` and the selected seven-file bundles.
+9. If a concrete vtable exists, check its slots and any `constructor-or-destructor-candidate` records rather than assuming a lifecycle role.
+10. Confirm `manifest.json` reports `readOnly: true`, the 256-slot vtable limit, the 20-function export limit, and either a writer count or the explicit negative result.
+11. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
+
+The minimum successful live outcome is: anchors exported, at least one strong/medium class method, a field search confined to that method set, and an explicit result when no writer exists. The best case is a concrete `ResourceViewWidget` vtable, a vtable-writer candidate that also writes `this+0xA0`, written-value provenance identifying the source object, and independent structural evidence for its `+0x20` component. Resource-specific BIOM/RSGD/PNDT/RSCS or leveled-list evidence is recorded if encountered but is never forced.
+
+### Known limitations
+
+- The script targets Ghidra's public program-model and decompiler APIs and depends on completed analysis, current symbols, references, defined functions, and high p-code.
+- A concrete vtable cannot be inferred when it is unnamed; RTTI is recorded as supporting evidence but is not fully reconstructed.
+- The vtable walk assumes the named address is the first method slot and stops conservatively at the first invalid region.
+- Receiver-flow expansion is one direct strong-method boundary; it is not recursive class reconstruction.
+- Vtable reference prefiltering can miss a compiler/decompiler form whose reference is absent from the current database.
+- Allocation-name evidence is diagnostic only. Constructor/destructor role, ownership, and cleanup semantics are not inferred from names.
+- Nested analysis is bounded and same-function only. It does not traverse a heap graph or arbitrary aliases across calls.
+- Export is not atomic; cancellation or an I/O failure can leave partial files, while the manifest is written last.
+
+Like the other exporters, this script only reads Ghidra analysis state and writes external files. It starts no transaction and does not rename symbols/functions, create labels/comments, change signatures/types, apply types, or modify memory.
