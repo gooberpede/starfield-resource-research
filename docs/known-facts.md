@@ -1,319 +1,276 @@
 # Known Facts
 
-This file contains observations established by direct extraction, runtime testing, or repeated dataset validation. It should not contain unproven explanations of why those observations occur.
+This file contains **PROVEN** observations established by live execution, direct extraction, or equivalent decisive evidence. Interpretations that remain **STRONG** or **PROVISIONAL** belong in `hypotheses.md`. Historical interpretations displaced by later evidence are retained as **SUPERSEDED**.
 
-## Data Relationships
+## PNDT, BIOM, and RSGD
 
-### PNDT references BIOM
+The established data relationship is:
 
-Planet records (`PNDT`) contain biome references.
+```text
+PNDT
+ ├─ RSCS
+ └─ ordered biome entries
+        ↓
+      BIOM
+        ↓
+      RSGD
+```
 
-### PNDT contains RSCS
+PNDT may specify a per-biome RSGD override. The **PROVEN** precedence rule is:
 
-Planet records contain a Resource Creation Seed (`RSCS`). The seed participates in deterministic resource-generation behaviour.
+```text
+if PNDT biome Resource Generation != NULL:
+    EffectiveRSGD = PNDT override
+else:
+    EffectiveRSGD = BIOM.RNAM
+```
 
-### BIOM references RSGD
+PNDT and BIOM RSGDs are not merged. For tested live cases, biome-list construction follows PNDT `BiomeIndex` order before shuffling; Kreet provides direct live proof.
 
-Biome records (`BIOM`) reference Resource Generation (`RSGD`) data.
+## PRNG
 
-### RSGD describes resource-generation possibility space
+For non-zero PNDT `RSCS`, unsigned 32-bit `RSCS` directly seeds MT19937. The same evolving MT19937 state drives the biome shuffle and subsequent resource-generation draws.
 
-RSGD records contain resource-related generation data and references used by the game's resource-generation system. Changing relevant RSGD data can alter resource-generation outcomes.
+Generation converts a raw word to a float as follows:
 
-## Runtime Resource Results
+```python
+raw_float = float32(raw_uint32)
+unit_value = float32(raw_float * float32(1.0 / 2**32))
+converted = float32(unit_value * float32(0.99999))
+```
 
-### Final planetary resources are determined at runtime
+### Biome-shuffle bounded integer helper
 
-The complete final planet/resource set is not represented in `Starfield.esm` as a simple static planet-to-resource table suitable for authoritative extraction.
+The **PROVEN** trace path is:
 
-Runtime engine logic can be queried to obtain the final resource set.
+```text
+0x14152CEBD -> 0x1401714A8
+0x1401714A8 -> 0x141560E90
+0x141560F5A -> 0x14001D63D
+0x14001D63D -> real helper 0x141587240
+```
 
-### SurveyAggregator exposes final planet-wide resources
+Equivalent logic:
 
-A native function referred to in this project as `SurveyAggregator`, RE ID `1016657`, can enumerate forms associated with a planet's completed survey/resource state.
+```python
+while True:
+    raw = next_uint32()
+    threshold = UINT32_MAX // upper_bound
+    if raw // upper_bound < threshold:
+        return raw % upper_bound
+```
 
-Filtering its aggregated forms identifies authoritative final inorganic and organic planetary resources.
+Rejected draws consume MT words. Bound `1` consumes one word and returns `0`.
 
-This function provides planet-wide results; it does not expose biome identity in the current implementation.
+### Descendant candidate selection
 
-## Canonical Inorganic Dataset
+This is a separate **PROVEN** bounded mechanism:
 
-An authoritative runtime-derived planet/resource dataset was built by joining runtime resource output to PNDT records from `Starfield.esm`.
+```text
+raw uint32
+→ float32(raw)
+→ * float32(2**-32)
+→ * float32(0.99999)
+→ * float32(candidate_count)
+→ truncate
+```
 
-Relevant counts from the analysed dataset:
+For `candidate_count > 0`, it consumes exactly one MT word.
 
-- 5,999 inorganic planet/resource rows;
-- 1,436 distinct bodies with inorganic resources;
-- 45 distinct inorganic resource EditorIDs in the canonical inorganic export.
+## Live Creation Kit Generation Path
 
-## Resource Families
+Live traces of the Creation Kit Galaxy View Apply operation establish `FUN_1415DCFB0` as the primary per-biome generator exercised by that operation. It handles at least Special category `5`, Common/root category `0`, family-cache interaction, descendant dispatch, and resource/family limits. The reconstructed behaviour agrees with known game/resource results; the supplied addresses are not asserted here to have been independently traced in retail `Starfield.exe`.
 
-Eight ordinary inorganic resource families are currently modelled.
+The established rarity/category mapping is:
 
-### Aluminium family
+```text
+0 Common
+1 Uncommon
+2 Rare
+3 Exotic
+4 Unique
+5 Special
+6 Everywhere
+```
 
-Root: `Aluminum`
+### Common/root selection
 
-Known members:
-- Aluminum
-- Beryllium
-- Neodymium
-- Europium
-- Indicite
+For the requested RSGD category, stored `RSGDResourceIndex` order is preserved. Selection uses cumulative `Chance / 100`; the first cumulative threshold exceeding the random value wins. Total weights are not normalized.
 
-### Nickel family
+### IRES graph and descendants
 
-Root: `Nickel`
+The resource-family graph is stored in IRES data:
 
-Known members:
-- Nickel
-- Cobalt
-- Platinum
-- Palladium
-- Tasine
+```text
+IRES
+ ├─ SNAM - Rarity
+ └─ Child Resources
+```
 
-### Lead family
+For rarity levels `1..4`, the candidate builder combines `children(root)` followed by `children(current_structural_node)`, rarity-filters the result, and stable-deduplicates it. Root-source candidates precede current-node-source candidates.
 
-Root: `Lead`
+`FUN_14157F120` is the **PROVEN** descendant helper in that live-traced CK path. When capacity permits it builds the requested rarity candidates, draws inclusion probability, draws candidate selection, emits the candidate on inclusion, and continues structurally through the chosen candidate even when omitted.
 
-Known members:
-- Lead
-- Tungsten
-- Titanium
-- Dysprosium
-- Silver
-- Mercury
+With zero candidates, exactly one MT word is consumed, nothing is emitted, and the structural node is unchanged. This states only what the trace establishes.
 
-### Uranium family
+After a new Common family is selected, its root is emitted unconditionally and descendant generation proceeds through rarities `1..4`.
 
-Root: `Uranium`
+The first selection of a Common/root family on a planet generates and caches its family configuration. Later biomes selecting the same root reuse the cache: the descendant helper is not called again and consumes no descendant RNG.
 
-Known members:
-- Uranium
-- Iridium
-- Vanadium
-- Plutonium
-- Vytinium
+## Capacity Limits
 
-### Copper family
+Maal VIII live traces establish these checks:
 
-Root: `Copper`
+```text
+0x1415DD0A3  cmp dword ptr [r12], 8
+0x1415DD0A8  jae ...
+0x1415DD0D3  cmp dword ptr [rsi], 5
+0x1415DD0D6  jae ...
+0x1415DD0DC  cmp dword ptr [r12], 8
+0x1415DD0E1  jae ...
+```
 
-Known members:
-- Copper
-- Fluorine
-- Tetrafluorides
-- IonicLiquids
-- Gold
-- Antimony
+The `8` comparisons prove an internal resource-container limit of `8`. The `5` comparison proves that the generation path contains a `count >= 5` guard on the structure associated with generated/cached Common-family configurations. The most likely interpretation is a five-family or five-generated-family-configuration limit, but that broader semantic interpretation remains **PROVISIONAL** because the structure's exact general role has not been independently established.
 
-### Chlorine family
+The descendant helper's early return is:
 
-Root: `Chlorine`
+```text
+0x14157F14D  mov rax,[rcx+20h]
+0x14157F151  cmp dword ptr [rax],8
+0x14157F154  jae 14157F371
+```
 
-Known members:
-- Chlorine
-- Chlorosilanes
-- Lithium
-- Caesium
-- Xenon
-- Aldumite
+At the observed comparison, `internal_resource_count = 8`. Thus:
 
-### Iron family
+```text
+if internal_resource_count >= 8:
+    return current_structural_node
+```
 
-Root: `Iron`
+The early return consumes no RNG. The internal count must not be described as merely eight visible CK resources.
 
-Known members:
-- Iron
-- Alkanes
-- Tantalum
-- Ytterbium
-- Rothicite
+## Worked Cases and Validation
 
-### Argon family
+The reconstructed runtime model reproduced exact known results for Oberon, Mimas, Decaran VII-b, Kreet, and Algorab I.
 
-Root: `Argon`
+Standalone reproducer validation reached:
 
-Known members:
-- Argon
-- Benzene
-- CarboxylicAcids
-- Neon
-- Veryl
+```text
+Validation population:       1,444
+Exact matches:               1,281
+Mismatches:                    163
+Exact rate:                  88.71%
+Errors:                         0
+```
 
-### Standalone inorganic resources
+The mismatches became research guides rather than wholesale disproof of the core algorithm.
 
-The current family model treats these as standalone rather than members of the eight families:
+## SurveyAggregator and the Old Oracle
 
-- Water
-- Helium3
+`SurveyAggregator` (RE ID `1016657`) and derived `data/planet-all-resources.csv` remain valuable, provenance-preserved empirical observations. Current evidence proves that the dataset omits at least some atmosphere-derived inorganic resources, so it is not an authoritative complete final planetary-resource oracle and does not expose biome identity in current use. It appears to correspond closely to the CK/biome-generation-visible resource set, but that correspondence is **STRONG / PROVISIONAL**, not a proven engine contract; the exact upstream state exposed by `SurveyAggregator` remains open.
 
-## Root Invariant
+Earlier aggregate family and biome results derived from this dataset remain useful when treating it as a qualified proxy, including the observed root invariant and `FamilyCount <= BiomeCount` constraint. They must not be generalized silently to all resource origins.
 
-For every analysed planet/family case containing at least one non-root family member, the family root was also present.
+### Preserved empirical constraints from the qualified dataset
 
-| Family | Bodies with descendant | Descendant occurrences | Missing root |
-|---|---:|---:|---:|
-| Aluminium | 242 | 320 | 0 |
-| Nickel | 212 | 281 | 0 |
-| Lead | 193 | 242 | 0 |
-| Uranium | 144 | 195 | 0 |
-| Copper | 225 | 311 | 0 |
-| Chlorine | 206 | 283 | 0 |
-| Iron | 163 | 219 | 0 |
-| Argon | 164 | 213 | 0 |
+The ordinary family model used in that analysis was:
 
-Totals:
+| Root | Other modelled members |
+|---|---|
+| Aluminum | Beryllium, Neodymium, Europium, Indicite |
+| Nickel | Cobalt, Platinum, Palladium, Tasine |
+| Lead | Tungsten, Titanium, Dysprosium, Silver, Mercury |
+| Uranium | Iridium, Vanadium, Plutonium, Vytinium |
+| Copper | Fluorine, Tetrafluorides, IonicLiquids, Gold, Antimony |
+| Chlorine | Chlorosilanes, Lithium, Caesium, Xenon, Aldumite |
+| Iron | Alkanes, Tantalum, Ytterbium, Rothicite |
+| Argon | Benzene, CarboxylicAcids, Neon, Veryl |
 
-- 1,549 body/family cases;
-- 2,064 descendant occurrences;
-- 0 observed root violations.
+Water and Helium3 were treated as standalone resources for the family-count analysis. IRES data now directly establishes the resource graph rather than leaving this only as an aggregate model.
 
-This establishes a planet-level invariant in the analysed canonical data:
+Across 1,549 body/family cases and 2,064 descendant occurrences, the qualified dataset had zero cases where a descendant was present without its root. Intermediate members were not mandatory: deeper members could occur while intermediate members were skipped.
 
-> If a planet contains a known descendant of an inorganic resource family, it also contains that family's root.
+The PNDT-to-BIOM xEdit export contained 3,192 biome rows and reproduced all six known Montara Luna biomes and composition percentages. Joining it to the qualified resource dataset produced zero `FamilyCount > BiomeCount` violations across 1,436 analysed family-bearing bodies; 1,038 had equal counts, including 880 one-family/one-biome bodies. These are planet-level empirical constraints, not direct proof of per-biome co-location.
 
-This does not by itself establish that the root and descendant are located in the same biome.
+Treating Indicite or Vytinium as separate standalone families introduced count violations on Katydid III and Decaran VII-b respectively, supporting their placement within the Aluminum and Uranium graphs.
 
-## Intermediate Members Are Not Mandatory
+## Atmospheric Resources
 
-A planet can contain a deeper family member while skipping one or more intermediate family members.
+Planet records reference ATMO atmosphere records. Bethesda reflection data resolves effective values as:
 
-Therefore the resource-family hierarchy is not simply a rule that all ancestors of an observed member must also be present.
+```text
+root/default ATMO: REFL = complete/base reflected object
+child ATMO:        RFDP = reflection parent
+                   RDIF = local differences/overrides
+```
 
-The exception is the observed root invariant described above.
+The Creation Kit displays the resolved inherited values.
 
-## Authoritative Biome Dataset
+**PROVEN static examples:**
 
-A dedicated xEdit exporter was built to extract planet-to-biome relationships from PNDT records.
+- Maal VIII's effective ATMO is nitrogen and explicitly contains Chlorine. Its raw `RDIF` includes literal `AT_TYPE_NITROGEN` and `D5 57 00 00`, the little-endian FormID `000057D5` for Chlorine.
+- Niira's effective atmospheric list contains Chlorine and Water; its serialized reflected `LIST` count is `2`, followed by both IRES FormIDs.
+- Kreet's atmospheric Helium-3 uses the same reflected list structure.
+- Vectera has no atmospheric resources and contains a zero-count `LIST`.
+- Titan and Maal IV demonstrate inherited Water. Titan inherits through `AtmoDefaultDense → AtmoOrangeBaseDense01 → ATMO_Titan`; the root/default Water list is in `REFL`, not `RDIF`.
 
-For each PNDT biome entry it exports:
+The generic interpretation that a sole zero-count `LIST` explicitly clears Inorganic Resources remains **PROVISIONAL** pending full property-identifier decoding.
 
-- PlanetFormID
-- PlanetEditorID
-- PlanetName
-- BiomeIndex
-- BiomeFormID
-- BiomeEditorID
-- BiomeName
-- Chance
+### Atmospheric extract
 
-The full exported dataset contains 3,192 biome rows.
+The dedicated xEdit exporter `Starfield_ExportPlanetAtmosphericResources` resolves ATMO inheritance and emits one row per planet × effective atmospheric resource while preserving provenance. No repository location is asserted here.
 
-### Montara Luna validation
+Full-population extraction produced:
 
-The exporter reproduced all six known Montara Luna biomes and their composition percentages, matching Creation Kit observations.
+```text
+335 planet × atmospheric-resource rows
+297 distinct planets/moons with atmospheric resources
+6 atmospheric resource types
+0 duplicate planet × resource rows
+maximum 2 atmospheric resources on one body
+```
 
-This validated the PNDT-to-BIOM extraction approach.
-
-## Family Count Versus Biome Count
-
-The canonical inorganic resource dataset was joined to the authoritative biome export by PlanetFormID.
-
-For each body:
-
-1. represented resource families were counted;
-2. Water and Helium3 were excluded from the family count;
-3. distinct biome records were counted.
-
-Across all 1,436 analysed bodies with inorganic family resources:
-
-> resource-family count was never greater than biome count.
-
-Observed violations:
-
-- 0
-
-The minimum value of `BiomeCount - FamilyCount` was 0.
-
-### Difference distribution
-
-| BiomeCount - FamilyCount | Bodies |
+| Resource | Rows |
 |---|---:|
-| 0 | 1,038 |
-| 1 | 229 |
-| 2 | 99 |
-| 3 | 45 |
-| 4 | 18 |
-| 5 | 7 |
+| Water | 260 |
+| Chlorine | 32 |
+| Helium-3 | 16 |
+| Fluorine | 11 |
+| Benzene | 8 |
+| Alkanes | 8 |
 
-Thus 1,038 of 1,436 analysed bodies have exactly as many biomes as represented resource families.
+### Maal VIII capacity observation
 
-### Single-biome bodies
+The CK Resource Generation view shows Iron, Nickel, Water, Uranium, Iridium, Vanadium, and Copper. The in-game survey adds Chlorine, and Maal VIII's ATMO explicitly assigns that Chlorine. The old oracle omitted it.
 
-Among the analysed family-bearing bodies:
+In the final Iron-biome trace, Iron insertion brought the internal count to `8`; the level-1 descendant helper returned immediately, preventing Alkanes and consuming no RNG. The exact atmospheric insertion function/order is not yet proven; the shared-capacity interpretation is recorded as **STRONG** in `hypotheses.md`.
 
-- 880 bodies have exactly 1 represented family and exactly 1 biome;
-- no single-biome body has more than 1 represented family.
+## Superseded Static Trail
 
-This is a strong empirical constraint, but it does not by itself prove a universal one-family-per-biome rule.
-
-## Unique Resources and Family Association
-
-Treating certain unique resources as standalone families causes family-count/biome-count violations.
-
-### Katydid III
-
-When Indicite is treated as part of the Aluminium family:
-
-```text
-4 represented families
-4 biomes
-```
-
-When Indicite is treated as its own family:
-
-```text
-5 represented families
-4 biomes
-```
-
-### Decaran VII-b
-
-When Vytinium is treated as part of the Uranium family:
-
-```text
-1 represented family
-1 biome
-```
-
-When Vytinium is treated as its own family:
-
-```text
-2 represented families
-1 biome
-```
-
-This independently supports modelling these unique resources as endpoints or members of their associated resource families.
-
-## Creation Kit / Ghidra Findings
-
-A Creation Kit resource-preview path was traced from:
+The following low-level analysis remains valid historical evidence:
 
 ```text
 ResourceViewWidget::OnApplySeed
     ↓
 FUN_1431bc320
-    ↓
+    ↓ temporary TESContainer / FUN_140e0aab0
 FUN_140e457b0
+    ↓
+generic leveled-list machinery
 ```
 
-The path eventually reaches generic leveled-list evaluation machinery.
+Its interpretation as the primary biome-resource allocation route is **SUPERSEDED / DEPRIORITISED**. Later live x64dbg tracing of the Creation Kit Galaxy View Apply operation establishes `FUN_1415DCFB0` and `FUN_14157F120` as the primary path exercised by that operation. The older path may still be legitimate CK/UI or downstream machinery; no researcher should assume it participates in biome allocation without new live evidence.
 
-A value derived from the resource seed appeared to behave like an effective level/input to leveled-list selection rather than simply exposing an obvious direct PRNG reseed.
+## Provenance-Aware Validation Rule
 
-Searches of global MT19937 reseed sites did not reveal a simple, confirmed pattern of:
+Validation must preserve resource origins rather than collapse them early:
 
 ```text
-RSCS -> seed global PRNG -> roll resources
+AtmosphericResources
+BiomeGeneratedResources
+EverywhereResources
+SpecialResources
+FinalPlanetaryResources
 ```
 
-No complete per-biome resource-allocation algorithm has yet been identified.
-
-## Downstream Placement Lists
-
-`LL_ResourceSurfaceFlora_*` leveled lists were investigated.
-
-They appear to be downstream surface-placement machinery using conditions such as resource availability and rarity weighting.
-
-They are not currently believed to be the primary mechanism that assigns a planet's resource families to biomes.
+An atmospheric FormID must not mask failure of a biome/RSGD path expected to produce the same FormID. Continue reconciling `planet-all-resources.csv` independently as an empirical proxy for the CK/biome-visible channel, without treating that correspondence as a proven contract, and reconcile the xEdit ATMO extract independently against the atmospheric channel. Deduplicate origins only for final player-facing membership.

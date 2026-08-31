@@ -18,31 +18,41 @@ The project aims to:
 - build a durable register of relevant Starfield functions and addresses;
 - distinguish confirmed observations from working hypotheses;
 - trace the runtime path that assigns inorganic resource families and family members to biomes;
-- validate candidate algorithms against authoritative runtime observations;
+- validate candidate algorithms against provenance-qualified runtime observations;
 - ultimately support a planner that can reason about likely resource co-location.
 
 ## Current Model
 
-Known game data relationships include:
+Evidence labels used throughout the repository are **PROVEN**, **STRONG**, **PROVISIONAL**, **COUNTERFACTUAL**, and **SUPERSEDED**. See `AGENTS.md` for their definitions.
+
+The proven data path and override precedence are:
 
 ```text
 PNDT
- ├─ planet-level data
- ├─ biome references
- └─ Resource Creation Seed (RSCS)
-
-BIOM
- └─ references resource-generation data
-
-RSGD
- └─ defines resource-generation possibility space
+ ├─ RSCS
+ └─ ordered biome entries
+        ↓
+      BIOM
+        ↓
+      RSGD
 ```
 
-The exact runtime transformation from these inputs to final per-biome resource membership remains unresolved.
+For each biome, a non-null PNDT Resource Generation override replaces `BIOM.RNAM`; the two RSGDs are not merged. Non-zero `RSCS` directly seeds unsigned 32-bit MT19937. The same evolving state drives the biome shuffle and later generation draws.
+
+In the live-traced Creation Kit Galaxy View Apply path, `FUN_1415DCFB0` is the proven primary per-biome generator and `FUN_14157F120` is its proven descendant helper. IRES records provide rarity and child-resource graph data. Common roots are inserted unconditionally, descendant choices traverse this graph, and a planet-level family cache prevents repeated descendant generation for a reused root. The reconstructed behaviour agrees with known game/resource results; these addresses are not presented as independently traced retail `Starfield.exe` addresses.
+
+The traced path has a proven eight-entry internal resource-container limit and a proven `count >= 5` guard on a structure associated with generated/cached Common-family configurations. Interpreting the latter as a general five-family or five-generated-family-configuration limit remains provisional. Atmospheric resources are strongly supported as sharing the eight-entry planet-wide capacity, although their exact insertion function and order remain unresolved.
 
 ## Current Reverse-Engineering Anchors
 
-The most promising Creation Kit trail found so far is:
+The current primary runtime anchors are:
+
+```text
+FUN_1415DCFB0  primary per-biome generator
+FUN_14157F120  descendant helper
+```
+
+The older static trail is retained as **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**:
 
 ```text
 ResourceViewWidget::OnApplySeed
@@ -54,7 +64,9 @@ FUN_140e457b0
 generic leveled-list evaluation machinery
 ```
 
-A separate runtime function, `SurveyAggregator` (RE ID `1016657`), can enumerate the final resources associated with a planet. It is useful as an authoritative observer of results, but it is not currently assumed to perform the biome allocation itself.
+Its low-level `TESContainer`, calling-convention, and leveled-list findings remain valid historical evidence and may describe legitimate CK/UI or downstream machinery. Live Galaxy View Apply tracing did not exercise it as the primary allocation trail.
+
+`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` remain useful empirical proxies for reconciling the CK/biome-generation-visible channel, but that correspondence is not a proven semantic contract. The exact upstream state exposed by `SurveyAggregator` remains unresolved. The dataset is not a complete final inorganic-resource oracle: atmosphere-derived resources can be absent.
 
 See `docs/function-register.md` for the working function register.
 
@@ -65,7 +77,7 @@ Independent extraction and analysis have established useful constraints on any c
 Examples include:
 
 - every observed inorganic resource-family descendant occurs on a planet that also contains that family's root;
-- across the authoritative analysed dataset, the number of represented resource families never exceeds the number of biomes on the same body;
+- across the qualified SurveyAggregator-derived proxy dataset, the number of represented resource families never exceeds the number of biomes on the same body;
 - many bodies have exactly as many represented resource families as biomes.
 
 These observations strongly motivate investigation of a biome/family allocation step, but they do not by themselves prove one fixed family per biome.
@@ -97,23 +109,11 @@ Suggested use:
 - `exports/` — generated analysis output;
 - `tools/` — supporting parsers, comparators, graph tools, and validation utilities.
 
-## First Milestone
+## Next Investigation (Not Yet Executed)
 
-Build a Ghidra script that exports complete analysis context for one selected function without modifying the Ghidra program.
+Starting from proven generator `FUN_1415DCFB0`, identify its immediate outer caller or enclosing planet-generation loop. Determine what happens between operation entry and the first per-biome call, focusing on the path from effective ATMO Inorganic Resources into the shared planet-wide resource container. Maal VIII is the preferred live case because atmospheric Chlorine appears in its in-game survey but not in the CK biome Resource Generation view or old plugin output.
 
-The first target should be `FUN_1431bc320`.
-
-The export should include, at minimum:
-
-- function address and name;
-- decompiled pseudocode;
-- callers;
-- callees;
-- referenced strings;
-- referenced globals;
-- useful constants.
-
-Once this works reliably, extend it to recursively export a bounded call neighbourhood.
+Keep origin channels distinct during validation: `AtmosphericResources`, `BiomeGeneratedResources`, `EverywhereResources`, `SpecialResources`, and `FinalPlanetaryResources`. Deduplicate FormIDs only for final player-facing membership.
 
 ## Research Method
 
@@ -128,7 +128,7 @@ candidate algorithm/model
       ↓
 implementation or prediction
       ↓
-comparison against authoritative runtime observations
+comparison against provenance-qualified runtime observations
       ↓
 counterexamples
       ↓

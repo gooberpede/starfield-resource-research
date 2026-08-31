@@ -8,12 +8,86 @@ Do not replace an original Ghidra name with a semantic alias unless evidence is 
 
 ---
 
+## FUN_1415DCFB0
+
+**Name:** `FUN_1415DCFB0`
+
+**Address:** `0x1415DCFB0`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit executable, live Galaxy View Apply path; executable diagnostics identify `BGSPlanetDataManager.cpp`
+
+**Status:** **PROVEN primary per-biome generator in the live-traced CK generation path**
+
+**Confidence:** high
+
+### Observed behaviour
+
+Live x64dbg traces tie this function to the Creation Kit Galaxy View Apply generation path. It handles at least Special category `5`, Common/root category `0`, family-cache interaction, descendant dispatch, and resource-count/family-count guards. The reconstructed behaviour agrees with known game/resource results; this entry does not claim that the address was independently traced in retail `Starfield.exe`.
+
+It preserves stored `RSGDResourceIndex` order for category selection and uses unnormalized cumulative `Chance / 100`. Once a new Common family is selected, it unconditionally emits the root and dispatches descendant generation through rarity levels `1..4`.
+
+### Proven limit checks
+
+```text
+0x1415DD0A3  cmp dword ptr [r12], 8
+0x1415DD0A8  jae ...
+0x1415DD0D3  cmp dword ptr [rsi], 5
+0x1415DD0D6  jae ...
+0x1415DD0DC  cmp dword ptr [r12], 8
+0x1415DD0E1  jae ...
+```
+
+The `8` comparisons establish an eight-entry internal resource-container limit. The `5` comparison proves a `count >= 5` guard on the structure associated with generated/cached Common-family configurations. Its likely interpretation as a general five-family or five-generated-family-configuration limit remains **PROVISIONAL** because the structure's exact general role has not been independently established.
+
+### Next analysis
+
+Do not resume broad exploration from the older leveled-list trail. Identify this function's immediate outer caller/enclosing planet loop and inspect pre-population of the shared resource container before the first per-biome call, especially for Maal VIII atmospheric Chlorine.
+
+---
+
+## FUN_14157F120
+
+**Name:** `FUN_14157F120`
+
+**Address:** `0x14157F120`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit executable, live Galaxy View Apply path
+
+**Status:** **PROVEN descendant helper in the live-traced CK generation path**
+
+**Confidence:** high
+
+### Observed behaviour
+
+For requested rarities `1..4`, it builds the stable-deduplicated candidate set from `children(root)` followed by `children(current_structural_node)`, rarity-filters it, draws inclusion and selection, emits on successful inclusion, and continues structurally through the chosen candidate even when omitted.
+
+This behaviour was observed executing in the Creation Kit Galaxy View Apply path and agrees with reconstructed game/resource results. The address is not asserted here to have been independently traced in retail `Starfield.exe`.
+
+With zero candidates it consumes exactly one MT word, emits nothing, and leaves the structural node unchanged.
+
+### Proven resource-limit return
+
+```text
+0x14157F14D  mov rax,[rcx+20h]
+0x14157F151  cmp dword ptr [rax],8
+0x14157F154  jae 14157F371
+```
+
+If the internal resource count is at least `8`, the helper returns the current structural node without consuming RNG.
+
+---
+
 ## ResourceViewWidget::OnApplySeed
 
 **Name:** `ResourceViewWidget::OnApplySeed`  
 **Address:** to be recorded from the current Ghidra project  
 **Source context:** Creation Kit  
-**Status:** known named anchor  
+**Status:** **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**; retained named CK/UI anchor
+
 **Confidence:** high
 
 ### Current interpretation
@@ -30,7 +104,7 @@ FUN_1431bc320
 
 ### Why it matters
 
-This is currently the strongest named entry point into resource-seed processing.
+This remains a useful named CK/UI entry point, but it is not the current primary allocation anchor.
 
 ### Open questions
 
@@ -41,14 +115,7 @@ This is currently the strongest named entry point into resource-seed processing.
 
 ### Next analysis
 
-Export:
-- decompilation;
-- callers;
-- callees;
-- referenced globals;
-- referenced strings;
-- structure offsets;
-- argument flow into `FUN_1431bc320`.
+No current analysis is planned on this path unless new live evidence connects it to `FUN_1415DCFB0` or the surrounding planet-generation loop. The earlier export objectives are preserved in the historical implementation briefs and experiment notes.
 
 ---
 
@@ -57,8 +124,9 @@ Export:
 **Name:** `FUN_1431bc320`  
 **Address:** `0x1431BC320`  
 **Proposed role:** resource seed / preview processing intermediary  
-**Status:** primary current target  
-**Confidence:** medium that it is close to target logic; low on exact semantics
+**Status:** **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**; historical static-analysis target
+
+**Confidence:** high in the recorded ABI/dataflow; low on its relation to biome allocation
 
 ### Known relationship
 
@@ -97,13 +165,11 @@ the concrete multiple-inheritance/containment declaration.
 
 ### Current interpretation
 
-This function lies directly downstream of the Creation Kit Apply Seed action and upstream of lower-level selection machinery.
-
-Its exact semantic role remains unresolved.
+This function lies downstream of the CK Apply Seed UI action and upstream of lower-level selection machinery. Live Galaxy View Apply tracing did not establish it as the primary biome allocator; it may remain legitimate CK/UI or downstream machinery.
 
 ### Why it matters
 
-This is the preferred first target for automated Ghidra context export.
+It is preserved because its low-level calling-convention and container findings are valid research history, not because it is the preferred current target.
 
 ### Questions to answer
 
@@ -117,13 +183,7 @@ This is the preferred first target for automated Ghidra context export.
 
 ### Next analysis
 
-First tooling milestone:
-
-```text
-export complete one-function analysis context for FUN_1431bc320
-```
-
-Then inspect its immediate call neighbourhood.
+Revisit only if new live evidence connects it to the proven runtime generation path.
 
 ---
 
@@ -194,14 +254,13 @@ or containment, nor does it justify calling the enclosing UI object itself a
 **Name:** `FUN_140e457b0`  
 **Address:** `0x140E457B0`  
 **Proposed role:** lower-level selection / leveled-list evaluation path  
-**Status:** known investigative anchor  
+**Status:** **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**; known generic-selection anchor
+
 **Confidence:** medium
 
 ### Current interpretation
 
-Prior Ghidra work traced this function into generic leveled-list evaluation machinery.
-
-An RSCS-derived or seed-derived value appeared to behave more like an effective level/input than an obvious conventional PRNG seed.
+Prior Ghidra work traced this function into generic leveled-list evaluation machinery. The earlier interpretation of an RSCS-derived value as effective-level-like rather than a direct PRNG seed is **SUPERSEDED** by live proof of direct unsigned 32-bit RSCS seeding of MT19937.
 
 ### Known relationship
 
@@ -262,9 +321,7 @@ It may instead be a generic selector used by a higher-level resource-specific al
 
 ### Next analysis
 
-Use `ExportResourceResolutionEvidence.java` to prepare a live observation-only
-capture, then record source, temporary input, selector, and the separately
-allocated resolved output for one known CK family case.
+No further work is currently planned on this path unless new live evidence connects it to biome allocation.
 
 ---
 
@@ -279,26 +336,27 @@ using fn_aggregator_t = void (*)(void* buffer, std::uint32_t planet_id);
 ```
 
 **Source context:** Starfield runtime  
-**Status:** authoritative runtime observer  
+**Status:** empirical resource-set observer/proxy; exact semantic contract unresolved
+
 **Confidence:** high for observed output; low that it is allocation logic
 
 ### Current interpretation
 
 Fills a fixed-size aggregation buffer for a planet.
 
-Existing runtime tooling iterates the populated spans and filters resource forms to recover authoritative final planet-wide resources.
+Existing runtime tooling iterates populated spans and filters resource forms. Current atmospheric evidence proves that at least some atmosphere-derived inorganic resources are absent from its derived dataset.
 
 ### Established use
 
-Used to create the canonical runtime-derived planet/resource dataset.
+Used to create `data/planet-all-resources.csv`, whose provenance remains valuable for independent resource-set validation. The dataset appears to correspond closely to the CK/biome-generation-visible channel, but that is not a proven engine contract.
 
 ### Why it matters
 
-It provides a large-scale oracle against which candidate reconstructed algorithms can be tested.
+It provides a large-scale empirical oracle/proxy useful for reconciling the CK/biome-generation-visible channel. Its exact semantics remain unresolved, and it must be reconciled separately from atmospheric extraction.
 
 ### Limitation
 
-Current use exposes planet-wide final resource membership but not biome identity.
+Current use exposes planet-wide membership without biome identity and omits at least some atmospheric resources. It must not be treated as a complete final inorganic oracle.
 
 ### Questions to answer
 
@@ -310,7 +368,7 @@ Current use exposes planet-wide final resource membership but not biome identity
 
 ### Suggested priority
 
-Secondary to the Creation Kit Apply Seed trail for now.
+Secondary to the proven live-traced CK `FUN_1415DCFB0` / `FUN_14157F120` path.
 
 Return to this path when:
 - validating candidate algorithms;

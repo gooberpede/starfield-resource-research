@@ -1,5 +1,7 @@
 # Resource-family container capture
 
+> **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH:** This note preserves a valid static experiment and its `TESContainer`/leveled-list evidence. Later live tracing of the Creation Kit Galaxy View Apply operation established `FUN_1415DCFB0` and `FUN_14157F120` as the primary generation path exercised by that operation, and IRES data as the family graph. Do not treat the proposed live capture below as the current next investigation.
+
 ## Objective
 
 Test whether the Creation Kit resource-preview path represents inorganic
@@ -156,10 +158,12 @@ Therefore:
 The hypothesis is neither strengthened nor rejected by live evidence. It is
 narrowed to a precise test with corrected input/output object identities.
 
-## Recommended next target
+## Historical recommended next target (superseded)
 
 Run one Nickel-selected CK preview with the three breakpoints and capture raw
 source, temporary input, selector, and returned output. Use that run first to
 reconcile the `TESLevItem` child layout and form identity fields/helpers. This
 is the shortest route to deciding whether the root lies structurally outside
 the randomized portion before adding a branching-family case.
+
+The current next question instead begins at `FUN_1415DCFB0` and traces its enclosing planet-generation loop for atmospheric pre-population of the shared resource container.

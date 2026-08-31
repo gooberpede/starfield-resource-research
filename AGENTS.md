@@ -20,7 +20,15 @@ Do not treat an inference, working theory, or pattern as an established fact.
 - Unproven explanations and models belong in `docs/hypotheses.md`.
 - If evidence changes, update the relevant file rather than silently rewriting history.
 
-When reporting a conclusion, state whether it is directly observed, strongly supported, tentative, or speculative.
+Use these evidence labels consistently:
+
+- **PROVEN** — directly established by live execution, direct data extraction, or equivalent decisive evidence.
+- **STRONG** — multiple independent observations support the interpretation, but the exact mechanism has not yet been directly observed.
+- **PROVISIONAL** — a working implementation or model fits current evidence, but an important structural detail remains unresolved.
+- **COUNTERFACTUAL** — a prediction from a controlled hypothetical intervention, not yet observed.
+- **SUPERSEDED** — an earlier interpretation retained for research history but displaced from the current model by later evidence.
+
+When static Ghidra interpretation conflicts with later live x64dbg execution, the live observation governs the current model. Preserve the older static result as historical evidence rather than silently deleting it.
 
 ### Preserve evidence
 
@@ -87,24 +95,20 @@ The repository should contain scripts, notes, schemas, derived metadata, and sma
 
 ## Current Investigation Direction
 
-The most promising static-analysis trail begins with the Creation Kit resource preview path:
+Live x64dbg traces in the Creation Kit Galaxy View Apply path establish these generation anchors:
 
-- `ResourceViewWidget::OnApplySeed`
-- `FUN_1431bc320`
-- `FUN_140e457b0`
+- `FUN_1415DCFB0` — **PROVEN** primary per-biome generator in the live-traced CK generation path;
+- `FUN_14157F120` — **PROVEN** descendant-generation helper in that path.
 
-Previous work suggests this path eventually reaches generic leveled-list evaluation machinery.
+The older Creation Kit trail through `ResourceViewWidget::OnApplySeed`, `FUN_1431bc320`, `FUN_140e457b0`, and generic leveled-list machinery is **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**. Preserve its valid calling-convention, `TESContainer`, and leveled-list findings: it may remain legitimate CK/UI or downstream machinery. Do not assume it participates in biome allocation without new live evidence.
 
-A separate runtime anchor is:
+`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` provide a valuable empirical resource-set oracle/proxy that appears to correspond closely to the CK/biome-generation-visible channel. That correspondence is not a proven engine contract, and the exact upstream state exposed by `SurveyAggregator` remains unresolved. Current evidence proves that the dataset omits at least some atmosphere-derived inorganic resources, so it is not a complete final planetary-resource oracle.
 
-- `SurveyAggregator`
-- RE ID `1016657`
+The next Ghidra investigation, when explicitly authorised, is to start from `FUN_1415DCFB0`, identify its immediate outer caller/enclosing planet-generation loop, and trace atmosphere-derived resource pre-population of the shared planet-wide resource container before the first per-biome call. Do not begin that investigation as part of documentation reconciliation.
 
-`SurveyAggregator` provides authoritative planet-wide final resource observations, but it is not currently believed to be the allocation algorithm itself.
+## Established Tooling Baseline
 
-## First Tooling Milestone
-
-The first Ghidra tooling milestone is a script that exports analysis context for a selected function.
+The first Ghidra tooling milestone was a script that exports analysis context for a selected function.
 
 At minimum, export:
 
@@ -134,6 +138,12 @@ exports/functions/<function-name-or-address>/
 The design should be easy to extend later to recursive neighbourhood export.
 
 ## Documentation Expectations
+
+### Preserve text encoding
+
+**Preserve UTF-8 text encoding.** Do not introduce mojibake or replace valid Unicode punctuation or diagram characters with mis-decoded byte sequences. Before finalising documentation changes, inspect modified text for common mojibake patterns such as `Ã`, `Â`, `ÔÇ`, `â€`, or corrupted box-drawing and arrows. If the repository already uses valid Unicode em dashes, arrows, multiplication signs, or box-drawing characters, preserve them as valid UTF-8 rather than transliterating or re-encoding them.
+
+If a diff or export display appears mojibaked but the repository file itself is valid UTF-8, do not “fix” the source based only on the broken display. Verify the actual file bytes or decoded text first.
 
 When adding or changing analysis tooling:
 
