@@ -1,0 +1,275 @@
+[
+  {
+    "callSite": "14152cbde",
+    "instruction": "CALL 0x1400487e3",
+    "target": "1400487e3",
+    "calleeName": "__chkstk",
+    "calleeEntry": "1400487e3"
+  },
+  {
+    "callSite": "14152cc88",
+    "instruction": "CALL 0x14003c899",
+    "target": "14003c899",
+    "calleeName": "thunk_FUN_145107e10",
+    "calleeEntry": "14003c899"
+  },
+  {
+    "callSite": "14152ccda",
+    "instruction": "CALL 0x1400c8d4e",
+    "target": "1400c8d4e",
+    "calleeName": "thunk_FUN_1415d2b30",
+    "calleeEntry": "1400c8d4e"
+  },
+  {
+    "callSite": "14152cd2b",
+    "instruction": "CALL 0x1400a9836",
+    "target": "1400a9836",
+    "calleeName": "thunk_FUN_1450f1a90",
+    "calleeEntry": "1400a9836"
+  },
+  {
+    "callSite": "14152cd36",
+    "instruction": "CALL 0x14002b84b",
+    "target": "14002b84b",
+    "calleeName": "thunk_FUN_140844130",
+    "calleeEntry": "14002b84b"
+  },
+  {
+    "callSite": "14152cd60",
+    "instruction": "CALL 0x1401850b1",
+    "target": "1401850b1",
+    "calleeName": "thunk_FUN_144d7baf0",
+    "calleeEntry": "1401850b1"
+  },
+  {
+    "callSite": "14152cd81",
+    "instruction": "CALL 0x14015d28c",
+    "target": "14015d28c",
+    "calleeName": "thunk_FUN_141576500",
+    "calleeEntry": "14015d28c"
+  },
+  {
+    "callSite": "14152cdb6",
+    "instruction": "CALL 0x1400c8d4e",
+    "target": "1400c8d4e",
+    "calleeName": "thunk_FUN_1415d2b30",
+    "calleeEntry": "1400c8d4e"
+  },
+  {
+    "callSite": "14152cebd",
+    "instruction": "CALL 0x1401714a8",
+    "target": "1401714a8",
+    "calleeName": "thunk_FUN_141560e90",
+    "calleeEntry": "1401714a8"
+  },
+  {
+    "callSite": "14152cf00",
+    "instruction": "CALL 0x140036002",
+    "target": "140036002",
+    "calleeName": "thunk_FUN_144d7f100",
+    "calleeEntry": "140036002"
+  },
+  {
+    "callSite": "14152cf17",
+    "instruction": "CALL 0x140088780",
+    "target": "140088780",
+    "calleeName": "thunk_FUN_1419fe120",
+    "calleeEntry": "140088780"
+  },
+  {
+    "callSite": "14152cf28",
+    "instruction": "CALL 0x140071193",
+    "target": "140071193",
+    "calleeName": "thunk_FUN_141a46660",
+    "calleeEntry": "140071193"
+  },
+  {
+    "callSite": "14152cf86",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152cfca",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152cff2",
+    "instruction": "CALL 0x140029357",
+    "target": "140029357",
+    "calleeName": "thunk_FUN_140f11690",
+    "calleeEntry": "140029357"
+  },
+  {
+    "callSite": "14152d016",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d067",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d0d3",
+    "instruction": "CALL 0x1401850b1",
+    "target": "1401850b1",
+    "calleeName": "thunk_FUN_144d7baf0",
+    "calleeEntry": "1401850b1"
+  },
+  {
+    "callSite": "14152d146",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d18a",
+    "instruction": "CALL 0x1400170a8",
+    "target": "1400170a8",
+    "calleeName": "thunk_FUN_140e5a710",
+    "calleeEntry": "1400170a8"
+  },
+  {
+    "callSite": "14152d1b5",
+    "instruction": "CALL 0x141548920",
+    "target": "141548920",
+    "calleeName": "FUN_141548920",
+    "calleeEntry": "141548920"
+  },
+  {
+    "callSite": "14152d222",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d28f",
+    "instruction": "CALL 0x1415dcfb0",
+    "target": "1415dcfb0",
+    "calleeName": "FUN_1415dcfb0",
+    "calleeEntry": "1415dcfb0"
+  },
+  {
+    "callSite": "14152d2b1",
+    "instruction": "CALL 0x140081e03",
+    "target": "140081e03",
+    "calleeName": "thunk_FUN_1415b2a30",
+    "calleeEntry": "140081e03"
+  },
+  {
+    "callSite": "14152d2c5",
+    "instruction": "CALL qword ptr [RAX + 0x310]",
+    "target": null,
+    "calleeName": null,
+    "calleeEntry": null
+  },
+  {
+    "callSite": "14152d2ed",
+    "instruction": "CALL 0x1400b9308",
+    "target": "1400b9308",
+    "calleeName": "thunk_FUN_144d793f0",
+    "calleeEntry": "1400b9308"
+  },
+  {
+    "callSite": "14152d346",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d381",
+    "instruction": "CALL qword ptr [RAX + 0x310]",
+    "target": null,
+    "calleeName": null,
+    "calleeEntry": null
+  },
+  {
+    "callSite": "14152d3a9",
+    "instruction": "CALL 0x1400b9308",
+    "target": "1400b9308",
+    "calleeName": "thunk_FUN_144d793f0",
+    "calleeEntry": "1400b9308"
+  },
+  {
+    "callSite": "14152d3f8",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d4d7",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d576",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d61c",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d69a",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d6c1",
+    "instruction": "CALL 0x1401c2cd6",
+    "target": "1401c2cd6",
+    "calleeName": "thunk_FUN_144d7c6b0",
+    "calleeEntry": "1401c2cd6"
+  },
+  {
+    "callSite": "14152d6fa",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d723",
+    "instruction": "CALL 0x1401c2cd6",
+    "target": "1401c2cd6",
+    "calleeName": "thunk_FUN_144d7c6b0",
+    "calleeEntry": "1401c2cd6"
+  },
+  {
+    "callSite": "14152d75f",
+    "instruction": "CALL 0x1400e5264",
+    "target": "1400e5264",
+    "calleeName": "thunk_FUN_144d76220",
+    "calleeEntry": "1400e5264"
+  },
+  {
+    "callSite": "14152d78d",
+    "instruction": "CALL 0x1401c2cd6",
+    "target": "1401c2cd6",
+    "calleeName": "thunk_FUN_144d7c6b0",
+    "calleeEntry": "1401c2cd6"
+  }
+]

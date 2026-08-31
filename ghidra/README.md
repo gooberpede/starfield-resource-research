@@ -1,13 +1,42 @@
 # Ghidra tooling
 
-This directory currently provides four read-only exporters:
+This directory currently provides seven read-only exporters/analyzers:
 
 - `ExportSelectedFunctionContext.java` exports one selected function.
 - `ExportFunctionNeighbourhood.java` exports the selected root function plus the resolved implementations of its direct internal callees. Its traversal depth is fixed at 1. It also performs focused recovery of simple vtable-based indirect calls in the root.
+- `ExportCallSignatureEvidence.java` exports focused machine-code and high-p-code call-signature evidence.
+- `ExportResourceResolutionEvidence.java` exports focused resource-resolution path evidence.
 - `AnalyzeFieldProvenance.java` traces a selected parameter/member offset, ranks same-offset read/write candidates, performs bounded written-value and nested-offset analysis, and exports the strongest candidate functions.
 - `AnalyzeClassFieldProvenance.java` discovers a bounded method family for one named class and searches only strong/medium class members for a selected `this`-relative field.
+- `ExportFunctionsByAddress.java` exports explicitly addressed functions with exact call sites and is suitable for GUI or headless investigations.
 
-All four scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. None starts a transaction or modifies the open program.
+All seven scripts read the current Ghidra analysis database and write plain files beneath a user-selected export root. None starts a transaction or modifies the open program.
+
+## ExportFunctionsByAddress.java
+
+`ExportFunctionsByAddress.java` is a read-only, address-led exporter intended for
+small reproducible investigations. It writes one directory per requested
+function containing `metadata.json`, `decompiled.c`, `instructions.txt`,
+`callers.json`, `callees.json`, and `data-references.json`, plus a run-level
+`manifest.json`. Caller and callee records retain exact call-site addresses.
+
+The script takes an output directory followed by one or more addresses. For
+example, from the Ghidra installation directory on Windows:
+
+```powershell
+support\analyzeHeadless.bat D:\ReverseEngineering\StarfieldCK\GhidraProject StarfieldCK `
+  -process CreationKit.exe -readOnly -noanalysis `
+  -scriptPath D:\Projects\starfield-resource-research\ghidra\scripts `
+  -postScript ExportFunctionsByAddress.java `
+    D:\Projects\starfield-resource-research\exports\address-investigation `
+    1415DCFB0 14157F120
+```
+
+It reads only the open Ghidra program and writes only the requested filesystem
+export. It does not start a transaction or modify symbols, types, comments,
+labels, function names, or any other Ghidra project state. Keep the traversal
+set small: the script exports exactly the supplied addresses and does not
+recursively expand the call graph.
 
 ## ExportSelectedFunctionContext.java
 

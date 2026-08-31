@@ -81,6 +81,32 @@ For `candidate_count > 0`, it consumes exactly one MT word.
 
 Live traces of the Creation Kit Galaxy View Apply operation establish `FUN_1415DCFB0` as the primary per-biome generator exercised by that operation. It handles at least Special category `5`, Common/root category `0`, family-cache interaction, descendant dispatch, and resource/family limits. The reconstructed behaviour agrees with known game/resource results; the supplied addresses are not asserted here to have been independently traced in retail `Starfield.exe`.
 
+### Static enclosing orchestration
+
+Read-only Ghidra analysis establishes `FUN_14152CBC0` at `0x14152CBC0` as the
+sole direct caller and the enclosing orchestration function. It initializes a
+shared dynamic array of 32-bit resource FormIDs, performs two pre-biome
+population passes, and then iterates the shuffled biome work objects. The call
+to `FUN_1415DCFB0` is at `0x14152D28F`.
+
+At that call, argument 4 (`R9`) is the shared resource-ID array. It is the same
+object whose count `FUN_1415DCFB0` compares against `8`; the temporary context
+passed onward lets `FUN_14157F120` recover it through offset `+0x20`.
+
+One prepopulation pass uses `FUN_141548920` at `0x141548920`. It finds category
+`6` (Everywhere) entries, writes the selected FormID to biome offset `+0x68`,
+and appends the same ID to the shared array. The other pass obtains a
+planet-keyed type-`0xAD` form through `FUN_1419FE120`, accesses an array at that
+form's `+0x1D8` through `FUN_141A46660`, resolves its entries, deduplicates
+their `form +0x70` IDs, and appends them to the same shared array. Its exact
+ATMO semantic identity is **STRONG**, not yet PROVEN, and is documented in
+`hypotheses.md`.
+
+The generator's diagnostic at `0x1415DD453` explicitly states that
+“Atmosphere and Everywhere resources” can fill all available slots. Full
+static evidence and the bounded live-trace window are preserved in
+`docs/experiments/pre-biome-resource-state-investigation.md`.
+
 The established rarity/category mapping is:
 
 ```text

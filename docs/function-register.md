@@ -81,6 +81,144 @@ If the internal resource count is at least `8`, the helper returns the current s
 
 ---
 
+## FUN_14152CBC0
+
+**Name:** `FUN_14152CBC0`
+
+**Address:** `0x14152CBC0`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit, `BGSPlanetDataManager.cpp` diagnostics
+
+**Status:** **PROVEN STATIC enclosing biome-generation orchestration function**
+
+**Confidence:** high
+
+### Observed behaviour
+
+This is the sole direct caller of `FUN_1415DCFB0`, at `0x14152D28F`. It builds
+and shuffles the biome work-object array, initializes a shared uint32 resource
+FormID array, populates that array from a planet-keyed `+0x1D8` list and from
+category-6 Everywhere entries, then calls `FUN_1415DCFB0` once per shuffled
+biome without resetting the shared array.
+
+At the generator call, `R9` is the shared resource-ID array and `R8` is the
+separate generated/cached Common-family configuration array.
+
+### Known relationships
+
+```text
+FUN_14157E850 / FUN_14158DBE0
+    ↓
+FUN_14152CBC0
+    ├─ FUN_1419FE120 → FUN_141A46660 → shared FormID array
+    ├─ FUN_141548920 → category-6 ID → shared FormID array
+    └─ FUN_1415DCFB0 (repeated biome loop)
+```
+
+### Important addresses
+
+```text
+0x14152CEBD  shuffle helper call
+0x14152CF17  planet-keyed typed-form lookup
+0x14152CF28  +0x1D8 array accessor
+0x14152D0E9  direct-list FormID store
+0x14152D1B5  category-6 helper call
+0x14152D28F  per-biome generator call
+```
+
+### Open question
+
+Static xrefs do not identify which of the two thin immediate wrappers is the
+previously observed Galaxy View Apply dispatch. `FUN_14158DBE0` has no direct
+static callers and may be invoked indirectly.
+
+---
+
+## FUN_141548920
+
+**Name:** `FUN_141548920`
+
+**Address:** `0x141548920`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit pre-biome setup
+
+**Status:** **PROVEN STATIC category-6 / Everywhere prepopulation helper**
+
+**Confidence:** high
+
+### Observed behaviour
+
+The helper walks dependency-managed entries and their `0x238`-byte nested
+records. It tests the resolved record's category byte at `+0x2F8` against `6`
+at `0x141548AC9`. On the first match it copies form `+0x70` to the current
+biome work object's `+0x68` field and appends the same uint32 FormID to the
+shared resource array at `0x141548AE7`.
+
+It is called only by `FUN_14152CBC0`, before that function starts the repeated
+calls to `FUN_1415DCFB0`.
+
+---
+
+## FUN_1419FE120
+
+**Name:** `FUN_1419FE120`
+
+**Address:** `0x1419FE120`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit component-database lookup
+
+**Status:** **PROVEN STATIC planet-keyed typed-form lookup; atmospheric role STRONG**
+
+**Confidence:** high for mechanics; medium-high for ATMO interpretation
+
+### Observed behaviour
+
+Given a manager-like object and a uint32 planet key, this helper performs a
+component-database lookup and returns either a resolved form whose type byte at
+`+0x88` equals `0xAD`, or a fallback object. `FUN_14152CBC0` immediately passes
+the result to `FUN_141A46660` and treats the returned field as the source of
+pre-biome resource forms.
+
+The current database does not name type `0xAD` as ATMO. The ATMO
+interpretation is supported by the enclosing dataflow and explicit
+“Atmosphere and Everywhere resources” diagnostic, but remains **STRONG** until
+confirmed by live form identity.
+
+---
+
+## FUN_141A46660
+
+**Name:** `FUN_141A46660`
+
+**Address:** `0x141A46660`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit typed-form field accessor
+
+**Status:** **PROVEN STATIC `+0x1D8` accessor; field semantics STRONG**
+
+**Confidence:** high for offset/access; medium-high for atmospheric-resource-list interpretation
+
+### Observed behaviour
+
+This eight-byte leaf function returns `param_1 + 0x1D8`. Its thunk has exactly
+one direct caller in the current database: `FUN_14152CBC0` at `0x14152CF28`.
+That caller interprets the field as a dynamic array of dependency-managed form
+pointers, resolves each entry, obtains its uint32 FormID from `form +0x70`,
+deduplicates it, and appends it to the shared pre-biome resource array.
+
+The exact field name and its ATMO semantic identity remain **STRONG**, not
+PROVEN.
+
+---
+
 ## ResourceViewWidget::OnApplySeed
 
 **Name:** `ResourceViewWidget::OnApplySeed`  

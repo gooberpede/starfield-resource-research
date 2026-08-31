@@ -20,7 +20,26 @@ Maal VIII provides the clearest evidence: ATMO supplies Chlorine; the CK biome v
 
 Population comparison independently supports the interpretation: `101 / 163` reproducer-mismatch planets have at least one atmospheric inorganic resource. A dense subset has atmosphere-only resources missing from both the old oracle and current reproducer, with counts matching the Maal VIII capacity pattern.
 
-The exact atmospheric insertion/loading function and ordering remain unresolved and must not be called proven.
+Focused static analysis now narrows the candidate insertion path:
+
+```text
+FUN_14152CBC0
+    ↓ planet-keyed FUN_1419FE120 lookup
+type-0xAD form
+    ↓ FUN_141A46660
+array at +0x1D8
+    ↓ resolve entries, load form +0x70, deduplicate, append
+shared uint32 resource-ID array
+    ↓ argument 4
+FUN_1415DCFB0
+```
+
+This identification is **STRONG**, not PROVEN as ATMO semantics. The database
+does not name the type/field, and Maal VIII Chlorine `000057D5` has not yet
+been observed traversing this path. The static insertion order is established:
+the candidate atmospheric list is processed first, category-6 Everywhere
+entries are processed for all biomes second, and the shuffled per-biome calls
+begin third.
 
 ## H2 — Zero-count reflected LIST explicitly clears atmospheric resources
 
@@ -44,23 +63,22 @@ The `count >= 5` guard in `FUN_1415DCFB0` is directly observed in the live-trace
 
 ## Open Runtime Question
 
-The next Ghidra investigation is documented but intentionally not executed:
-
-> Starting from the proven per-biome generator `FUN_1415DCFB0`, identify its immediate outer caller / enclosing planet-generation loop and determine what occurs between entry to that planet-generation operation and the first per-biome call, with particular attention to pre-population of the shared planet-wide resource container by atmosphere-derived resources.
-
-Target path:
+The enclosing static path is now identified. The next investigation should be
+a small, separately authorised Maal VIII live trace:
 
 ```text
-ATMO effective Inorganic Resources
+0x14152CF17  planet-keyed typed-form lookup
+        ↓ type-0xAD form / +0x1D8 array
+0x14152D034  source form +0x70 ID
+        ↓ expect 000057D5 for Maal VIII Chlorine
+0x14152D0E9  shared-array store
         ↓
-runtime insertion/loading path
-        ↓
-shared planet-wide resource container
-        ↓
-FUN_1415DCFB0 / FUN_14157F120 capacity checks
+0x14152D28F  first FUN_1415DCFB0 call
 ```
 
-Maal VIII is the preferred live case because `ATMO_MaalVIII → Chlorine`, while Chlorine appears in the in-game survey but not the CK biome Resource Generation view or old plugin output.
+The trace should establish or reject the ATMO identity, concrete Chlorine form,
+and effective/inherited-data timing without expanding into a broad reflection
+investigation.
 
 ## Superseded Interpretations
 
