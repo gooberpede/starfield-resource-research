@@ -1,0 +1,82 @@
+[
+  {
+    "sourceAddress": "140924806",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[-0x18]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14092480f",
+    "referenceType": "READ",
+    "targetAddress": "1486ea170",
+    "symbol": "DAT_1486ea170",
+    "dataType": "undefined4",
+    "value": null
+  },
+  {
+    "sourceAddress": "14092481b",
+    "referenceType": "READ",
+    "targetAddress": "1586a4b38",
+    "symbol": "PTR_log2f_1586a4b38",
+    "dataType": "pointer",
+    "value": null
+  },
+  {
+    "sourceAddress": "140924821",
+    "referenceType": "READ",
+    "targetAddress": "1486ea150",
+    "symbol": "DAT_1486ea150",
+    "dataType": "undefined4",
+    "value": null
+  },
+  {
+    "sourceAddress": "140924837",
+    "referenceType": "READ",
+    "targetAddress": "148542fe8",
+    "symbol": "DAT_148542fe8",
+    "dataType": "undefined4",
+    "value": null
+  },
+  {
+    "sourceAddress": "14092485b",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "140924862",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "1409249f5",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "1409249fa",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "1409249ff",
+    "referenceType": "READ",
+    "targetAddress": "Stack[-0x18]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  }
+]

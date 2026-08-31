@@ -141,7 +141,7 @@ The design should be easy to extend later to recursive neighbourhood export.
 
 ### Preserve text encoding
 
-**Preserve UTF-8 text encoding.** Do not introduce mojibake or replace valid Unicode punctuation or diagram characters with mis-decoded byte sequences. Before finalising documentation changes, inspect modified text for common mojibake patterns such as `Ã`, `Â`, `ÔÇ`, `â€`, or corrupted box-drawing and arrows. If the repository already uses valid Unicode em dashes, arrows, multiplication signs, or box-drawing characters, preserve them as valid UTF-8 rather than transliterating or re-encoding them.
+**Preserve UTF-8 text encoding.** Do not introduce mojibake or replace valid Unicode punctuation or diagram characters with mis-decoded byte sequences. Before finalising documentation changes, inspect modified text for common mojibake patterns such as `Ã`, `Â`, `ÔÇ`, `â€`, `ÔÇö`, `ÔÇô`, or corrupted box-drawing and arrows. If the repository already uses valid Unicode em dashes, arrows, multiplication signs, or box-drawing characters, preserve them as valid UTF-8 rather than transliterating or re-encoding them.
 
 If a diff or export display appears mojibaked but the repository file itself is valid UTF-8, do not “fix” the source based only on the broken display. Verify the actual file bytes or decoded text first.
 

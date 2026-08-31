@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exportedAtUtc": "2026-08-31T10:46:52.250198600Z",
+  "programName": "CreationKit.exe",
+  "md5": "0215f03ec24922dfd4015dcdc5317dc4",
+  "imageBase": "140000000",
+  "requestedAddress": "14157c470",
+  "functionName": "FUN_14157c470",
+  "entryAddress": "14157c470",
+  "signature": "undefined8 * __fastcall FUN_14157c470(undefined8 * param_1, undefined8 * param_2, longlong param_3)",
+  "bodyMin": "14157c470",
+  "bodyMax": "14157c636",
+  "decompilationCompleted": true,
+  "decompilationError": null
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "callSite": "14092481b",
+    "instruction": "CALL qword ptr [0x1586a4b38]",
+    "target": "EXTERNAL:0000014d",
+    "calleeName": "log2f",
+    "calleeEntry": "EXTERNAL:0000014d"
+  }
+]

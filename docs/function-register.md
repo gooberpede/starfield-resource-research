@@ -47,6 +47,63 @@ Do not resume broad exploration from the older leveled-list trail. Identify this
 
 ---
 
+## FUN_141580660
+
+**Name:** `FUN_141580660`
+
+**Address:** `0x141580660`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit executable, live Galaxy View Apply path
+
+**Status:** **PROVEN category-generic Special/Common selector in the live-traced CK generation path**
+
+**Confidence:** high
+
+### Observed behaviour
+
+`FUN_1415DCFB0` calls this function at `0x1415DD09E` with category `5`
+(Special) and at `0x1415DD0F2` with category `0` (Common). It consumes one
+MT19937 word before candidate enumeration, converts it through the binary32
+`uint32 -> [0, 0.99999]` probability path, and delegates ordered entry scanning
+to `FUN_14157C470`.
+
+The helper filters on resource/IRES byte `+0x2F8`, reads the category-indexed
+chance at RSGD entry `+0x24 + category*0x28`, accumulates `chance * 0.01f`
+without normalization, and selects the first entry for which
+`roll < cumulative`. The returned 16-byte pair is `{resource pointer,
+entry+8}`. The selector uses the same code, RNG consumption, probability rule,
+and return shape for categories `5` and `0`; it contains no Special-only or
+Common-only branch.
+
+The up-front draw occurs even with no qualifying entry, one qualifying entry,
+or a single `100%` entry. Full static evidence is preserved in
+`docs/experiments/special-common-selector-investigation.md`.
+
+### Key addresses
+
+```text
+0x1415806A8  MT19937 binary32 draw via thunk to FUN_140924800
+0x14158070C  scan optional direct generation-data source
+0x14158080C  scan one fallback generation-data source
+0x14157C5AA  compare resource/IRES +0x2F8 with requested category
+0x14157C5BE  read entry +0x24 + category*0x28 chance
+0x14157C5CA  update cumulative threshold
+0x14157C5E3  branch when roll < cumulative
+0x14157C5F7  store selected resource pointer
+0x14157C5FA  store selected entry +0x08
+```
+
+### Open detail
+
+The current Ghidra database does not name the exact C++ types of the selector
+context's optional direct source and the source object containing the fallback
+dependency array at `+0x728`. Their observed dataflow is established; semantic
+type names should not be invented.
+
+---
+
 ## FUN_14157F120
 
 **Name:** `FUN_14157F120`

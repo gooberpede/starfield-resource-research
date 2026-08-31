@@ -1,0 +1,4 @@
+144d8c490  VMOVSD XMM0,qword ptr [0x14d4bb920]
+144d8c498  VMOVSD qword ptr [RCX],XMM0
+144d8c49c  MOV RAX,RCX
+144d8c49f  RET

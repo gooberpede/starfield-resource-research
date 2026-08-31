@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "exportedAtUtc": "2026-08-31T10:46:53.135565400Z",
+  "programName": "CreationKit.exe",
+  "functions": [
+    {
+      "requestedAddress": "141580660",
+      "status": "exported",
+      "functionName": "FUN_141580660",
+      "entryAddress": "141580660",
+      "directory": "FUN_141580660__141580660"
+    },
+    {
+      "requestedAddress": "14157c470",
+      "status": "exported",
+      "functionName": "FUN_14157c470",
+      "entryAddress": "14157c470",
+      "directory": "FUN_14157c470__14157c470"
+    },
+    {
+      "requestedAddress": "140924800",
+      "status": "exported",
+      "functionName": "FUN_140924800",
+      "entryAddress": "140924800",
+      "directory": "FUN_140924800__140924800"
+    },
+    {
+      "requestedAddress": "144d8c490",
+      "status": "exported",
+      "functionName": "FUN_144d8c490",
+      "entryAddress": "144d8c490",
+      "directory": "FUN_144d8c490__144d8c490"
+    }
+  ]
+}

@@ -123,6 +123,33 @@ The established rarity/category mapping is:
 
 For the requested RSGD category, stored `RSGDResourceIndex` order is preserved. Selection uses cumulative `Chance / 100`; the first cumulative threshold exceeding the random value wins. Total weights are not normalized.
 
+### Category-5 / category-0 selector
+
+Read-only static analysis of Creation Kit `FUN_141580660` and its focused
+helpers establishes the selector mechanism used by `FUN_1415DCFB0` for both
+Special category `5` and Common category `0`:
+
+```text
+draw one MT19937 binary32 probability in [0, 0.99999]
+walk ordered 0x238-byte RSGD entries
+require resource/IRES +0x2F8 == requested category
+cumulative += (entry +0x24 + category*0x28 chance) * 0.01
+return first entry where roll < cumulative
+```
+
+The draw occurs before enumeration, so each selector call consumes exactly one
+raw MT word even if the category has no entries, has one entry, or has a single
+`100%` entry. Categories `5` and `0` use the same selector path, probability
+logic, RNG consumption, and `{resource pointer, entry+8}` result shape; there
+is no Special-only branch inside `FUN_141580660`.
+
+Callisto provides paired **PROVEN live** CK evidence: category `5` returned
+Helium-3 `000057F5`, then category `0` returned Iron `000057C7`. Its extracted
+RSGD rows give Helium-3 Special chance `100`, Iron Common chance `30`, and
+Aluminum Common chance `70`, consistent with the statically proven ordered
+cumulative mechanism. Exact addresses and evidence boundaries are recorded in
+`docs/experiments/special-common-selector-investigation.md`.
+
 ### IRES graph and descendants
 
 The resource-family graph is stored in IRES data:

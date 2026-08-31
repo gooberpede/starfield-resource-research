@@ -1,0 +1,194 @@
+[
+  {
+    "sourceAddress": "14157c49b",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[-0x48]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c4b4",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x18]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c4c3",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[-0x38]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c4db",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[-0x58]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c4e1",
+    "referenceType": "READ",
+    "targetAddress": "148544e84",
+    "symbol": "DAT_148544e84",
+    "dataType": "undefined4",
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c4f0",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c500",
+    "referenceType": "DATA",
+    "targetAddress": "148524a20",
+    "symbol": "s_Invalid_iterator_148524a20",
+    "dataType": "string",
+    "value": "Invalid iterator"
+  },
+  {
+    "sourceAddress": "14157c50d",
+    "referenceType": "DATA",
+    "targetAddress": "148522ab0",
+    "symbol": "s_E:\\BuildAgent\\work\\fee57674ddcb4_148522ab0",
+    "dataType": "string",
+    "value": "E:\\BuildAgent\\work\\fee57674ddcb42c9\\Genesis\\BSCore\\BSTArray.inl"
+  },
+  {
+    "sourceAddress": "14157c514",
+    "referenceType": "DATA",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c521",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c52a",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c532",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c53c",
+    "referenceType": "READ",
+    "targetAddress": "14bc65518",
+    "symbol": "DAT_14bc65518",
+    "dataType": "undefined1",
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c543",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c562",
+    "referenceType": "DATA",
+    "targetAddress": "14869a900",
+    "symbol": "s_QForm()_cannot_be_called_on_an_u_14869a900",
+    "dataType": "string",
+    "value": "QForm() cannot be called on an uninitialized dependency pointer"
+  },
+  {
+    "sourceAddress": "14157c56f",
+    "referenceType": "DATA",
+    "targetAddress": "14869a950",
+    "symbol": "s_E:\\BuildAgent\\work\\fee57674ddcb4_14869a950",
+    "dataType": "string",
+    "value": "E:\\BuildAgent\\work\\fee57674ddcb42c9\\Genesis\\Shared\\FormComponents\\BGSDependencyManagedFormPointer.h"
+  },
+  {
+    "sourceAddress": "14157c576",
+    "referenceType": "DATA",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c583",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x10]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c58d",
+    "referenceType": "WRITE",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c599",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x8]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c5fe",
+    "referenceType": "READ",
+    "targetAddress": "Stack[-0x58]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c604",
+    "referenceType": "READ",
+    "targetAddress": "Stack[0x18]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c60c",
+    "referenceType": "READ",
+    "targetAddress": "Stack[-0x38]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  },
+  {
+    "sourceAddress": "14157c615",
+    "referenceType": "READ",
+    "targetAddress": "Stack[-0x48]",
+    "symbol": null,
+    "dataType": null,
+    "value": null
+  }
+]
