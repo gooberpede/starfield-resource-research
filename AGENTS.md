@@ -95,16 +95,70 @@ The repository should contain scripts, notes, schemas, derived metadata, and sma
 
 ## Current Investigation Direction
 
-Live x64dbg traces in the Creation Kit Galaxy View Apply path establish these generation anchors:
+The v1.0 inorganic generation algorithm is recovered and independently validated within its defined scope:
 
-- `FUN_1415DCFB0` — **PROVEN** primary per-biome generator in the live-traced CK generation path;
-- `FUN_14157F120` — **PROVEN** descendant-generation helper in that path.
+```text
+1,444 / 1,444 canonical planet-wide exact
+all targeted pathological CK biome regressions exact
+10 / 10 fresh CK + retail holdout exact
+```
+
+Start with `docs/v1-research-baseline.md`. Live x64dbg traces in the Creation Kit Galaxy View Apply path establish these primary anchors:
+
+- `FUN_14152CBC0` — enclosing orchestration and atmosphere/Everywhere prepopulation;
+- `FUN_141548920` — **PROVEN LIVE** Everywhere/category-6 pre-pass;
+- `FUN_1415DCFB0` — **PROVEN LIVE** primary per-biome generator;
+- `FUN_141580660` — **PROVEN** Special/Common weighted selector;
+- `FUN_14157F120` — **PROVEN LIVE** descendant-generation helper;
+- `FUN_14154C710` — **PROVEN LIVE** guard-fallback candidate construction;
+- `FUN_14015B4A0` — **PROVEN LIVE** float-scaled fallback family selection.
 
 The older Creation Kit trail through `ResourceViewWidget::OnApplySeed`, `FUN_1431bc320`, `FUN_140e457b0`, and generic leveled-list machinery is **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**. Preserve its valid calling-convention, `TESContainer`, and leveled-list findings: it may remain legitimate CK/UI or downstream machinery. Do not assume it participates in biome allocation without new live evidence.
 
-`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` provide a valuable empirical resource-set oracle/proxy that appears to correspond closely to the CK/biome-generation-visible channel. That correspondence is not a proven engine contract, and the exact upstream state exposed by `SurveyAggregator` remains unresolved. Current evidence proves that the dataset omits at least some atmosphere-derived inorganic resources, so it is not a complete final planetary-resource oracle.
+`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` provide a valuable canonical validator for the CK/RSGD-visible channel used by the reproducer. The exact upstream semantic contract remains unresolved, and the dataset is proven incomplete for atmosphere-derived final membership. It is validation evidence, never generation logic.
 
-The next Ghidra investigation, when explicitly authorised, is to start from `FUN_1415DCFB0`, identify its immediate outer caller/enclosing planet-generation loop, and trace atmosphere-derived resource pre-population of the shared planet-wide resource container before the first per-biome call. Do not begin that investigation as part of documentation reconciliation.
+The earlier Maal VIII atmosphere trace is complete: atmospheric Chlorine `000057D5` was observed entering shared resource-ID state before Everywhere and shuffled per-biome generation. Do not preserve that resolved trace as an active next investigation.
+
+Current posture is to preserve evidence, investigate new falsifications or executable/version drift, and support downstream planner/data tooling. Do not silently reopen settled rules merely because a non-blocking semantic detail remains unknown.
+
+## Protected v1.0 Baseline
+
+Keep these generation concepts separate:
+
+- planet-wide resource identity;
+- family configuration cache;
+- family configuration origin;
+- biome-local Common-family assignment;
+- atmosphere, Everywhere, and Special occurrence.
+
+Do not merge the following RNG mechanisms:
+
+1. biome-shuffle integer rejection/modulo;
+2. MT19937-to-binary32 probability conversion;
+3. Special/Common ordered cumulative selector;
+4. descendant float32-scaled candidate index;
+5. guard-fallback float32-scaled cached-family index.
+
+Additional guardrails:
+
+- do not treat Creation Kit addresses as retail `Starfield.exe` addresses;
+- do not infer an empty result from missing PNDT/effective-RSGD input;
+- do not use validation-oracle data as generation input;
+- do not change the recovered algorithm without new evidence and a reproducible counterexample;
+- preserve superseded evidence rather than deleting history.
+
+The research repository owns evidence status, trace provenance, and native-function findings. The sibling `starfield-resource-reproducer` owns the executable reference model and regression suite. A future settled-rule change must reconcile both repositories:
+
+```text
+1. reproduce a counterexample
+2. add or update research evidence
+3. classify the evidence
+4. reconcile the research baseline
+5. issue an implementation brief
+6. update the reproducer
+7. add a regression
+8. rerun canonical and holdout validation
+```
 
 ## Established Tooling Baseline
 
@@ -157,6 +211,18 @@ When making a research claim:
 1. update `docs/function-register.md` if a specific function is involved;
 2. update `docs/known-facts.md` only when the result is established;
 3. otherwise update `docs/hypotheses.md` or an experiment note.
+
+### Diff export encoding
+
+When producing a diff for external review, do not pipe `git diff` through PowerShell `Out-File`, `Set-Content`, or similar text commands. Use Git's native `--output=<path>` option so patch bytes are written directly without PowerShell transcoding.
+
+```text
+# Do not use:
+git diff --cached | Out-File -Encoding utf8 "myDiff.diff"
+
+# Use:
+git diff --cached --output="myDiff.diff"
+```
 
 ## Scope Discipline
 

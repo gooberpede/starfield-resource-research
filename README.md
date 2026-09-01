@@ -1,58 +1,89 @@
 # Starfield Resource Research
 
-This repository contains tooling and research notes for reverse engineering Starfield's runtime inorganic resource-generation system.
+This repository is the durable evidence and research-history record for reverse engineering Starfield's runtime inorganic resource-generation system. The central question is:
 
-The central question is:
+> How does Starfield transform planet, biome, resource-generation, atmosphere, and seed data into the final per-biome inorganic resource set at runtime?
 
-> How does Starfield determine exactly which inorganic resources are available in each biome?
+The executable reference model lives in the sibling `starfield-resource-reproducer` repository. Start with `docs/v1-research-baseline.md` for the current evidence state.
 
-The final resource set is not stored directly as a simple planet/biome/resource table in `Starfield.esm`. Instead, the game combines planet, biome, resource-generation, and seed data at runtime.
+## Status
 
-This project is intended to make that process reproducible and analysable without relying on a manual cycle of opening functions in Ghidra, copying decompiled code into chat, and choosing the next function by hand.
-
-## Goals
-
-The project aims to:
-
-- automate extraction of useful analysis context from Ghidra;
-- build a durable register of relevant Starfield functions and addresses;
-- distinguish confirmed observations from working hypotheses;
-- trace the runtime path that assigns inorganic resource families and family members to biomes;
-- validate candidate algorithms against provenance-qualified runtime observations;
-- ultimately support a planner that can reason about likely resource co-location.
-
-## Current Model
-
-Evidence labels used throughout the repository are **PROVEN**, **STRONG**, **PROVISIONAL**, **COUNTERFACTUAL**, and **SUPERSEDED**. See `AGENTS.md` for their definitions.
-
-The proven data path and override precedence are:
+**Core inorganic generation algorithm: recovered and independently validated within the v1.0 scope.**
 
 ```text
-PNDT
- ├─ RSCS
- └─ ordered biome entries
-        ↓
-      BIOM
-        ↓
-      RSGD
+canonical planet-wide validation: 1,444 / 1,444 exact
+mismatches:                         0
+errors:                             0
+targeted pathological CK regressions: exact
+fresh CK + retail holdout:          10 / 10 exact
 ```
 
-For each biome, a non-null PNDT Resource Generation override replaces `BIOM.RNAM`; the two RSGDs are not merged. Non-zero `RSCS` directly seeds unsigned 32-bit MT19937. The same evolving state drives the biome shuffle and later generation draws.
+The holdout is an independent corroboration layer. Creation Kit addresses and control flow are proven for the live-traced CK Galaxy View Apply path; they are not asserted to be retail `Starfield.exe` addresses.
 
-In the live-traced Creation Kit Galaxy View Apply path, `FUN_1415DCFB0` is the proven primary per-biome generator and `FUN_14157F120` is its proven descendant helper. IRES records provide rarity and child-resource graph data. Common roots are inserted unconditionally, descendant choices traverse this graph, and a planet-level family cache prevents repeated descendant generation for a reused root. The reconstructed behaviour agrees with known game/resource results; these addresses are not presented as independently traced retail `Starfield.exe` addresses.
+No known algorithmic hole remains within the current v1.0 scope. Future counterexamples, executable/version drift, and new evidence remain valid research targets.
 
-The traced path has a proven eight-entry internal resource-container limit and a proven `count >= 5` guard on a structure associated with generated/cached Common-family configurations. Interpreting the latter as a general five-family or five-generated-family-configuration limit remains provisional. Atmospheric resources are strongly supported as sharing the eight-entry planet-wide capacity, although their exact insertion function and order remain unresolved.
-
-## Current Reverse-Engineering Anchors
-
-The current primary runtime anchors are:
+## Recovered Model
 
 ```text
+PNDT / BIOM / RSGD / IRES / ATMO
+        ↓
+nonzero unsigned RSCS seeds MT19937
+        ↓
+atmosphere prepopulation
+        ↓
+Everywhere/category-6 pre-pass
+        ↓
+PNDT-order biome construction
+        ↓
+deterministic biome shuffle
+        ↓
+per shuffled biome:
+    Special/category-5 selector
+        ↓
+    Special shared-state insertion
+        ↓
+    five-tree guard
+        ↓
+    shared-eight guard
+        ↓
+    normal Common selector
+        OR
+    guard fallback family assignment
+        ↓
+    new family generation
+        OR
+    ordinary cached-family reuse
+        OR
+    guarded cached-family reuse
+```
+
+PNDT `Resource Generation` overrides `BIOM.RNAM` for that biome; the two RSGDs are not merged. Stored RSGD order is significant. Atmosphere, Everywhere, Special, Common roots, and emitted descendants share the guarded planet-wide resource-ID state. The validated model tracks unique FormID occupancy separately from provenance occurrences.
+
+Keep these concepts distinct:
+
+- planet-wide resource identity;
+- family configuration cache and configuration origin;
+- biome-local Common-family assignment;
+- Everywhere, Special, and atmosphere occurrence.
+
+The Common assignment mechanisms are `NEW_FAMILY`, `NORMAL_CACHE_REUSE`, `GUARD_MATCHED_FALLBACK`, `GUARD_GENERAL_FALLBACK`, and `NO_COMMON_ASSIGNMENT`.
+
+## Native Anchors
+
+The primary CK runtime anchors are:
+
+```text
+FUN_14152CBC0  enclosing orchestration and prepopulation
+FUN_141548920  Everywhere/category-6 pre-pass
 FUN_1415DCFB0  primary per-biome generator
-FUN_14157F120  descendant helper
+FUN_141580660  Special/Common weighted selector
+FUN_14157F120  descendant-generation helper
+FUN_14154C710  guard-fallback candidate construction
+FUN_14015B4A0  guard-fallback cached-family selection
+FUN_140924800  MT19937 → binary32 probability conversion
 ```
 
-The older static trail is retained as **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**:
+The older static trail remains **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**:
 
 ```text
 ResourceViewWidget::OnApplySeed
@@ -61,30 +92,39 @@ FUN_1431bc320
     ↓
 FUN_140e457b0
     ↓
-generic leveled-list evaluation machinery
+generic leveled-list machinery
 ```
 
-Its low-level `TESContainer`, calling-convention, and leveled-list findings remain valid historical evidence and may describe legitimate CK/UI or downstream machinery. Live Galaxy View Apply tracing did not exercise it as the primary allocation trail.
+Its calling-convention, `TESContainer`, and leveled-list findings remain valid historical evidence and may describe CK/UI or downstream machinery.
 
-`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` remain useful empirical proxies for reconciling the CK/biome-generation-visible channel, but that correspondence is not a proven semantic contract. The exact upstream state exposed by `SurveyAggregator` remains unresolved. The dataset is not a complete final inorganic-resource oracle: atmosphere-derived resources can be absent.
+## Evidence and Oracle Boundaries
 
-See `docs/function-register.md` for the working function register.
+Evidence labels are **PROVEN**, **STRONG**, **PROVISIONAL**, **COUNTERFACTUAL**, and **SUPERSEDED**; see `AGENTS.md`.
 
-## Empirical Constraints
+`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` are valuable validation evidence for the CK/RSGD-visible channel. The dataset is proven incomplete for atmosphere-derived final membership, and the exact upstream `SurveyAggregator` semantic contract remains unresolved. Oracle data must never become generation logic.
 
-Independent extraction and analysis have established useful constraints on any candidate algorithm.
+Missing PNDT/effective-RSGD input means biome-local generation is unknown or unavailable, not empty. Independently sourced atmosphere can still be reported. Volii Alpha is the negative control for this input-boundary rule, not evidence about its actual terrestrial biome allocation.
 
-Examples include:
+## Repository Contract
 
-- every observed inorganic resource-family descendant occurs on a planet that also contains that family's root;
-- across the qualified SurveyAggregator-derived proxy dataset, the number of represented resource families never exceeds the number of biomes on the same body;
-- many bodies have exactly as many represented resource families as biomes.
+```text
+starfield-resource-research
+    owns evidence status, trace provenance, and native function findings
 
-These observations strongly motivate investigation of a biome/family allocation step, but they do not by themselves prove one fixed family per biome.
+starfield-resource-reproducer
+    owns the executable reference model and regression suite
+```
 
-See:
-- `docs/known-facts.md`
-- `docs/hypotheses.md`
+A future settled-rule change must be reconciled across both repositories: reproduce the counterexample, preserve and classify the evidence here, update the research baseline, issue an implementation brief, update the reproducer and regressions, then rerun canonical and holdout validation.
+
+## Current Research Posture
+
+- preserve raw evidence and superseded interpretations;
+- investigate new falsifications or executable/version drift;
+- support downstream planner and data tooling;
+- keep non-blocking questions clearly separated from recovered generation semantics.
+
+Current non-blocking questions are summarized in `docs/v1-research-baseline.md` and `docs/hypotheses.md`.
 
 ## Repository Layout
 
@@ -93,52 +133,14 @@ See:
 ├─ AGENTS.md
 ├─ README.md
 ├─ docs/
+│  ├─ v1-research-baseline.md
 │  ├─ known-facts.md
 │  ├─ hypotheses.md
-│  └─ function-register.md
-├─ ghidra/
-│  └─ scripts/
+│  ├─ function-register.md
+│  └─ experiments/
+├─ ghidra/scripts/
 ├─ exports/
 └─ tools/
 ```
 
-Suggested use:
-
-- `docs/` — durable research notes and evidence summaries;
-- `ghidra/scripts/` — Ghidra extraction and analysis scripts;
-- `exports/` — generated analysis output;
-- `tools/` — supporting parsers, comparators, graph tools, and validation utilities.
-
-## Next Investigation (Not Yet Executed)
-
-Starting from proven generator `FUN_1415DCFB0`, identify its immediate outer caller or enclosing planet-generation loop. Determine what happens between operation entry and the first per-biome call, focusing on the path from effective ATMO Inorganic Resources into the shared planet-wide resource container. Maal VIII is the preferred live case because atmospheric Chlorine appears in its in-game survey but not in the CK biome Resource Generation view or old plugin output.
-
-Keep origin channels distinct during validation: `AtmosphericResources`, `BiomeGeneratedResources`, `EverywhereResources`, `SpecialResources`, and `FinalPlanetaryResources`. Deduplicate FormIDs only for final player-facing membership.
-
-## Research Method
-
-The intended loop is:
-
-```text
-Ghidra analysis
-      ↓
-candidate interpretation
-      ↓
-candidate algorithm/model
-      ↓
-implementation or prediction
-      ↓
-comparison against provenance-qualified runtime observations
-      ↓
-counterexamples
-      ↓
-refined Ghidra investigation
-```
-
-The aim is to replace ad hoc manual exploration with repeatable evidence-producing experiments.
-
-## Repository Policy
-
-Do not commit proprietary Starfield binaries or Ghidra project databases containing imported game binaries.
-
-Keep generated bulk exports out of Git unless they are deliberately selected as small, useful research evidence.
+Do not commit proprietary Starfield binaries, extracted proprietary assets, or Ghidra project databases containing imported game binaries.

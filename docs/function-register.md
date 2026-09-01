@@ -24,9 +24,21 @@ Do not replace an original Ghidra name with a semantic alias unless evidence is 
 
 ### Observed behaviour
 
-Live x64dbg traces tie this function to the Creation Kit Galaxy View Apply generation path. It handles at least Special category `5`, Common/root category `0`, family-cache interaction, descendant dispatch, and resource-count/family-count guards. The reconstructed behaviour agrees with known game/resource results; this entry does not claim that the address was independently traced in retail `Starfield.exe`.
+Live x64dbg traces tie this function to the Creation Kit Galaxy View Apply generation path. It handles Special category `5`, Common/root category `0`, family-cache interaction, descendant dispatch, Common guards, and guarded fallback assignment. The reconstructed behaviour agrees with CK and retail outputs; this entry does not claim that the address was independently traced in retail `Starfield.exe`.
 
 It preserves stored `RSGDResourceIndex` order for category selection and uses unnormalized cumulative `Chance / 100`. Once a new Common family is selected, it unconditionally emits the root and dispatches descendant generation through rarity levels `1..4`.
+
+**PROVEN LIVE ordering:**
+
+```text
+Special selector
+→ Special written/recorded into shared state
+→ five-tree guard
+→ shared-eight guard
+→ normal Common selector OR fallback near 0x1415DD255
+```
+
+A new Special can fill slot eight and force fallback for the current biome. A duplicate Special does not increment the validated unique-identity occupancy model.
 
 ### Proven limit checks
 
@@ -39,11 +51,30 @@ It preserves stored `RSGDResourceIndex` order for category selection and uses un
 0x1415DD0E1  jae ...
 ```
 
-The `8` comparisons establish an eight-entry internal resource-container limit. The `5` comparison proves a `count >= 5` guard on the structure associated with generated/cached Common-family configurations. Its likely interpretation as a general five-family or five-generated-family-configuration limit remains **PROVISIONAL** because the structure's exact general role has not been independently established.
+The `8` comparisons establish the shared resource-state guard. Bara VII-d live progression `0, 1, 1, 2, 2, 3, 4, 5` proves that the `5` guard applies to five distinct generated/cached Common-family configurations in this generation path; normal cache reuse does not increment it.
 
-### Next analysis
+Both Common guards suppress the normal category-0 selector and branch to fallback near `0x1415DD255`. The earlier interpretation that the shared-eight branch necessarily leaves the biome without a Common family is **SUPERSEDED**.
 
-Do not resume broad exploration from the older leveled-list trail. Identify this function's immediate outer caller/enclosing planet loop and inspect pre-population of the shared resource container before the first per-biome call, especially for Maal VIII atmospheric Chlorine.
+### Common assignment paths
+
+```text
+normal selector → new root:
+    generate and cache family
+
+normal selector → cached root:
+    ordinary cache reuse; no descendant RNG
+
+five-tree/shared-eight guard:
+    FUN_14154C710 candidate construction
+    → FUN_14015B4A0 cached-family choice when a pool exists
+    → copy existing configuration; no descendant regeneration
+```
+
+Current assignment provenance is `NEW_FAMILY`, `NORMAL_CACHE_REUSE`, `GUARD_MATCHED_FALLBACK`, `GUARD_GENERAL_FALLBACK`, or `NO_COMMON_ASSIGNMENT`.
+
+### Current posture
+
+No settled generation hole remains within v1.0 scope. Revisit this function for new falsifications, version drift, or evidence that contradicts the recovered control flow.
 
 ---
 
@@ -104,6 +135,113 @@ type names should not be invented.
 
 ---
 
+## FUN_14154C710
+
+**Name:** `FUN_14154C710`
+
+**Address:** `0x14154C710`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit guard-fallback path
+
+**Status:** **PROVEN LIVE fallback candidate-construction helper**
+
+**Confidence:** high
+
+### Observed behaviour
+
+The helper scans the current effective RSGD in stored order. It considers only category-0/Common resources, records whether any Common entries exist, and compares each Common root FormID with roots in the already-generated family cache. Matching cached configurations form a preferred pool. It applies no chance weighting.
+
+### Decision context
+
+```text
+no Common roots
+    → NO_COMMON_ASSIGNMENT
+matching cached roots
+    → preferred matching pool
+Common roots but no matches
+    → all cached families
+```
+
+Jaffa VII-b provides the decisive live decision-rule observations. Selection from the resulting pool is performed separately by `FUN_14015B4A0`.
+
+---
+
+## FUN_14015B4A0
+
+**Name:** `FUN_14015B4A0`
+
+**Address:** `0x14015B4A0`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit guard-fallback path
+
+**Status:** **PROVEN LIVE float-scaled fallback family selector**
+
+**Confidence:** high
+
+### Observed behaviour
+
+For lower bound zero and candidate count `N`, selection is:
+
+```python
+index = trunc(float32(probability * float32(N)))
+```
+
+It obtains `probability` through `FUN_1401190CD → FUN_140924800`. A one-element pool still consumes one probability draw. This semantic mechanism is distinct from the biome-shuffle integer rejection/modulo helper even though it shares arithmetic with descendant candidate indexing.
+
+---
+
+## FUN_1401190CD
+
+**Name:** `FUN_1401190CD`
+
+**Address:** `0x1401190CD`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit
+
+**Status:** **PROVEN thunk to FUN_140924800**
+
+**Confidence:** high
+
+### Observed behaviour
+
+The thunk jumps to `FUN_140924800` and supplies the recovered MT19937-to-binary32 probability primitive to guard-fallback selection.
+
+---
+
+## FUN_140924800
+
+**Name:** `FUN_140924800`
+
+**Address:** `0x140924800`
+
+**Proposed alias:** none
+
+**Source context:** Creation Kit PRNG machinery
+
+**Status:** **PROVEN MT19937 binary32 probability conversion**
+
+**Confidence:** high
+
+### Observed behaviour
+
+```text
+raw uint32
+→ float32(raw)
+→ × float32(2**-32)
+→ × float32(0.99999)
+→ binary32 probability
+```
+
+Proven callers include the Special/Common selector path through its thunk and the guard-fallback selector through `FUN_1401190CD`. Descendant and fallback bounded choices use the resulting probability in separate semantic contexts; this function is not the biome-shuffle integer helper.
+
+---
+
 ## FUN_14157F120
 
 **Name:** `FUN_14157F120`
@@ -148,7 +286,7 @@ If the internal resource count is at least `8`, the helper returns the current s
 
 **Source context:** Creation Kit, `BGSPlanetDataManager.cpp` diagnostics
 
-**Status:** **PROVEN STATIC enclosing biome-generation orchestration function**
+**Status:** **PROVEN STATIC enclosing orchestration; PROVEN LIVE atmosphere-before-Everywhere-before-biomes semantics**
 
 **Confidence:** high
 
@@ -159,6 +297,8 @@ and shuffles the biome work-object array, initializes a shared uint32 resource
 FormID array, populates that array from a planet-keyed `+0x1D8` list and from
 category-6 Everywhere entries, then calls `FUN_1415DCFB0` once per shuffled
 biome without resetting the shared array.
+
+Maal VIII live tracing proves that the first source carries effective atmospheric Chlorine `000057D5` into shared state before Everywhere and the first per-biome call. This upgrades the enclosing atmospheric prepopulation order from strong static interpretation to proven live semantics while preserving the static evidence boundary on unnamed engine types/fields.
 
 At the generator call, `R9` is the shared resource-ID array and `R8` is the
 separate generated/cached Common-family configuration array.
@@ -203,20 +343,22 @@ static callers and may be invoked indirectly.
 
 **Source context:** Creation Kit pre-biome setup
 
-**Status:** **PROVEN STATIC category-6 / Everywhere prepopulation helper**
+**Status:** **PROVEN LIVE category-6 / Everywhere prepopulation helper**
 
 **Confidence:** high
 
 ### Observed behaviour
 
-The helper walks dependency-managed entries and their `0x238`-byte nested
-records. It tests the resolved record's category byte at `+0x2F8` against `6`
-at `0x141548AC9`. On the first match it copies form `+0x70` to the current
-biome work object's `+0x68` field and appends the same uint32 FormID to the
-shared resource array at `0x141548AE7`.
+The helper walks effective generation entries and their `0x238`-byte nested
+records in stored order. It tests the resolved record's category byte at
+`+0x2F8` against `6` at `0x141548AC9`. On a match it copies form `+0x70`
+to the current biome work object's `+0x68` field and appends the same uint32
+FormID to the shared resource array at `0x141548AE7`.
 
 It is called only by `FUN_14152CBC0`, before that function starts the repeated
 calls to `FUN_1415DCFB0`.
+
+Fermi VIII-b `OceanDefaultRes` proves live that this path does not consult DNAM Everywhere chance, consumes no RNG, and is not ordinary weighted selection.
 
 ---
 
@@ -230,9 +372,9 @@ calls to `FUN_1415DCFB0`.
 
 **Source context:** Creation Kit component-database lookup
 
-**Status:** **PROVEN STATIC planet-keyed typed-form lookup; atmospheric role STRONG**
+**Status:** **PROVEN STATIC planet-keyed typed-form lookup in the PROVEN LIVE atmospheric prepopulation path**
 
-**Confidence:** high for mechanics; medium-high for ATMO interpretation
+**Confidence:** high for mechanics and enclosing atmospheric role; medium for exact type identity
 
 ### Observed behaviour
 
@@ -242,10 +384,9 @@ component-database lookup and returns either a resolved form whose type byte at
 the result to `FUN_141A46660` and treats the returned field as the source of
 pre-biome resource forms.
 
-The current database does not name type `0xAD` as ATMO. The ATMO
-interpretation is supported by the enclosing dataflow and explicit
-“Atmosphere and Everywhere resources” diagnostic, but remains **STRONG** until
-confirmed by live form identity.
+The current database does not name type `0xAD` as ATMO, so no semantic C++
+type name is assigned. Separately, Maal VIII live tracing proves the enclosing
+path's effective atmospheric-resource role and concrete Chlorine identity.
 
 ---
 
@@ -259,9 +400,9 @@ confirmed by live form identity.
 
 **Source context:** Creation Kit typed-form field accessor
 
-**Status:** **PROVEN STATIC `+0x1D8` accessor; field semantics STRONG**
+**Status:** **PROVEN STATIC `+0x1D8` accessor in the PROVEN LIVE atmospheric prepopulation path**
 
-**Confidence:** high for offset/access; medium-high for atmospheric-resource-list interpretation
+**Confidence:** high for offset/access and enclosing atmospheric role; medium for exact field identity
 
 ### Observed behaviour
 
@@ -271,8 +412,8 @@ That caller interprets the field as a dynamic array of dependency-managed form
 pointers, resolves each entry, obtains its uint32 FormID from `form +0x70`,
 deduplicates it, and appends it to the shared pre-biome resource array.
 
-The exact field name and its ATMO semantic identity remain **STRONG**, not
-PROVEN.
+The exact C++ field name remains unknown and must not be invented. The enclosing
+path's atmospheric-resource semantics are independently **PROVEN LIVE**.
 
 ---
 

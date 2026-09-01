@@ -60,7 +60,10 @@ The observed per-biome checks are:
 0x1415DD0E1  jae ...
 ```
 
-The `8` comparisons prove an eight-entry internal resource-container limit. The `5` comparison proves a `count >= 5` guard on the structure associated with generated/cached Common-family configurations. A general five-family or five-generated-family-configuration limit is the most likely semantic interpretation, but remains **PROVISIONAL** because the structure's exact general role has not been independently established.
+The `8` comparisons prove the shared resource-state guard. Later Bara VII-d
+live work established that the `5` comparison guards the collection of five
+distinct generated/cached Common-family configurations in this generation path;
+ordinary cache reuse does not increment it.
 
 The descendant early return is:
 
@@ -76,16 +79,32 @@ At the dedicated Maal VIII observation, the internal count was `8`. The helper r
 
 The CK biome Resource Generation view has seven entries: Iron, Nickel, Water, Uranium, Iridium, Vanadium, and Copper. The in-game survey additionally has Chlorine. ATMO data explicitly assigns Chlorine, while the old plugin/oracle omits it.
 
-In the final Iron-biome trace, Iron insertion brought the internal count to `8`; the rarity-1 descendant call returned immediately, preventing Alkanes without consuming RNG. This directly proves the limit behaviour. The interpretation that atmospheric Chlorine pre-populates the same container is **STRONG**, not yet **PROVEN**, because its precise insertion function and order have not been observed.
+In the final Iron-biome trace, Iron insertion brought the internal count to `8`; the rarity-1 descendant call returned immediately, preventing Alkanes without consuming RNG. This directly proves the limit behaviour.
+
+**Later PROVEN LIVE reconciliation:** a focused Maal VIII trace observed
+atmospheric Chlorine `000057D5` entering the same shared planet-wide
+resource-ID state before Everywhere and the shuffled per-biome generator.
 
 The population comparison provides independent support: `101 / 163` mismatch planets have atmospheric inorganic resources.
 
 ## Validation and provenance
 
-The reconstructed model exactly reproduced Oberon, Mimas, Decaran VII-b, Kreet, and Algorab I. Full validation was 1,281 exact matches from 1,444 bodies (88.71%), with 163 mismatches and no errors.
+At the time of this experiment, the reconstructed model exactly reproduced
+Oberon, Mimas, Decaran VII-b, Kreet, and Algorab I. The then-current validation
+was 1,281 exact matches from 1,444 bodies (88.71%), with 163 mismatches and no
+errors.
+
+**HISTORICAL:** subsequent atmosphere, Everywhere, five-tree, shared-eight,
+fallback, and Special-order corrections reached 1,444 / 1,444 exact with zero
+mismatches and zero errors. Targeted CK biome regressions and the fresh ten-body
+CK/retail holdout are also exact.
 
 Resource origins must remain separate during validation. Atmospheric membership cannot silently satisfy an expected biome/RSGD result. Continue validating `planet-all-resources.csv` independently as an empirical proxy for the CK/biome-visible channel, while recognizing that this correspondence is not a proven semantic contract, and validate the ATMO extract independently against the atmospheric channel. Deduplicate FormIDs only when constructing final player-facing membership.
 
-## Next question (not executed)
+## Historical next question (completed)
 
 Starting at `FUN_1415DCFB0`, identify the enclosing planet-generation caller/loop and trace activity before the first per-biome call, especially effective ATMO resource insertion into the shared resource container. Maal VIII atmospheric Chlorine is the preferred live case.
+
+This investigation was later completed. `FUN_14152CBC0` is the enclosing
+orchestrator, and Maal VIII atmospheric Chlorine was observed in shared state
+before Everywhere and the first per-biome call. It is not an active next task.

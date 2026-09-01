@@ -1,115 +1,95 @@
 # Hypotheses and Open Models
 
-This file contains interpretations not directly established by decisive evidence. Labels follow `AGENTS.md`.
+This file contains only interpretations not directly settled by decisive evidence. Labels follow `AGENTS.md`. Resolved rules are in `known-facts.md`; displaced interpretations remain below as research history.
 
-## H1 — Atmospheric resources share the eight-entry capacity
-
-**STRONG**
-
-Current interpretation:
-
-```text
-effective ATMO inorganic resources
-    ↓
-planet-wide resource state before/during biome generation
-    ↓
-same eight-entry internal container checked by FUN_1415DCFB0/FUN_14157F120
-```
-
-Maal VIII provides the clearest evidence: ATMO supplies Chlorine; the CK biome view has seven resources; the in-game survey has those seven plus Chlorine; and the final Iron-biome trace reaches internal count `8`, causing the proven no-RNG descendant early return and preventing Alkanes.
-
-Population comparison independently supports the interpretation: `101 / 163` reproducer-mismatch planets have at least one atmospheric inorganic resource. A dense subset has atmosphere-only resources missing from both the old oracle and current reproducer, with counts matching the Maal VIII capacity pattern.
-
-Focused static analysis now narrows the candidate insertion path:
-
-```text
-FUN_14152CBC0
-    ↓ planet-keyed FUN_1419FE120 lookup
-type-0xAD form
-    ↓ FUN_141A46660
-array at +0x1D8
-    ↓ resolve entries, load form +0x70, deduplicate, append
-shared uint32 resource-ID array
-    ↓ argument 4
-FUN_1415DCFB0
-```
-
-This identification is **STRONG**, not PROVEN as ATMO semantics. The database
-does not name the type/field, and Maal VIII Chlorine `000057D5` has not yet
-been observed traversing this path. The static insertion order is established:
-the candidate atmospheric list is processed first, category-6 Everywhere
-entries are processed for all biomes second, and the shuffled per-biome calls
-begin third.
-
-## H2 — Zero-count reflected LIST explicitly clears atmospheric resources
+## H1 — Zero-count reflected LIST explicitly clears atmosphere
 
 **PROVISIONAL**
 
-Vectera has no atmospheric resources and a zero-count `LIST`. Treating a sole zero-count list as an explicit Inorganic Resources clear fits current evidence, but the reflected property identifier has not been fully decoded.
+Vectera has no atmospheric resources and a zero-count reflected `LIST`. Treating a sole zero-count list as an explicit Inorganic Resources clear fits current evidence, but the generic property identifier and override semantics have not been fully decoded.
 
-## H3 — One ordinary resource family per biome
+This question does not block v1.0 because the authoritative effective-atmosphere export already resolves the current corpus.
 
-**STRONG** as a planner model, not proven as a universal engine rule.
+## H2 — Planner co-location shorthand
 
-In the qualified SurveyAggregator-derived proxy dataset, `FamilyCount <= BiomeCount` had zero violations across 1,436 analysed bodies, including 880 one-family/one-biome bodies. The dataset appears to correspond closely to the CK/biome-visible channel, but its exact semantic contract remains unresolved. Aggregate planet-level counts cannot prove exact biome membership.
+**PROVISIONAL as planner guidance; not an engine rule**
 
-Practical heuristic: required resources from different ordinary inorganic families should not be assumed co-located in one normal biome. This remains a planning heuristic, not proof of a global one-family-per-biome mapping.
+The recovered per-biome mechanism assigns at most one Common-family configuration during each processed biome invocation. This exact control-flow statement is **PROVEN** and belongs in `known-facts.md`.
 
-## H4 — Five-family check semantics
+It must not be shortened to “one resource family per biome” without qualification:
 
-**PROVISIONAL**
+- atmosphere, Everywhere, and Special occurrences can coexist with Common resources;
+- guard fallback can assign a family whose root is absent from that biome's effective RSGD;
+- qualified planet-level `FamilyCount <= BiomeCount` evidence does not itself prove physical co-location.
 
-The `count >= 5` guard in `FUN_1415DCFB0` is directly observed in the live-traced CK generation path and therefore **PROVEN**. Its interpretation as a general five-family or five-generated-family-configuration limit fits the trace, but remains **PROVISIONAL** because the structure's exact general role has not been independently established.
+A planner may conservatively avoid assuming that resources from different Common families co-occur in one normal biome, but that remains derived guidance rather than a universal allocation rule.
 
-## Open Runtime Question
+## Genuine Non-Blocking Open Questions
 
-The enclosing static path is now identified. The next investigation should be
-a small, separately authorised Maal VIII live trace:
+### SurveyAggregator semantic contract
 
-```text
-0x14152CF17  planet-keyed typed-form lookup
-        ↓ type-0xAD form / +0x1D8 array
-0x14152D034  source form +0x70 ID
-        ↓ expect 000057D5 for Maal VIII Chlorine
-0x14152D0E9  shared-array store
-        ↓
-0x14152D28F  first FUN_1415DCFB0 call
-```
+The exact upstream state represented by `SurveyAggregator` and `planet-all-resources.csv` remains unresolved. The dataset is a useful canonical validator for the CK/RSGD-visible channel and is proven incomplete for atmosphere-derived final membership. Reversing its exact contract is not required for v1.0.
 
-The trace should establish or reject the ATMO identity, concrete Chlorine form,
-and effective/inherited-data timing without expanding into a broad reflection
-investigation.
+### Retail address/version mapping
 
-## Superseded Interpretations
+Creation Kit addresses and control flow are proven for the live-traced CK Galaxy View Apply path. Equivalent retail `Starfield.exe` addresses and version mappings have not been independently established.
+
+### Defensive empty-cache fallback state
+
+**OPEN, apparently unreachable:** if a Common guard were entered with Common entries present but no generated family configurations available, current evidence does not define the engine's behavior. Recovered control flow appears to prevent this during normal execution, so it does not block v1.0.
+
+## Resolved and Superseded Interpretations
+
+### Atmosphere sharing the eight-entry state
+
+**SUPERSEDED AS A HYPOTHESIS → PROVEN LIVE**
+
+Maal VIII live tracing observed atmospheric Chlorine `000057D5` entering shared planet-wide resource-ID state before Everywhere and shuffled per-biome generation. The old proposed trace is complete and is not a current next investigation.
+
+### Five-family check semantics
+
+**SUPERSEDED AS PROVISIONAL → PROVEN LIVE FOR THIS GENERATION PATH**
+
+Bara VII-d progression `0, 1, 1, 2, 2, 3, 4, 5` and the branch at five establish that the guarded structure contains five distinct generated/cached Common-family configurations. Normal cache reuse does not increment it.
+
+### Shared-eight means no biome Common family
+
+**SUPERSEDED**
+
+The guard suppresses the normal Common selector but enters fallback near `0x1415DD255`, which can assign an existing family configuration.
+
+### Everywhere uses chance or ordinary weighted selection
+
+**SUPERSEDED**
+
+`FUN_141548920` performs a pre-biome category-6 scan without consulting DNAM Everywhere chance or consuming RNG.
 
 ### Creation Kit leveled-list trail as primary allocation path
 
 **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**
 
-Earlier work proposed that `ResourceViewWidget::OnApplySeed → FUN_1431bc320 → FUN_140e457b0 → generic leveled-list machinery` contained or closely approached the target biome allocator. Live traces of the Creation Kit Galaxy View Apply operation instead establish `FUN_1415DCFB0` and `FUN_14157F120` as the primary generation path exercised by that operation.
-
-The old trail's calling-convention, `TESContainer`, mixed ordinary/`TESLevItem`, and generic resolver findings remain technically valid. It may still be CK/UI or downstream machinery. New live evidence would be required before reconnecting it to biome allocation.
+The earlier `ResourceViewWidget::OnApplySeed → FUN_1431bc320 → FUN_140e457b0` trail retains valid calling-convention, `TESContainer`, and generic resolver evidence. Live Galaxy View Apply tracing instead establishes `FUN_1415DCFB0` as the primary per-biome generator in that operation.
 
 ### Direct RSCS seeding unresolved
 
 **SUPERSEDED**
 
-Earlier static work could not identify a simple `RSCS → global PRNG reseed` pattern and speculated about an effective-level selector. Live tracing now proves that non-zero unsigned 32-bit RSCS directly seeds MT19937 and that its evolving state drives shuffle and generation.
+Live tracing proves that nonzero unsigned 32-bit RSCS directly seeds MT19937 and that the evolving state drives shuffle and generation.
 
 ### Root insertion mechanism unresolved
 
 **SUPERSEDED**
 
-The earlier alternative that family roots might merely be statistically unavoidable has been displaced. Live tracing proves unconditional Common/root emission when a new family is selected.
+A newly selected Common root is emitted unconditionally before descendant processing.
 
-### Leveled lists may encode the resource-family graph
+### Leveled lists encode the resource-family graph
 
 **SUPERSEDED**
 
-The resource graph is established in IRES `SNAM` rarity and Child Resources data. The generic leveled-list resolver's mixed-entry capability remains a valid static fact, but it no longer explains the current family graph.
+IRES rarity and Child Resources directly encode the recovered inorganic family graph.
 
 ### SurveyAggregator as complete final oracle
 
 **SUPERSEDED**
 
-The old oracle omits at least some atmosphere-derived inorganic resources. It remains a useful empirical proxy for reconciling the CK/biome-generation-visible channel, but the correspondence is **STRONG / PROVISIONAL** rather than a proven engine contract. The exact upstream state exposed by `SurveyAggregator` remains open.
+The derived dataset omits at least some atmosphere-derived inorganic resources and cannot be treated as a complete final planetary-resource oracle.

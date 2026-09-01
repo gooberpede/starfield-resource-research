@@ -171,7 +171,7 @@ The current database does not name the type as ATMO or decode the `+0x1D8`
 field, so those semantic identities are not promoted to PROVEN by static
 inference alone.
 
-### OPEN QUESTIONS
+### HISTORICAL OPEN QUESTIONS AT THE TIME
 
 - Does a Maal VIII live call to `FUN_1419FE120` return its effective ATMO
   object, and does the `+0x1D8` array contain a resolved Chlorine form whose
@@ -183,7 +183,7 @@ inference alone.
 - Can the shared array contain repeated IDs from category-6 processing, or do
   upstream data constraints make those appends unique?
 
-## Recommended live trace window
+## Historical recommended live trace window
 
 For a later, separately authorised Maal VIII x64dbg experiment, start at
 `0x14152CF05` (immediately after shared-array initialization) and stop after
@@ -209,3 +209,16 @@ This window is sufficient to test the strong ATMO interpretation, concrete
 Maal VIII Chlorine identity, insertion ordering, and whether the same array is
 presented to the first generator call without tracing the wider manager or UI
 path.
+
+## Later reconciliation
+
+**COMPLETED / SUPERSEDED AS AN OPEN INVESTIGATION:** the recommended Maal VIII
+live trace was later performed. Atmospheric Chlorine `000057D5` was observed
+entering the shared planet-wide resource-ID state before the Everywhere pre-pass
+and shuffled per-biome generator calls.
+
+The current evidence classification is therefore **PROVEN LIVE** for effective
+atmosphere prepopulation and ordering in the CK Galaxy View Apply path. The
+static uncertainty about the exact C++ name of type `0xAD` and field `+0x1D8`
+remains, but it is a non-blocking type-recovery detail rather than an unresolved
+generation rule.
