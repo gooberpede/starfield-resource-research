@@ -4,7 +4,11 @@ This repository is the durable evidence and research-history record for reverse 
 
 > How does Starfield transform planet, biome, resource-generation, atmosphere, and seed data into the final per-biome inorganic resource set at runtime?
 
-The executable reference model lives in the sibling `starfield-resource-reproducer` repository. Start with `docs/v1-research-baseline.md` for the current evidence state.
+The executable reference model lives in the sibling
+[`starfield-resource-reproducer`](https://github.com/gooberpede/starfield-resource-reproducer)
+repository. Start with the [v1 research baseline](docs/v1-research-baseline.md)
+for the current evidence state, or use the [documentation index](docs/README.md)
+to navigate the full record.
 
 ## Status
 
@@ -99,9 +103,16 @@ Its calling-convention, `TESContainer`, and leveled-list findings remain valid h
 
 ## Evidence and Oracle Boundaries
 
-Evidence labels are **PROVEN**, **STRONG**, **PROVISIONAL**, **COUNTERFACTUAL**, and **SUPERSEDED**; see `AGENTS.md`.
+Evidence labels are **PROVEN**, **STRONG**, **PROVISIONAL**, **COUNTERFACTUAL**, and **SUPERSEDED**; see [AGENTS.md](AGENTS.md).
 
-`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` are valuable validation evidence for the CK/RSGD-visible channel. The dataset is proven incomplete for atmosphere-derived final membership, and the exact upstream `SurveyAggregator` semantic contract remains unresolved. Oracle data must never become generation logic.
+The historical `SurveyAggregator` export (RE ID `1016657`) was valuable
+validation evidence for the CK/RSGD-visible channel. It is proven incomplete
+for atmosphere-derived final membership, and the exact upstream
+`SurveyAggregator` semantic contract remains unresolved. Oracle data must
+never become generation logic. The older CSV snapshots were removed from this
+repository's current tree after dependency verification; maintained canonical
+production data and xEdit exporters now live in the
+[`starfield-resource-reproducer`](https://github.com/gooberpede/starfield-resource-reproducer).
 
 Missing PNDT/effective-RSGD input means biome-local generation is unknown or unavailable, not empty. Independently sourced atmosphere can still be reported. Volii Alpha is the negative control for this input-boundary rule, not evidence about its actual terrestrial biome allocation.
 
@@ -109,10 +120,10 @@ Missing PNDT/effective-RSGD input means biome-local generation is unknown or una
 
 ```text
 starfield-resource-research
-    owns evidence status, trace provenance, and native function findings
+    owns evidence status, trace provenance, native function findings, and history
 
 starfield-resource-reproducer
-    owns the executable reference model and regression suite
+    owns the executable reference model, regression suite, canonical data, and extraction tooling
 ```
 
 A future settled-rule change must be reconciled across both repositories: reproduce the counterexample, preserve and classify the evidence here, update the research baseline, issue an implementation brief, update the reproducer and regressions, then rerun canonical and holdout validation.
@@ -124,23 +135,64 @@ A future settled-rule change must be reconciled across both repositories: reprod
 - support downstream planner and data tooling;
 - keep non-blocking questions clearly separated from recovered generation semantics.
 
-Current non-blocking questions are summarized in `docs/v1-research-baseline.md` and `docs/hypotheses.md`.
+Current non-blocking questions are summarized in the
+[v1 baseline](docs/v1-research-baseline.md) and
+[hypotheses](docs/hypotheses.md).
+
+## Navigation
+
+- [Current v1 research baseline](docs/v1-research-baseline.md)
+- [Known facts](docs/known-facts.md)
+- [Hypotheses and open questions](docs/hypotheses.md)
+- [Native function register](docs/function-register.md)
+- [Experiment records](docs/experiments/)
+- [Focused evidence bundles](docs/experiments/evidence/)
+- [Ghidra tooling and reproduction guide](ghidra/README.md)
+- [Historical implementation briefs](docs/implementation-briefs/)
+- [Build, tool, and evidence provenance](docs/PROVENANCE.md)
+
+## Reporting Counterexamples
+
+If a planet, build, or scenario contradicts the recovered model, open an issue
+with the Starfield or Creation Kit version, relevant body, reproduction steps,
+and observed result. New evidence should be classified through the existing
+evidence-status workflow and reconciled with the baseline; it should not
+silently overwrite the historical record.
 
 ## Repository Layout
 
 ```text
 .
 ├─ AGENTS.md
+├─ LICENSE
 ├─ README.md
+├─ THIRD_PARTY_NOTICES.md
 ├─ docs/
+│  ├─ README.md
+│  ├─ PROVENANCE.md
 │  ├─ v1-research-baseline.md
 │  ├─ known-facts.md
 │  ├─ hypotheses.md
 │  ├─ function-register.md
-│  └─ experiments/
-├─ ghidra/scripts/
-├─ exports/
-└─ tools/
+│  ├─ audits/
+│  ├─ experiments/
+│  │  └─ evidence/
+│  └─ implementation-briefs/
+├─ ghidra/
+│  └─ scripts/
+└─ exports/
 ```
 
 Do not commit proprietary Starfield binaries, extracted proprietary assets, or Ghidra project databases containing imported game binaries.
+
+## License and Third-Party Material
+
+Original project code and documentation are licensed under
+[GPL-3.0-or-later](LICENSE), except where otherwise noted. The license does not
+relicense Starfield, Creation Kit, Bethesda/ZeniMax trademarks, or targeted
+game-derived reverse-engineering evidence. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the rights boundary and
+evidence scope.
+
+This is an unofficial community research project and is not affiliated with,
+endorsed by, or sponsored by Bethesda Softworks or ZeniMax Media.

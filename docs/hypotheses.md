@@ -28,7 +28,7 @@ A planner may conservatively avoid assuming that resources from different Common
 
 ### SurveyAggregator semantic contract
 
-The exact upstream state represented by `SurveyAggregator` and `planet-all-resources.csv` remains unresolved. The dataset is a useful canonical validator for the CK/RSGD-visible channel and is proven incomplete for atmosphere-derived final membership. Reversing its exact contract is not required for v1.0.
+The exact upstream state represented by `SurveyAggregator` and the historical `planet-all-resources.csv` snapshot remains unresolved. The dataset is a useful canonical validator for the CK/RSGD-visible channel and is proven incomplete for atmosphere-derived final membership. The snapshot is no longer distributed from this research repository; maintained canonical data lives in the sibling reproducer. Reversing its exact contract is not required for v1.0.
 
 ### Retail address/version mapping
 

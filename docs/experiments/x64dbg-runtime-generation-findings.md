@@ -99,7 +99,7 @@ fallback, and Special-order corrections reached 1,444 / 1,444 exact with zero
 mismatches and zero errors. Targeted CK biome regressions and the fresh ten-body
 CK/retail holdout are also exact.
 
-Resource origins must remain separate during validation. Atmospheric membership cannot silently satisfy an expected biome/RSGD result. Continue validating `planet-all-resources.csv` independently as an empirical proxy for the CK/biome-visible channel, while recognizing that this correspondence is not a proven semantic contract, and validate the ATMO extract independently against the atmospheric channel. Deduplicate FormIDs only when constructing final player-facing membership.
+Resource origins must remain separate during validation. Atmospheric membership cannot silently satisfy an expected biome/RSGD result. Continue validating the maintained `SurveyAggregator`-derived dataset in the sibling reproducer independently as an empirical proxy for the CK/biome-visible channel, while recognizing that this correspondence is not a proven semantic contract, and validate the ATMO extract independently against the atmospheric channel. The historical research-tree snapshot was named `planet-all-resources.csv`. Deduplicate FormIDs only when constructing final player-facing membership.
 
 ## Historical next question (completed)
 

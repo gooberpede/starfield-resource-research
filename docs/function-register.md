@@ -684,7 +684,7 @@ Existing runtime tooling iterates populated spans and filters resource forms. Cu
 
 ### Established use
 
-Used to create `data/planet-all-resources.csv`, whose provenance remains valuable for independent resource-set validation. The dataset appears to correspond closely to the CK/biome-generation-visible channel, but that is not a proven engine contract.
+Used to create the historical `planet-all-resources.csv` snapshot, whose provenance remains valuable for independent resource-set validation. The snapshot is no longer distributed from this research repository. It appears to correspond closely to the CK/biome-generation-visible channel, but that is not a proven engine contract.
 
 ### Why it matters
 

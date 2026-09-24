@@ -105,7 +105,7 @@ The fresh holdout is recorded in `docs/experiments/v1-holdout-validation.md`.
 
 ## Input and Oracle Boundaries
 
-`planet-all-resources.csv` is a canonical validator for the CK/RSGD-visible channel used by the reproducer. It is proven incomplete for atmosphere-derived final membership, its upstream `SurveyAggregator` semantic contract is unresolved, and it must never be consulted during generation.
+The historical `planet-all-resources.csv` export was a canonical validator for the CK/RSGD-visible channel used by the reproducer. It is proven incomplete for atmosphere-derived final membership, its upstream `SurveyAggregator` semantic contract is unresolved, and it must never be consulted during generation. The snapshot is no longer distributed from this research repository; maintained canonical data and tooling live in the sibling reproducer.
 
 Missing PNDT/biome/effective-RSGD input means biome-local generation is unknown or unsupported, not empty. Volii Alpha is absent from the generation corpus while independent atmosphere data provides Benzene and Water; reporting those known atmospheric resources without fabricating terrestrial biome assignments validates the model's input boundary. It is not evidence about Volii Alpha's actual terrestrial allocation or a recovered native engine rule.
 

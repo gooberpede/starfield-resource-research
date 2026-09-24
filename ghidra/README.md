@@ -24,11 +24,11 @@ The script takes an output directory followed by one or more addresses. For
 example, from the Ghidra installation directory on Windows:
 
 ```powershell
-support\analyzeHeadless.bat D:\ReverseEngineering\StarfieldCK\GhidraProject StarfieldCK `
+support\analyzeHeadless.bat <ghidra-project-dir> StarfieldCK `
   -process CreationKit.exe -readOnly -noanalysis `
-  -scriptPath D:\Projects\starfield-resource-research\ghidra\scripts `
+  -scriptPath <repository>\ghidra\scripts `
   -postScript ExportFunctionsByAddress.java `
-    D:\Projects\starfield-resource-research\exports\address-investigation `
+    <output-directory> `
     1415DCFB0 14157F120
 ```
 
@@ -37,6 +37,11 @@ export. It does not start a transaction or modify symbols, types, comments,
 labels, function names, or any other Ghidra project state. Keep the traversal
 set small: the script exports exactly the supplied addresses and does not
 recursively expand the call graph.
+
+Exact executable and tested-tool provenance for the checked-in evidence is
+recorded in [docs/PROVENANCE.md](../docs/PROVENANCE.md). Compatibility notes
+below describe the assumptions of each script; they are not a universal
+compatibility guarantee.
 
 ## ExportSelectedFunctionContext.java
 

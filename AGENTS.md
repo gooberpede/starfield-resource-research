@@ -115,7 +115,7 @@ Start with `docs/v1-research-baseline.md`. Live x64dbg traces in the Creation Ki
 
 The older Creation Kit trail through `ResourceViewWidget::OnApplySeed`, `FUN_1431bc320`, `FUN_140e457b0`, and generic leveled-list machinery is **SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**. Preserve its valid calling-convention, `TESContainer`, and leveled-list findings: it may remain legitimate CK/UI or downstream machinery. Do not assume it participates in biome allocation without new live evidence.
 
-`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` provide a valuable canonical validator for the CK/RSGD-visible channel used by the reproducer. The exact upstream semantic contract remains unresolved, and the dataset is proven incomplete for atmosphere-derived final membership. It is validation evidence, never generation logic.
+`SurveyAggregator` (RE ID `1016657`) and the historical `planet-all-resources.csv` snapshot provide valuable canonical validation evidence for the CK/RSGD-visible channel used by the reproducer. The snapshot is no longer distributed from this research repository; maintained canonical data and extraction tooling belong in the sibling reproducer. The exact upstream semantic contract remains unresolved, and the dataset is proven incomplete for atmosphere-derived final membership. It is validation evidence, never generation logic.
 
 The earlier Maal VIII atmosphere trace is complete: atmospheric Chlorine `000057D5` was observed entering shared resource-ID state before Everywhere and shuffled per-biome generation. Do not preserve that resolved trace as an active next investigation.
 

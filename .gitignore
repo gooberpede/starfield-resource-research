@@ -18,3 +18,15 @@ tmp/
 
 # Local working material
 .local-work/
+
+# Debugger traces, dumps, and x64dbg session databases
+*.trace64
+*.dmp
+*.dd32
+*.dd64
+
+# Evidence-transfer archives are ignored by default. A deliberately reviewed
+# archive must be force-added explicitly.
+*.zip
+*.7z
+*.rar

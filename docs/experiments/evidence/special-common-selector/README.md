@@ -15,12 +15,12 @@ The export was produced from the existing analysed project with analysis
 disabled and the project opened read-only:
 
 ```powershell
-D:\tools\ghidra_12.1.2_PUBLIC\support\analyzeHeadless.bat `
-  D:\ReverseEngineering\StarfieldCK\GhidraProject StarfieldCK `
+<ghidra-install>\support\analyzeHeadless.bat `
+  <ghidra-project-dir> StarfieldCK `
   -process CreationKit.exe -readOnly -noanalysis `
-  -scriptPath D:\Projects\starfield-resource-research\ghidra\scripts `
+  -scriptPath <repository>\ghidra\scripts `
   -postScript ExportFunctionsByAddress.java `
-  D:\Projects\starfield-resource-research\docs\experiments\evidence\special-common-selector `
+  <output-directory> `
   141580660 14157C470 140924800 144D8C490
 ```
 
@@ -43,3 +43,6 @@ Ghidra project.
 The constants were checked read-only against the executable's PE section
 mapping. No proprietary binary content is copied here beyond the small scalar
 values needed to reproduce the analysis.
+
+See the [central provenance record](../../../PROVENANCE.md) for the recorded
+Ghidra version, executable identity, and known version gaps.

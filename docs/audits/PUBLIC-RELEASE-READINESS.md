@@ -2,6 +2,11 @@
 
 Audit date: 2026-09-24
 
+> Historical audit record: the original verdict and findings below are
+> preserved as assessed. See the dated remediation appendix and the separate
+> [release-readiness recheck](PUBLIC-RELEASE-READINESS-RECHECK.md) for current
+> status.
+
 Audited repository: `gooberpede/starfield-resource-research`
 
 Audited branch and commit: `main` at `0408bf1`
@@ -226,6 +231,28 @@ No tracked or historically committed file was conclusively placed in this catego
 5. Repair README navigation/layout, link the sibling repo, explain datasets/evidence/history, add counterexample guidance, and include a brief unofficial-project notice.
 6. Add a docs index that frames implementation briefs and superseded experiments.
 7. Replace active absolute-path examples and strengthen narrowly scoped ignore rules.
+
+## Remediation Status — 2026-09-24
+
+This appendix records the owner's publication decisions and the resulting
+working-tree remediation. It does not rewrite the original `NOT READY` verdict
+or the evidence that supported it.
+
+| Finding | Status | Resolution |
+|---|---|---|
+| PRR-001 | **RESOLVED BY REMEDIATION** | All three CSVs were confirmed to have no active runtime/tool dependency and removed from `HEAD`. Historical references remain where they explain validation; no history rewrite was performed. Maintained datasets and exporters are linked in the sibling reproducer. |
+| PRR-002 | **RESOLVED BY OWNER DECISION + REMEDIATION** | The focused evidence corpus was approved for publication in principle. The complete `FUN_14152CBC0` decompiler and instruction exports were replaced by provenance-preserving contiguous excerpts, and the third-party evidence boundary is documented. |
+| PRR-003 | **RESOLVED BY REMEDIATION** | Official GPL version 3 text added with identifier `GPL-3.0-or-later`; the README and third-party notice exclude proprietary third-party material from implied relicensing. |
+| PRR-004 | **RESOLVED BY REMEDIATION** | README navigation, tracked-tree layout, sibling link, counterexample path, and non-affiliation statement added. |
+| PRR-005 | **RESOLVED BY REMEDIATION** | `docs/PROVENANCE.md` centralizes all recorded identities, hashes, tools, dates, evidence mappings, and explicit unknowns. |
+| PRR-006 | **RESOLVED BY REMEDIATION** | Active reproduction commands now use portable placeholders. Historical task specifications and executable-derived Bethesda build strings remain as provenance/history. |
+| PRR-007 | **RESOLVED BY REMEDIATION** | Narrow debugger trace/dump/session and archive-transfer ignore rules added. |
+| PRR-008 | **RESOLVED BY REMEDIATION** | Documentation, experiment, and evidence indexes now separate current authority from historical specifications and superseded work. |
+| PRR-009 | **DEFERRED OPTIONAL** | GitHub description/topics/settings remain a final owner action; visibility was not changed. |
+| PRR-010 | **DEFERRED OPTIONAL** | No large Ghidra README restructuring was performed; actual compatibility claims and tested provenance remain scoped. |
+
+The remaining no-action findings retain their original status. See the recheck
+for post-remediation scans and the current release verdict.
 8. Review GitHub description/homepage/topics/archive/default-branch settings; reciprocally link the sibling repo when it is public.
 9. Re-run the release checklist from a fresh clone immediately before changing visibility.
 

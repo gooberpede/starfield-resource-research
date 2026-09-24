@@ -306,7 +306,7 @@ This is a validated epistemic/input-boundary behavior, not a recovered engine ru
 
 ## SurveyAggregator and Qualified Oracle
 
-`SurveyAggregator` (RE ID `1016657`) and `data/planet-all-resources.csv` remain valuable empirical/canonical validation evidence for the CK/RSGD-visible channel. The dataset is proven incomplete for atmosphere-derived final membership, does not expose biome identity in current use, and must never be used as generation logic. Its exact upstream semantic contract remains unresolved and is non-blocking for v1.0.
+`SurveyAggregator` (RE ID `1016657`) and the historical `planet-all-resources.csv` snapshot remain valuable empirical/canonical validation evidence for the CK/RSGD-visible channel. The dataset is proven incomplete for atmosphere-derived final membership, does not expose biome identity in current use, and must never be used as generation logic. Its exact upstream semantic contract remains unresolved and is non-blocking for v1.0. The snapshot is no longer distributed from this research repository; maintained canonical data and tooling live in the sibling reproducer.
 
 Historical qualified-dataset observations remain valid within that boundary:
 
