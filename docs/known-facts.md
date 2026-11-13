@@ -4,6 +4,17 @@ This file contains **PROVEN** observations established by live execution, direct
 
 Creation Kit addresses below apply to the live-traced CK Galaxy View Apply path. Retail validation corroborates outputs independently; it does not prove that CK addresses equal retail `Starfield.exe` addresses.
 
+## Pinned retail static evidence
+
+**PROVEN STATIC:** In retail `Starfield.exe` 1.16.244.0, the orchestrator
+at preferred VA `0x140779760` passes separately maintained family and
+shared ID arrays to `0x140777870` at `0x140779C86`. The per-biome body
+calls the same weighted selector with category 5 and category 0. Between
+them, the Special path can insert a shared ID, and the five-family and
+eight-ID guards converge on cached-family fallback. See
+[SRR-002](SRR-002-retail-static-reconnaissance.md#retail-mapping-on-the-pinned-image)
+for the image pin, instruction sites and mapping limits.
+
 ## Input Resolution and Biome Order
 
 ```text

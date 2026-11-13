@@ -74,7 +74,11 @@ Get-FileHash -LiteralPath $exe -Algorithm SHA256
 
 The historical retail planetary-scan executable version, build and hash are
 unknown. A record tied to those scan sessions is needed to resolve them. The
-current file observation provides a starting pin for future native research.
+current pin also qualifies [SRR-002](SRR-002-retail-static-reconnaissance.md).
+The existing Ghidra 12.1.2 PUBLIC program recorded the same import SHA-256,
+base `0x140000000`, language `x86:LE:64:default` and compiler ID `windows`.
+An independent PE decode corroborated the instruction locations and critical
+operands in the focal listing. The historical scan builds remain unknown.
 
 ## Applicability register
 
@@ -85,7 +89,8 @@ current file observation provides a starting pin for future native research.
 | [CK Galaxy View Apply traces](experiments/x64dbg-runtime-generation-findings.md) and [function register](function-register.md) | CK address space, live build and hash unknown | Observed native control flow, addresses, offsets and state ordering during Apply | Scenario-specific runtime observations. Data/plugin versions are unknown. Broader object lifecycles and retail addresses require separate evidence. |
 | [Historical ten-body holdout](experiments/v1-holdout-validation.md) | CK and retail builds/hashes unknown | Output semantics | CK biome assignments and retail final planet-wide scan membership, 10/10 exact. Run date and data/plugin versions unknown. Native equivalence and retail lifecycle remain open. |
 | [Canonical 1,444-body validation](v1-research-baseline.md#validation-baseline) | Reproducer source-data snapshot, upstream retail capture build unknown | Output semantics | Exact on the CK/RSGD-visible planet-wide validation channel. Run date and base-game/plugin/DLC versions unknown. Atmosphere-derived final membership and native equivalence are outside the oracle's coverage. |
-| Current retail identity above | Steam `1716740`, observed build `23518663` | Executable identity | Applies to the measured local file. No data/plugin identity was needed for this observation. Retail native control flow, addresses, offsets, and lifecycle remain open. |
+| Current retail identity above | Steam `1716740`, observed build `23518663` | Executable identity | Applies to the measured local file. No data/plugin identity was needed for this observation. |
+| [SRR-002 retail mapping](SRR-002-retail-static-reconnaissance.md#retail-mapping-on-the-pinned-image) | Pinned retail executable and matching saved Ghidra program above | Bounded static native control flow, addresses and offsets | The dossier grades each pairing and bounds the search. Retail execution, output equivalence and lifecycle remain open. |
 
 The historical PNDT/BIOM/RSGD/IRES extraction timestamp is
 `2026-08-30 11:40:41`. The xEdit version is unknown. The 2026-09-24

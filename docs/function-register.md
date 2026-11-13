@@ -9,6 +9,24 @@ Names beginning with `FUN_` are Ghidra-generated identifiers unless otherwise st
 
 Do not replace an original Ghidra name with a semantic alias unless evidence is strong. Proposed aliases should be recorded separately.
 
+## Retail Starfield.exe 1.16.244.0
+
+These preferred VAs apply to the [pinned retail image](PROVENANCE.md#current-retail-identity).
+RVA is VA minus `0x140000000`. The [SRR-002 mapping](SRR-002-retail-static-reconnaissance.md#retail-mapping-on-the-pinned-image)
+records instruction anchors, differences and supporting helpers.
+
+| Retail Ghidra entry | CK VA or region | Bounded correspondence |
+| --- | --- | --- |
+| `FUN_140779760` | `0x14152CBC0`, with `0x141548920` role inlined | **STATICALLY ESTABLISHED / PROVEN** prepopulation and shuffled biome loop. |
+| `FUN_140777870` | `0x1415DCFB0` | **STATICALLY ESTABLISHED / PROVEN** per-biome allocation and guard dispatch. |
+| `FUN_140777e30`, `FUN_140777ff0` | `0x141580660`, `0x14157C470` | **STATICALLY ESTABLISHED / PROVEN** category-generic selector and entry scan. |
+| `FUN_1407780b0`, `FUN_1407784d0` | `0x14157F120` region | **STRONG CORRESPONDENCE / STRONG** descendant generation. Candidate multiplicity remains open. |
+| `FUN_14077c0e0`, `FUN_1402fcee0` | `0x14154C710`, `0x14015B4A0` | **STATICALLY ESTABLISHED / PROVEN** guarded fallback construction and float-scaled selection. |
+| `FUN_1402fbc20` | `0x140924800` | **STATICALLY ESTABLISHED / PROVEN** MT-to-binary32 primitive. |
+| `FUN_14077c6e0`, `FUN_14077c4d0` | Shuffle call at `0x14152CEBD` | **STRONG CORRESPONDENCE / STRONG** integer shuffle helpers. |
+
+The CK entries below retain their original build and evidence scope.
+
 ---
 
 ## FUN_1415DCFB0

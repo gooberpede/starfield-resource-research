@@ -30,9 +30,14 @@ A planner may conservatively avoid assuming that resources from different Common
 
 The exact upstream state represented by `SurveyAggregator` and the historical `planet-all-resources.csv` snapshot remains unresolved. The dataset is a useful canonical validator for the CK/RSGD-visible channel and is proven incomplete for atmosphere-derived final membership. The snapshot is no longer distributed from this research repository; maintained canonical data lives in the sibling reproducer. Reversing its exact contract is not required for v1.0.
 
-### Retail address/version mapping
+### Retail dispatch and descendant multiplicity
 
-Creation Kit addresses and control flow are proven for the live-traced CK Galaxy View Apply path. Equivalent retail `Starfield.exe` addresses and version mappings have not been independently established.
+[SRR-002](SRR-002-retail-static-reconnaissance.md) establishes the core
+static mapping for the pinned retail image. **PROVISIONAL:** the upstream
+references to the candidate dispatch wrapper may lead to a gameplay
+trigger. Their owners and invocation conditions remain open. The retail
+descendant append loop could preserve overlapping child pointers. Actual
+candidate multiplicity depends on the upstream lists and remains unverified.
 
 ### Defensive empty-cache fallback state
 

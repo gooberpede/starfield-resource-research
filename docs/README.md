@@ -19,6 +19,7 @@ superseded interpretations, but are not substitutes for the baseline.
 ## Investigation Dossiers
 
 - [SRR-001 executable identity and research foundations](SRR-001-executable-identity.md)
+- [SRR-002 retail static reconnaissance](SRR-002-retail-static-reconnaissance.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence
