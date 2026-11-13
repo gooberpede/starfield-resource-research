@@ -36,3 +36,11 @@ SRR-001. The capture stays local. Any future disclosure involving such material
 requires a documented basis specific to its scope and purpose. See the
 [SRR-001 release scope](docs/SRR-001-executable-identity.md#release-scope)
 for claim-specific holds.
+
+## SRR-003 analysis tools
+
+SRR-003 used the maintainer-authored `OutpostRecon.java` from
+`starfield-outpost-research` in place for read-only reference and
+data queries. Ghidra and Capstone contributors provided the analysis and
+decoding tools. The [dossier](docs/SRR-003-retail-allocator-invocation-and-dispatch.md#reproduction-publication-and-next-experiment)
+records the tool revisions, local inspection scope and publication holds.

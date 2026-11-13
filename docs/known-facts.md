@@ -15,6 +15,15 @@ eight-ID guards converge on cached-family fallback. See
 [SRR-002](SRR-002-retail-static-reconnaissance.md#retail-mapping-on-the-pinned-image)
 for the image pin, instruction sites and mapping limits.
 
+**PROVEN STATIC:** On the same pinned retail image, the
+`StarField::ModuleState` construction path passes a stack callback to a
+type-bucket iterator at two sites. The iterator resolves slot +`0x10` to
+`FUN_14077c470` for this receiver. The callback forwards a non-null PNDT
+form to `FUN_140779610`, which calls the planet orchestrator. The module
+pointer gates construction, and a separate byte gates the early sweep.
+See [SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md#native-path-and-predicates)
+for the exact predicates and retail evidence scope.
+
 ## Input Resolution and Biome Order
 
 ```text

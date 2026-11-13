@@ -20,6 +20,7 @@ superseded interpretations, but are not substitutes for the baseline.
 
 - [SRR-001 executable identity and research foundations](SRR-001-executable-identity.md)
 - [SRR-002 retail static reconnaissance](SRR-002-retail-static-reconnaissance.md)
+- [SRR-003 retail allocator invocation and dispatch](SRR-003-retail-allocator-invocation-and-dispatch.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence

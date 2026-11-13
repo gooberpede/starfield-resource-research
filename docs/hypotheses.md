@@ -32,12 +32,13 @@ The exact upstream state represented by `SurveyAggregator` and the historical `p
 
 ### Retail dispatch and descendant multiplicity
 
-[SRR-002](SRR-002-retail-static-reconnaissance.md) establishes the core
-static mapping for the pinned retail image. **PROVISIONAL:** the upstream
-references to the candidate dispatch wrapper may lead to a gameplay
-trigger. Their owners and invocation conditions remain open. The retail
-descendant append loop could preserve overlapping child pointers. Actual
-candidate multiplicity depends on the upstream lists and remains unverified.
+[SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md) resolves
+the candidate wrapper references from SRR-002 and establishes a conditional
+module-state construction route. The optional sweep flag's source and
+runtime value, the outer callers' association with named player operations
+and any additional allocator routes remain open. The retail descendant
+append loop could preserve overlapping child pointers. Actual candidate
+multiplicity depends on the upstream lists and remains unverified.
 
 ### Defensive empty-cache fallback state
 

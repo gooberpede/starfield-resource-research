@@ -25,6 +25,15 @@ records instruction anchors, differences and supporting helpers.
 | `FUN_1402fbc20` | `0x140924800` | **STATICALLY ESTABLISHED / PROVEN** MT-to-binary32 primitive. |
 | `FUN_14077c6e0`, `FUN_14077c4d0` | Shuffle call at `0x14152CEBD` | **STRONG CORRESPONDENCE / STRONG** integer shuffle helpers. |
 
+[SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md#native-path-and-predicates)
+qualifies these retail upstream entries:
+
+| Retail Ghidra entry | Bounded native role |
+| --- | --- |
+| `FUN_1409518b0`, `FUN_14094e3d0` | **PROVEN STATIC** module-pointer-guarded `StarField::ModuleState` construction and callback setup. A byte gates an early sweep. The common tail contains a later sweep using the same callback. |
+| `FUN_140593280`, `FUN_14077c470` | **PROVEN STATIC** type-bucket iterator and resolved PNDT callback. The call at `0x1405932EF` uses slot +`0x10`. The callback's type-gated direct call is at `0x14077C482`. |
+| `FUN_140779610` | **PROVEN STATIC** form/context adapter. The direct call to `FUN_140779760` is at `0x1407796D2`. |
+
 The CK entries below retain their original build and evidence scope.
 
 ---
