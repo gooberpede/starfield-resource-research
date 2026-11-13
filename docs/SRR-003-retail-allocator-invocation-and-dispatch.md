@@ -70,6 +70,104 @@ selects calls to `FUN_141893ee0` at `0x14187FA0F` (0) or
 evidence establish upstream alternatives at the native level. The user-facing
 meaning of those entry contexts is unqualified.
 
+## Conditional dispatch in pseudocode
+
+The pseudocode and diagram show the two focal generation sweeps on the
+[pinned retail image](PROVENANCE.md#current-retail-identity). Names such as
+`sweep`, `receiver` and `common_tail` are research aliases. Addresses below
+identify preferred VAs. See the [structure register](structure-register.md#retail-dispatch)
+for the receiver, bucket and slot layout.
+
+```text
+FUN_1409518b0:
+    if qword[0x1461E2288] == 0:                     # branch at 0x140951904
+        qword[0x1461E2288] = 0x1462194F0
+        install the three ModuleState vptrs
+        directly call FUN_14094e3d0(0x1462194F0)   # 0x1409519BE
+        finish the remaining construction-path work
+    continue at 0x140951A3C
+
+FUN_14094e3d0, from the flag test at 0x14094E542:
+    if byte[0x145EA6000] != 0:
+        sweep(stack receiver at [rsp+0x70])       # direct call at 0x14094E577
+        call FUN_14077b1d0, then continue intervening calls and loops
+        reach common_tail if that work completes # pointer-zero bypass or loop exit
+    else:
+        jump to common_tail                     # 0x14094EEB4
+    common_tail:
+        run preceding calls, including other receiver sweeps
+        sweep(stack receiver at [rbp-0x60])      # direct call at 0x14094EF57
+        call FUN_14077b1d0 and continue
+
+sweep(receiver):
+    install vptr 0x144B3D9E8 in receiver
+    directly call FUN_140593280(qword[0x145FD9B28], 0xBA, receiver)
+
+FUN_140593280, for these two callsites:
+    compute and acquire access to the type-0xBA bucket
+    if count != 0:                               # reads at 0x1405932C7–0x1405932D8
+        for each entry in the bucket range:
+            if entry is null: continue
+            result = indirect call [receiver.vptr + 0x10](receiver, entry)
+            if result == 0: break                # 0x1405932EF–0x1405932FF
+    run the iterator's exit and release logic
+
+FUN_14077c470(receiver, form):                    # resolved target of +0x10
+    if form is non-null and byte[form+0x2E] == 0xBA:
+        directly call FUN_140779610(form)        # 0x14077C482
+    return 1                                    # also for rejected forms
+
+FUN_140779610(form):
+    save the TLS field, set it to 0x82, and prepare access state and context
+    directly call FUN_140779760(&saved_form, &saved_context) # 0x1407796D2
+    run access cleanup and restore the saved TLS field # 0x1407796D8–0x140779748
+```
+
+The nonzero flag path reaches the common tail on normal continuation
+through the pointer-zero branch at `0x14094EC02` or after its loop. Other
+calls in the tail precede the later sweep. The module-pointer bypass skips
+construction through this entry. The flag's origin and runtime value,
+outer gameplay association, actual retail invocation and additional paths
+remain unresolved. See [native predicates](#native-path-and-predicates) and
+[search bounds](#alternative-explanations-and-search-bounds).
+
+```mermaid
+---
+config:
+  flowchart:
+    rankSpacing: 26
+    nodeSpacing: 25
+    wrappingWidth: 205
+---
+flowchart TD
+    Entry["Two verified direct callers enter FUN_1409518b0"] --> Module{"Module pointer zero?"}
+    Module -->|No| Continue["Common continuation"]
+    Module -->|Yes| Construct["Publish pointer and install ModuleState vptrs"]
+    Construct -->|Direct call| Flag{"FUN_14094e3d0<br/>Flag byte nonzero?"}
+    Flag -->|Yes| Early["Early sweep<br/>Stack receiver, vptr 0x144B3D9E8"]
+    Flag -->|Zero| Tail["Common tail with intervening calls"]
+    Early -->|After sweep returns and intervening work completes| Tail
+    Tail -->|On normal continuation| Late["Later sweep<br/>Stack receiver, same vptr"]
+    Late -->|After sweep returns and construction completes| Continue
+    Early -->|Direct call per sweep| Iterator
+    Late -->|Direct call per sweep| Iterator
+    subgraph Each["Inside either focal sweep"]
+        Iterator["FUN_140593280<br/>Read bucket count and scan range"] --> EntryGate{"Next entry?"}
+        EntryGate -->|Range exhausted or empty| Exit["Return to calling sweep"]
+        EntryGate -->|Null entry, advance| EntryGate
+        EntryGate -->|"Non-null entry, indirect slot +0x10"| Callback{"FUN_14077c470<br/>Non-null form and type 0xBA?"}
+        Callback -->|Yes, direct call| Adapter["FUN_140779610<br/>Prepare TLS and context"]
+        Adapter -->|Direct call| Planet["FUN_140779760<br/>Planetary orchestrator"]
+        Callback -->|Rejected form| Return["Callback returns 1"]
+        Planet -->|Via adapter cleanup on normal return| Return
+        Return -->|Nonzero, advance| EntryGate
+    end
+```
+
+The call arrows enter the same iterator from either site. The return resumes
+the originating sweep. The iterator's generic zero-result exit is shown in
+the pseudocode. The resolved receiver returns 1 on both shown callback paths.
+
 ## Alternative explanations and search bounds
 
 - **Metadata or dormant table.** The exception row is metadata. The two
@@ -209,6 +307,12 @@ HEAD and index match the starting state. The Git-native task patch is
 `.local-work/diffs/SRR-003.diff`. The final verification receipt records
 the isolated apply check, replay and byte comparison against every
 deliverable.
+
+### SRR-004 editorial revision
+
+SRR-004 adds the conditional dispatch pseudocode, control-flow diagram and explanatory cross-links. The status below identifies the original investigation snapshot.
+The [SRR-004 editorial review record](research-workflow.md#srr-004-editorial-review)
+identifies the separate snapshot for these additions.
 
 <!-- review-status:start -->
 ## Review status

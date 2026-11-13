@@ -16,6 +16,9 @@ superseded interpretations, but are not substitutes for the baseline.
 - [Provenance and applicability register](PROVENANCE.md#applicability-register) — executable identities,
   tool and data provenance, and the scope of each evidence class.
 
+- [Glossary](glossary.md) — research terminology, record signatures and address domains.
+- [Native structure register](structure-register.md) — build-qualified field and relationship evidence.
+
 ## Investigation Dossiers
 
 - [SRR-001 executable identity and research foundations](SRR-001-executable-identity.md)

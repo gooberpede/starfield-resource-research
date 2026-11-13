@@ -1,5 +1,8 @@
 # Function Register
 
+See the [native structure register](structure-register.md) for selected fields
+and relationships used by the retail functions below.
+
 This register tracks native functions relevant to Starfield resource generation.
 
 See the [applicability register](PROVENANCE.md#applicability-register) for

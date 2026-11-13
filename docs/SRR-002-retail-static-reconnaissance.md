@@ -144,6 +144,67 @@ point at biome configuration storage, ordinary reuse matches the root ID, and
 fallback consumes cached configuration pointers. These mechanics explain why a
 shared ID count and a family count can independently route to one fallback.
 
+## Allocation state flow
+
+The diagram summarizes the [pinned retail mapping](#retail-mapping-on-the-pinned-image).
+Arrows carry the labeled inputs, writes or branch conditions along static
+paths. Section numbers show ordering within the orchestrator. The diagram
+uses research aliases and [separate native state records](structure-register.md#retail-planet-allocation-state).
+
+```mermaid
+---
+config:
+  flowchart:
+    rankSpacing: 26
+    nodeSpacing: 25
+    wrappingWidth: 205
+---
+flowchart TD
+    Seed["Planet seed read"] -->|Initialize| MT["1. Stack MT19937 state"]
+    Work["Collected biome work pointers"] --> Shuffle["1. Shuffle work pointers"]
+    MT -->|Integer draws| Shuffle
+    Shuffle -->|Shuffled work range| Everywhere["2. Everywhere pass<br/>after atmosphere"]
+    Atmos["2. Atmosphere prepopulation"] -->|First, duplicate-checked IDs| IDs["Shared resource-ID state"]
+    Everywhere -->|Then, category-6 ID if selected| IDs
+    Everywhere -->|Pass finishes before biome loop| Special["3. Per-biome Special selector<br/>with valid BIOM"]
+    Shuffle -->|Current work object in shuffled order| Special
+    MT -->|State for all per-biome draws, reseeded per entry only for zero planet seed| Special
+    Special -->|Eligible Special ID| IDs
+    Special -->|After selection and any write| Guard{"Family count ≥ 5 or<br/>shared ID count ≥ 8?"}
+    IDs -->|Current count after any Special write| Guard
+    Cache["Family-configuration cache<br/>pointers to five-ID configurations"] -->|Count on entering current biome| Guard
+    Guard -->|Neither threshold met| Common["Common selector and root match"]
+    Guard -->|Either threshold met| Fallback["Fallback<br/>Filter with BIOM list, then select from cache"]
+    Cache -->|Root lookup| Common
+    Cache -->|Configuration pointers| Fallback
+    Common -->|Existing root match| Copy["Copy configuration to current work object"]
+    Fallback -->|Selected pointer non-null| Copy
+    Common -->|New selected root| New["Write root and generate descendants"]
+    IDs -->|Count-eight can skip descendant draws| New
+    New -->|Root and emitted descendant IDs| IDs
+    New -->|Append pointer on successful slot allocation| Cache
+```
+
+The shuffle calls at `0x1407798E0` and `0x1407798EB` advance the stack
+MT state. The atmosphere store at `0x140779AA6` and Everywhere insert at
+`0x140779BB8` precede the per-biome call at `0x140779C86`. Its arguments
+include the work pointer and all three state references. The generator
+draws for Special before testing whether its result can be written.
+At `0x140777986` and `0x14077798F` it tests the two counts separately.
+The Common selector, descendant helper and fallback index draw also use the
+passed RNG state. The mapping table gives their distinct draw mechanisms.
+
+Fallback uses the BIOM list, prefers matching cached configurations and can
+draw from the whole cache when the list has Common entries and the matching
+pool is empty and the cache is nonempty. With no eligible result it can leave the configuration
+uncopied. Reuse copies IDs into the work object. The new-root path supplies
+the shared-ID writes and the cache append shown above. New Common writes feed the Common guards
+in later biomes. Special can affect the guards in its current biome. The descendant
+count check at `0x1407780E6` is separate from the Common guards. Exact
+retail runtime semantics and descendant candidate multiplicity remain open.
+The [CK and reproducer evidence](#search-and-prior-art) supplies comparison
+context.
+
 ## Reproduction, publication and next experiment
 
 Start at the [retail pin](PROVENANCE.md#current-retail-identity) and the
@@ -196,6 +257,12 @@ for each headless run. space.log and space-during.json record preflight and in-r
 The replay applies it to bytes retrieved from the starting Git objects in
 isolation and checks the result against all delivered file bytes. The brief,
 original Git index, CK evidence and unrelated tracked paths are preserved.
+
+### SRR-004 editorial revision
+
+SRR-004 adds the allocation state-flow diagram and its explanatory cross-links. The status below identifies the original investigation snapshot.
+The [SRR-004 editorial review record](research-workflow.md#srr-004-editorial-review)
+identifies the separate snapshot for these additions.
 
 <!-- review-status:start -->
 ## Review status

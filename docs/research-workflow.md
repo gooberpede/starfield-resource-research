@@ -47,6 +47,29 @@ partial output, and record the affected drive and next safe step. Lightweight
 documentation and read-only identity checks may continue. This floor applies
 to available space on the drives. There is no fixed size cap on `.local-work/`.
 
+## Pseudocode, diagrams and structure records
+
+- Keep optional pseudocode in its dossier. Use original prose and research
+  aliases to express control or data semantics. Cite native locators for
+  branches, ordering, exits, effects and fallbacks, and mark unknowns. Use
+  the reproducer only as a qualified comparison where retail evidence leaves
+  a gap.
+- Use Mermaid when a control-flow, data-flow or structure relationship
+  diagram improves on the surrounding prose or table. Label direct calls,
+  predicates, indirect dispatch and unresolved links in text or a legend.
+  Identify static reachability and observed execution explicitly.
+- Validate Mermaid syntax, render the diagram and visually inspect the
+  result with a documented available method. If rendering is unavailable,
+  record the limitation and perform the available syntax and structural
+  checks. Dependency installation or external validation requires separate
+  approval.
+- Record reusable fields in the [structure register](structure-register.md)
+  with a build pin, base and offset unit, access width and operation,
+  evidence locator, confidence and unknowns. Identify proposed aliases and
+  keep layout observations distinct from ownership and lifetime hypotheses.
+  Add reusable terms to the [glossary](glossary.md) when they resolve an
+  ambiguity. Link to existing evidence and keep review metadata distinct.
+
 ## Publication
 
 For each candidate claim, record build applicability, essential evidence,
@@ -90,3 +113,27 @@ Include new task files and the completed review block. Check and apply the
 patch against the starting content in an isolated context, then compare the
 result byte-for-byte against the delivered files. Account for pre-existing
 changes separately.
+
+<!-- srr-004-review:start -->
+## SRR-004 editorial review
+
+**COMPLETE.** Independent internal challenger `srr004_reviewer` accepted
+AC1–AC7 for this editorial revision after rework on adapter cleanup and
+allocation state timing. The challenger checked original static evidence,
+inspected both Mermaid renders, and verified the final patch replay.
+
+Reviewed manifest SHA-256 `67bdb5b299e55da81595ab11f89280a357f9a14fb0fa74a619ff3bb2b471d77c`.
+It records each file's SHA-256, two spaces, repository-relative path and LF
+in sorted path order. The seven paths are the documentation index, function
+register, glossary, research workflow, structure register and the SRR-002
+and SRR-003 dossiers. Only this marked SRR-004 review block is excluded from
+the workflow digest. The historical SRR-002 and SRR-003 review blocks remain
+part of their dossier bytes in this new manifest.
+
+Both Mermaid diagrams passed parsing and visual inspection after rendering
+locally with VS Code's bundled Mermaid engine in headless Chrome. Detailed
+receipts and the manifest are under `.local-work/independent-review/SRR-004/`
+and `.local-work/codex/SRR-004/`. Retail gameplay association, actual
+invocation, cache lifecycle, descendant multiplicity and full runtime
+equivalence remain open under the existing publication holds.
+<!-- srr-004-review:end -->
