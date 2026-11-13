@@ -63,7 +63,11 @@ Keep planet-wide resource identity, family configuration origin, current biome a
 | `FUN_1401190CD` | PROVEN thunk to `FUN_140924800` |
 | `FUN_140924800` | PROVEN MT19937-to-binary32 probability conversion |
 
-These addresses belong to the investigated Creation Kit executable. Retail output is an independent corroboration layer, not an address-equivalence proof.
+These addresses belong to the investigated Creation Kit address space. The
+[applicability register](PROVENANCE.md#applicability-register) distinguishes the
+fingerprinted static exports from the live traces, which lack a trace-specific
+executable hash. Retail output corroborates membership. Retail address
+equivalence remains open.
 
 ## Evidence Stack
 

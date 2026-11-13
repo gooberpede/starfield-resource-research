@@ -13,8 +13,13 @@ superseded interpretations, but are not substitutes for the baseline.
 - [Hypotheses](hypotheses.md) — unresolved models and non-blocking questions.
 - [Function register](function-register.md) — native anchors, addresses, and
   evidence status.
-- [Provenance](PROVENANCE.md) — executable, tool, extraction, and validation
-  provenance, including explicitly unrecorded values.
+- [Provenance and applicability register](PROVENANCE.md#applicability-register) — executable identities,
+  tool and data provenance, and the scope of each evidence class.
+
+## Investigation Dossiers
+
+- [SRR-001 executable identity and research foundations](SRR-001-executable-identity.md)
+- [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence
 

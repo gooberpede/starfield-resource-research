@@ -193,6 +193,12 @@ The design should be easy to extend later to recursive neighbourhood export.
 
 ## Documentation Expectations
 
+### Investigation workflow
+
+Use the [research workflow](docs/research-workflow.md) for investigation
+dossiers, executable provenance, local retention, dependency checks, disk
+space, publication scope, and independent review.
+
 ### Preserve text encoding
 
 **Preserve UTF-8 text encoding.** Do not introduce mojibake or replace valid Unicode punctuation or diagram characters with mis-decoded byte sequences. Before finalising documentation changes, inspect modified text for common mojibake patterns such as `Ã`, `Â`, `ÔÇ`, `â€`, `ÔÇö`, `ÔÇô`, or corrupted box-drawing and arrows. If the repository already uses valid Unicode em dashes, arrows, multiplication signs, or box-drawing characters, preserve them as valid UTF-8 rather than transliterating or re-encoding them.

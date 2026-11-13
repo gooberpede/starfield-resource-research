@@ -2,6 +2,9 @@
 
 This register tracks native functions relevant to Starfield resource generation.
 
+See the [applicability register](PROVENANCE.md#applicability-register) for
+build qualifications on CK native evidence and historical retail output checks.
+
 Names beginning with `FUN_` are Ghidra-generated identifiers unless otherwise stated.
 
 Do not replace an original Ghidra name with a semantic alias unless evidence is strong. Proposed aliases should be recorded separately.

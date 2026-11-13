@@ -22,7 +22,11 @@ targeted pathological CK regressions: exact
 fresh CK + retail holdout:          10 / 10 exact
 ```
 
-The holdout is an independent corroboration layer. Creation Kit addresses and control flow are proven for the live-traced CK Galaxy View Apply path; they are not asserted to be retail `Starfield.exe` addresses.
+The holdout corroborates CK biome and retail planet-wide outputs for the sampled
+bodies. The CK Galaxy View Apply trace establishes native behavior in its
+recorded address space. See [executable provenance](docs/PROVENANCE.md) for the
+separate build qualifications and the local retail identity baseline. Retail
+native mapping remains open.
 
 No known algorithmic hole remains within the current v1.0 scope. Future counterexamples, executable/version drift, and new evidence remain valid research targets.
 

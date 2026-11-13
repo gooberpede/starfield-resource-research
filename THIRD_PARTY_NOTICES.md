@@ -17,3 +17,22 @@ The project license applies only to material for which the repository owner
 holds the relevant rights. It does not purport to relicense proprietary
 third-party content, executable-derived evidence, or third-party trademarks
 and names.
+
+## SRR-001 sources and permissions
+
+The maintainer designated the installed Steam copies for read-only identity
+checks and supplied the Creation Kit About capture for local inspection.
+Bethesda/ZeniMax are credited for the software and About dialog, and the
+maintainer for supplying the capture and the outpost workflow references
+that informed this investigation. The Ghidra project and x64dbg contributors
+provided the analysis tools. The reproducer maintainers provided the canonical
+validation and its documentation. The historical `SurveyAggregator` observer
+contributed the empirical oracle. Individual attribution for that observer
+is unrecorded in the consulted research records.
+
+Inspection and credit establish provenance. Redistribution clearance for the
+About image and additional executable-derived material was not established in
+SRR-001. The capture stays local. Any future disclosure involving such material
+requires a documented basis specific to its scope and purpose. See the
+[SRR-001 release scope](docs/SRR-001-executable-identity.md#release-scope)
+for claim-specific holds.
