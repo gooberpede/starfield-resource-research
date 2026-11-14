@@ -25,6 +25,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-002 retail static reconnaissance](SRR-002-retail-static-reconnaissance.md)
 - [SRR-003 retail allocator invocation and dispatch](SRR-003-retail-allocator-invocation-and-dispatch.md)
 - [SRR-005 retail allocator live-observation preparation](SRR-005-live-observation-preparation.md)
+- [SRR-006 four-site hardware observer](SRR-006-four-site-hardware-observer.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence
