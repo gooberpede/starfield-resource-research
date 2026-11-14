@@ -22,7 +22,8 @@ static void NTAPI early_tls(void*, DWORD reason, void*) {
         wchar_t mode[32]{};
         if (GetEnvironmentVariableW(L"SRR006_FIXTURE_MODE", mode, 32) &&
             (wcscmp(mode, L"quiet") == 0 || wcscmp(mode, L"delay") == 0 ||
-             wcscmp(mode, L"slot-loss") == 0))
+             (wcscmp(mode, L"slot-loss") == 0 &&
+              !GetEnvironmentVariableW(L"SRR007_DISPOSABLE_ATTACH", nullptr, 0))))
             return;
         sample_guard();
     }
@@ -73,17 +74,83 @@ static int unowned_step() {
     return 96;
 }
 
+static bool competing_breakpoint() {
+    const auto address = reinterpret_cast<void(*)()>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "DbgBreakPoint"));
+    __try { address(); }
+    __except (GetExceptionCode() == EXCEPTION_BREAKPOINT ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+        return true;
+    }
+    return false;
+}
+
 static void wait_for(const std::filesystem::path& path) {
     while (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) Sleep(20);
 }
 
 int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
-    const std::filesystem::path folder(directory);
+    std::filesystem::path folder(directory);
     auto is = [&](const wchar_t* name) { return wcscmp(scenario, name) == 0; };
+    const bool late_attach = !is(L"quiet") &&
+        GetEnvironmentVariableW(L"SRR007_DISPOSABLE_ATTACH", nullptr, 0) != 0;
+    if (late_attach) {
+        // One actual worker predates the attach census. It executes a site
+        // only after the initial break-in and the operator's title marker.
+        const auto parked = CreateThread(nullptr, 0, [](void* arg) -> DWORD {
+            const auto& output = *static_cast<const std::filesystem::path*>(arg);
+            wait_for(output / "advance");
+            sample_guard();
+            return 0;
+        }, &folder, 0, nullptr);
+        if (!parked || fixture_count != 1) return 99;
+        std::ofstream(folder / "attach-ready").put('\n');
+        if (is(L"competing-breakpoint")) {
+            wait_for(folder / "compete");
+            if (!competing_breakpoint()) return 100;
+            std::ofstream(folder / "competitor-handled").put('\n');
+        }
+        wait_for(folder / "advance");
+        if (WaitForSingleObject(parked, INFINITE) != WAIT_OBJECT_0) return 99;
+        CloseHandle(parked);
+        // The previous guard hit served the attach census control. Existing
+        // fixture cases use their original expected counts from this point.
+        InterlockedDecrement(&fixture_count);
+        if (is(L"crash")) {
+            right_form[0x2e] = 0xba;
+            sweep_later(&receiver, right_form);
+            std::ofstream(folder / "ready").put('\n');
+        }
+        if (std::wstring_view(scenario).starts_with(L"recover-")) {
+            right_form[0x2e] = 0xba;
+            sweep_later(&receiver, right_form);
+            std::ofstream(folder / "ready").put('\n');
+            wait_for(folder / "quit");
+            BOOL debugged = TRUE;
+            if (!CheckRemoteDebuggerPresent(GetCurrentProcess(), &debugged)) return 101;
+            const bool expected_attached = is(L"recover-refusal") || is(L"recover-partial") ||
+                                           is(L"recover-detach-error");
+            if (bool(debugged) != expected_attached) return 102;
+            auto worker = CreateThread(nullptr, 0, [](void*) -> DWORD {
+                sample_guard();
+                return 0;
+            }, nullptr, 0, nullptr);
+            if (!worker || WaitForSingleObject(worker, INFINITE) != WAIT_OBJECT_0) return 103;
+            CloseHandle(worker);
+            sample_guard();
+            return fixture_count == 5 ? 0 : 104;
+        }
+        if (is(L"anomalous-return")) {
+            // Visit the callback directly with the wrong return path. The
+            // real call chain that follows must remain independently usable.
+            reinterpret_cast<void(*)(void*, void*)>(fixture_vtable[2])(&receiver, wrong_form);
+            InterlockedDecrement(&fixture_count);
+        }
+    }
     if (is(L"quiet") || is(L"delay") || is(L"slot-loss")) {
         if (is(L"delay")) Sleep(2300);
+        if (late_attach) std::ofstream(folder / "ready").put('\n');
         wait_for(folder / "quit");
-        return fixture_count == 0 ? 0 : 83;
+        return fixture_count == int(late_attach) ? 0 : 83;
     }
     if (is(L"continue-persistent")) {
         wait_for(folder / "fault");
@@ -141,9 +208,14 @@ int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
     if (is(L"unexpected-module")) {
         auto module = LoadLibraryExW(L"version.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!module) return 98;
+        if (late_attach) {
+            FreeLibrary(module);
+            right_form[0x2e] = 0xba;
+            sweep_later(&receiver, right_form);
+        }
         std::ofstream(folder / "ready").put('\n');
         wait_for(folder / "quit");
-        FreeLibrary(module);
+        if (!late_attach) FreeLibrary(module);
         return 0;
     }
     right_form[0x2e] = 0xba;

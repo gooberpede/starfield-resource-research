@@ -32,8 +32,17 @@ inline bool publish_record(const std::filesystem::path& path, const std::string&
                                    &written, nullptr) && written == bytes.size() &&
                          FlushFileBuffers(handle);
     const bool closed = CloseHandle(handle) != 0;
-    return flushed && closed && MoveFileExW(temporary.c_str(), path.c_str(),
-                                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    if (!flushed || !closed) return false;
+    // An external reader can briefly hold the prior watermark without
+    // delete sharing. Retry only that transient publication failure.
+    for (unsigned attempt = 0; attempt != 5; ++attempt) {
+        if (MoveFileExW(temporary.c_str(), path.c_str(),
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) return true;
+        const DWORD error = GetLastError();
+        if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED) return false;
+        Sleep(10);
+    }
+    return false;
 }
 
 // One producer (debug loop), one consumer. Producer never waits for storage.
@@ -44,6 +53,7 @@ class Journal {
     std::filesystem::path watermark;
     std::atomic<bool> done{false};
     std::atomic<uint64_t> head{0}, tail{0}, checkpoint{0};
+    std::atomic<uint64_t> sealed_stop{0};
     std::thread writer;
     bool inject_failure, slow_writer, abrupt_fixture;
     uint64_t peak = 0;
@@ -83,7 +93,8 @@ class Journal {
                 offset += count;
                 row.clear();
                 tail = ++written;
-                if (written >= checkpoint.load() && durable.load() < checkpoint.load())
+                if (written == sealed_stop.load() ||
+                    (written >= checkpoint.load() && durable.load() < checkpoint.load()))
                     break;
             }
             if (!failed) {
@@ -92,7 +103,9 @@ class Journal {
                     std::to_string(written) + ",\"bytes\":" + std::to_string(offset) +
                     ",\"sha256\":\"" + prefix_digest + "\"}\n";
                 if (prefix_digest.empty() || !FlushFileBuffers(file) ||
-                    !publish_record(watermark, prefix)) failed = true;
+                    !publish_record(watermark, prefix) ||
+                    (written == sealed_stop.load() &&
+                     !publish_record(watermark.parent_path() / "stop-prefix.json", prefix))) failed = true;
                 else durable.store(written);
             }
             if (finishing && written == head.load()) break;
@@ -116,7 +129,7 @@ public:
     }
     ~Journal() { finish(); }
 
-    bool append(std::string fields) {
+    bool append(std::string fields, bool seal_stop = false) {
         ++attempted;
         const uint64_t next = head.load();
         const auto depth = next - tail.load();
@@ -126,6 +139,7 @@ public:
         }
         queue[next % queue.size()] =
             "{\"schema\":1,\"seq\":" + std::to_string(attempted) + ',' + fields + "}\n";
+        if (seal_stop) sealed_stop = attempted;
         head = ++accepted;
         if (peak < depth + 1) peak = depth + 1;
         return true;

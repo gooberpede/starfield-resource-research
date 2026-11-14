@@ -26,6 +26,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-003 retail allocator invocation and dispatch](SRR-003-retail-allocator-invocation-and-dispatch.md)
 - [SRR-005 retail allocator live-observation preparation](SRR-005-live-observation-preparation.md)
 - [SRR-006 four-site hardware observer](SRR-006-four-site-hardware-observer.md)
+- [SRR-007 retail launch boundary and Stage A qualification](SRR-007-retail-launch-and-stage-a-qualification.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence

@@ -77,6 +77,8 @@ struct Thread {
     uint64_t created, generation;
     CONTEXT original{};
     bool armed = false;
+    bool debug_written = false;
+    Address start_address = 0;
     Correlation frames;
 };
 
@@ -87,6 +89,8 @@ class Observer {
     fs::path folder;
     std::wstring scenario;
     const ProfileRole profile_role;
+    const bool late_attach;
+    const bool non_killing;
     PROCESS_INFORMATION child{};
     HANDLE image;
     std::string digest;
@@ -95,14 +99,20 @@ class Observer {
     Layout layout;
     std::array<Address, 4> addresses{};
     std::map<DWORD, Thread> threads;
-    std::map<Address, std::string> modules;
-    WindowEvidence windows{{"fixture_startup", "fixture_title", "fixture_menu"}};
+    struct ModuleRecord { std::string name; bool continuity_only; };
+    std::map<Address, ModuleRecord> modules;
+    WindowEvidence windows;
     uint64_t created = 0, births = 0, continued = 0, foreign = 0;
     uint64_t phase_ack = 0, menu_ack = 0, stop_ack = 0, event_number = 0;
+    uint64_t title_boundary = 0, stop_boundary = 0, retire_ack = 0;
+    uint64_t recovery_after_generation = 0;
     uint64_t first_invoked = 0, first_allocator = 0, rejected = 0;
     unsigned phase = 0;
     bool loader = false, identity = false, healthy = true, stopped = false;
     bool handoff = false;
+    bool retired = false, stop_durable = false;
+    bool detached = false, recovery_attempted = false, disarmed = false;
+    bool recovery_break_pending = false, recovery_break_owned = false;
     bool forced = false, exit_event = false, signaled = false;
     bool emergency_requested = false, recovery_unconfirmed = false, abrupt_queued = false;
     bool cross_phase = false, cross_menu = false;
@@ -112,26 +122,34 @@ class Observer {
     std::array<uint64_t, 4> after_stop{};
     std::array<uint64_t, 4> after_gap{};
     std::array<unsigned char, 16> loader_bytes{};
+    std::array<unsigned char, 5> breakin_call{};
+    DWORD held_breakin = 0;
+    static constexpr Address remote_breakin_rva = 0xccaf0, breakin_return_rva = 0xccb3e;
     std::wstring loader_mapping;
+    std::string run_id;
     LARGE_INTEGER frequency{};
 
     bool is(const wchar_t* name) const { return scenario == name; }
     bool retail_profile() const { return profile_role == ProfileRole::pinned_retail; }
 
-    void gap() {
-        healthy = false;
+    void continuity_gap() {
         windows.gap();
         for (auto& [tid, thread] : threads) thread.frames.clear();
     }
-    uint64_t row(const char* kind, DWORD tid, const std::string& fields = "") {
+    void gap() {
+        healthy = false;
+        continuity_gap();
+    }
+    uint64_t row(const char* kind, DWORD tid, const std::string& fields = "", bool seal_stop = false) {
         LARGE_INTEGER qpc{};
         FILETIME utc{};
         QueryPerformanceCounter(&qpc);
         GetSystemTimePreciseAsFileTime(&utc);
         const auto thread = threads.find(tid);
         std::ostringstream out;
-        out << "\"kind\":\"" << kind << "\",\"run\":\"" << digest << '-' << child.dwProcessId
-            << '-' << created << "\",\"role\":\"fixture\",\"qpc\":" << qpc.QuadPart
+        out << "\"kind\":\"" << kind << "\",\"run\":\"" << run_id
+            << "\",\"role\":\"fixture\",\"method\":\"" << (late_attach ? "late_attach" : "creation")
+            << "\",\"qpc\":" << qpc.QuadPart
             << ",\"qpc_frequency\":" << frequency.QuadPart << ",\"utc_filetime\":" << ticks(utc)
             << ",\"pid\":" << child.dwProcessId << ",\"process_birth\":" << created
             << ",\"tid\":" << tid << ",\"thread_birth\":"
@@ -141,7 +159,7 @@ class Observer {
             << ",\"image_sha256\":\"" << digest << "\",\"identity\":" << identity
             << ",\"phase\":" << phase << ",\"stopped\":" << stopped
             << ",\"healthy\":" << healthy << ",\"event\":" << event_number << fields;
-        if (!journal.append(out.str())) { gap(); return 0; }
+        if (!journal.append(out.str(), seal_stop)) { gap(); return 0; }
         return journal.accepted;
     }
 
@@ -149,6 +167,25 @@ class Observer {
         SIZE_T received = 0;
         return ReadProcessMemory(child.hProcess, reinterpret_cast<void*>(address), data,
                                  size, &received) && received == size;
+    }
+    bool attach_preflight() const {
+        wchar_t path[32768]{};
+        DWORD length = ARRAYSIZE(path);
+        BOOL debugged = FALSE;
+        if (!created || GetProcessId(child.hProcess) != child.dwProcessId ||
+            birth(child.hProcess, true) != created ||
+            WaitForSingleObject(child.hProcess, 0) != WAIT_TIMEOUT ||
+            !CheckRemoteDebuggerPresent(child.hProcess, &debugged) || debugged ||
+            !QueryFullProcessImageNameW(child.hProcess, 0, path, &length))
+            return false;
+        const auto reported = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr,
+                                          OPEN_EXISTING, 0, nullptr);
+        if (reported == INVALID_HANDLE_VALUE) return false;
+        const bool match = same_file(reported, image);
+        CloseHandle(reported);
+        // The stopped verifier still authenticates the event's backing file,
+        // executable bytes and relocation state before any register writes.
+        return match;
     }
     RetailVerification verify_creation(const CREATE_PROCESS_DEBUG_INFO& info) const {
         if (retail_profile())
@@ -187,8 +224,8 @@ class Observer {
     }
     // Called between events using only balanced, observer-owned suspensions.
     // A thread born/exiting around the check can make the census indeterminate.
-    bool checkpoint() {
-        if (!identity || !loader) return false;
+    bool thread_census(bool held) {
+        if (!identity) return false;
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
         if (snapshot == INVALID_HANDLE_VALUE) return false;
         THREADENTRY32 item{};
@@ -201,22 +238,42 @@ class Observer {
             const auto entry = threads.find(item.th32ThreadID);
             if (entry == threads.end() || !entry->second.armed) { complete = false; continue; }
             const auto& thread = entry->second;
-            if (SuspendThread(thread.handle) == DWORD(-1)) { complete = false; continue; }
+            if (!held && SuspendThread(thread.handle) == DWORD(-1)) { complete = false; continue; }
             CONTEXT c{};
             const bool readback = read_context(thread.handle, c);
             // Simulate a persistent loss at the same decision boundary as the
             // real readback. Windows may restore loader-exception context
             // transiently cleared by the separate native injection control.
-            if (is(L"slot-loss") && item.th32ThreadID == child.dwThreadId) c.Dr7 = 0;
+            if (!held && is(L"slot-loss") && item.th32ThreadID == child.dwThreadId) c.Dr7 = 0;
             const bool valid = birth(thread.handle, false) == thread.created && readback && owns(c);
-            const bool released = ResumeThread(thread.handle) != DWORD(-1);
+            const bool released = held || ResumeThread(thread.handle) != DWORD(-1);
             if (!valid || !released) complete = false;
         } while (Thread32Next(snapshot, &item));
         complete = complete && GetLastError() == ERROR_NO_MORE_FILES;
         CloseHandle(snapshot);
         return complete && observed == threads.size() && observed != 0;
     }
-    bool add(DWORD tid, HANDLE handle) {
+    bool module_census() const {
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, child.dwProcessId);
+        if (snapshot == INVALID_HANDLE_VALUE) return false;
+        MODULEENTRY32W item{};
+        item.dwSize = sizeof item;
+        size_t count = 0;
+        bool complete = Module32FirstW(snapshot, &item) != 0;
+        if (complete) do {
+            const auto address = reinterpret_cast<Address>(item.modBaseAddr);
+            if (address == base) continue;
+            if (!modules.contains(address)) complete = false;
+            ++count;
+        } while (Module32NextW(snapshot, &item));
+        complete = complete && GetLastError() == ERROR_NO_MORE_FILES;
+        CloseHandle(snapshot);
+        return complete && ntdll && count == modules.size();
+    }
+    bool checkpoint() {
+        return loader && thread_census(false) && (!late_attach || module_census());
+    }
+    bool add(DWORD tid, HANDLE handle, Address start_address = 0) {
         const auto stamp = birth(handle, false);
         if (!identity || threads.size() == 256 || !stamp ||
             GetProcessIdOfThread(handle) != child.dwProcessId || GetThreadId(handle) != tid)
@@ -224,6 +281,8 @@ class Observer {
         auto [entry, inserted] = threads.try_emplace(tid, Thread{handle, stamp, ++births});
         if (!inserted) return false;
         auto& thread = entry->second;
+        thread.start_address = start_address;
+        if (disarmed) return true;
         auto& c = thread.original;
         if (!read_context(handle, c)) return false;
         // Inject a conflicting original snapshot at the decision boundary.
@@ -245,7 +304,9 @@ class Observer {
         armed.Dr2 = addresses[2]; armed.Dr3 = addresses[3];
         armed.Dr7 = (armed.Dr7 & ~dr7_fields) | 0x55;
         CONTEXT check{};
-        if (!SetThreadContext(handle, &armed) || !read_context(handle, check)) return false;
+        if (!SetThreadContext(handle, &armed)) return false;
+        thread.debug_written = true;
+        if (!read_context(handle, check)) return false;
         if (is(L"readback") && tid == child.dwThreadId) check.Dr3 ^= 1;
         const bool verified = owns(check) && !(check.EFlags & rf) &&
                               (check.Dr6 & dr6_causes) == 0;
@@ -258,6 +319,14 @@ class Observer {
         return thread.armed;
     }
     bool terminate_exact() {
+        if (non_killing) {
+            if (!emergency_requested) {
+                emergency_requested = true;
+                emergency_error = ERROR_ACCESS_DENIED;
+                row("termination_refused", 0);
+            }
+            return false;
+        }
         if (forced) return true;
         if (emergency_requested) return false;
         emergency_requested = true;
@@ -318,8 +387,14 @@ class Observer {
             basename += (ch >= L'0' && ch <= L'9') || (ch >= L'A' && ch <= L'Z') ||
                         (ch >= L'a' && ch <= L'z') || ch == L'.' || ch == L'_' || ch == L'-'
                         ? char(ch) : '?';
-        if (modules.size() < 256 && !modules.try_emplace(at, basename).second) gap();
-        if (!expected || modules.size() == 256) gap();
+        // Only the disposable control vouches for this DLL's role. An
+        // arbitrary unqualified module still quarantines the capture.
+        const bool continuity_only = late_attach && is(L"unexpected-module") &&
+            mapped_image && in_system && _wcsicmp(name.data(), L"version.dll") == 0;
+        if (modules.size() == 256 ||
+            !modules.try_emplace(at, ModuleRecord{basename, continuity_only}).second ||
+            (!expected && !continuity_only)) gap();
+        else if (continuity_only) continuity_gap();
         return ",\"module_base\":" + std::to_string(at) + ",\"module_name\":\"" + basename +
                "\",\"module_expected\":" + std::to_string(expected) +
                ",\"module_system_directory\":" + std::to_string(in_system) +
@@ -329,14 +404,16 @@ class Observer {
         const auto address = reinterpret_cast<Address>(info.lpBaseOfDll);
         const auto module = modules.extract(address);
         // A loss of a qualified module is a change of the observed image set.
-        if (!stopped || module.empty() || address == ntdll) gap();
+        if (module.empty() || address == ntdll) gap();
+        else if (!stopped && late_attach && module.mapped().continuity_only) continuity_gap();
+        else if (!stopped) gap();
         return ",\"module_base\":" + std::to_string(address) + ",\"module_name\":\"" +
-               (module.empty() ? std::string{} : module.mapped()) + "\"";
+               (module.empty() ? std::string{} : module.mapped().name) + "\"";
     }
     bool loader_event(const DEBUG_EVENT& event, Address address) {
         const auto& e = event.u.Exception;
-        if (loader || !identity || !ntdll || !loader_rva ||
-            event.dwThreadId != child.dwThreadId || !e.dwFirstChance ||
+        if ((loader && !recovery_break_pending) || !identity || !ntdll || !loader_rva ||
+            (!late_attach && event.dwThreadId != child.dwThreadId) || !e.dwFirstChance ||
             e.ExceptionRecord.ExceptionCode != EXCEPTION_BREAKPOINT ||
             address != ntdll + loader_rva)
             return false;
@@ -354,7 +431,117 @@ class Observer {
         if (initial == threads.end() || !read_context(initial->second.handle, c) ||
             c.Rip != address + 1 || c.EFlags & (tf | rf) || c.Dr6 & dr6_causes)
             return false;
+        if (late_attach) {
+            Address return_address = 0;
+            std::array<unsigned char, 5> call{};
+            MEMORY_BASIC_INFORMATION stack{};
+            if (initial->second.start_address != ntdll + remote_breakin_rva ||
+                (recovery_break_pending && initial->second.generation <= recovery_after_generation) ||
+                c.Rsp % 16 != 8 ||
+                !VirtualQueryEx(child.hProcess, reinterpret_cast<void*>(c.Rsp), &stack, sizeof stack) ||
+                stack.Type != MEM_PRIVATE || stack.State != MEM_COMMIT ||
+                !mapped(c.Rsp, &return_address, sizeof return_address) ||
+                return_address != ntdll + breakin_return_rva ||
+                !profile_detail::read_image(child.hProcess, ntdll, return_address - call.size(),
+                                            call.data(), call.size(), true) || call != breakin_call)
+                return false;
+        }
+        if (recovery_break_pending) {
+            recovery_break_owned = true;
+            recovery_break_pending = false;
+            return true;
+        }
+        if (late_attach && (!thread_census(true) || !module_census())) gap();
         return loader = true;
+    }
+    // The debugger event keeps all threads stopped while we validate the census
+    // and take one extra suspend per live thread. The duplicate handles remain
+    // valid after debug-event continuation and detach.
+    struct Suspension { DWORD tid; HANDLE handle; };
+    bool suspend_for_detach(std::vector<Suspension>& suspended) {
+        if (!thread_census(true)) return false;
+        suspended.reserve(threads.size());
+        for (const auto& [tid, thread] : threads) {
+            HANDLE owned{};
+            if (!DuplicateHandle(GetCurrentProcess(), thread.handle, GetCurrentProcess(), &owned,
+                                 THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT |
+                                 THREAD_QUERY_INFORMATION | SYNCHRONIZE, FALSE, 0) ||
+                SuspendThread(owned) == DWORD(-1)) {
+                if (owned) CloseHandle(owned);
+                return false;
+            }
+            suspended.push_back({tid, owned});
+        }
+        return !suspended.empty();
+    }
+    void release_suspensions(std::vector<Suspension>& suspended) {
+        while (!suspended.empty()) {
+            const auto [tid, handle] = suspended.back();
+            if (ResumeThread(handle) == DWORD(-1) &&
+                WaitForSingleObject(handle, 0) != WAIT_OBJECT_0) {
+                row("suspension_release_unconfirmed", tid);
+                // Retain the duplicate and our suspend obligation while
+                // leaving the exact child untouched by any kill fallback.
+                do { Sleep(100); } while (ResumeThread(handle) == DWORD(-1) &&
+                    WaitForSingleObject(handle, 0) != WAIT_OBJECT_0);
+            }
+            CloseHandle(handle);
+            suspended.pop_back();
+        }
+    }
+    bool original_debug_state(const CONTEXT& check, const CONTEXT& original) const {
+        return slots(check) == slots(original) &&
+            ((check.Dr7 ^ original.Dr7) & dr7_fields) == 0 &&
+            ((check.Dr6 ^ original.Dr6) & dr6_causes) == 0;
+    }
+    bool verify_released_event_state(const std::vector<Suspension>& suspended) {
+        bool verified = true;
+        for (const auto& [tid, handle] : suspended) {
+            auto& thread = threads.at(tid);
+            CONTEXT check{};
+            const bool read = birth(handle, false) == thread.created && read_context(handle, check);
+            const bool original = read && original_debug_state(check, thread.original);
+            if (!original) {
+                verified = false;
+                // If continuation reinstated our exact slots, continue to
+                // service them. A foreign context is never overwritten.
+                thread.armed = read && owns(check);
+                thread.debug_written = thread.armed;
+            }
+            row("post_continue_debug_state", tid, ",\"verified\":" + std::to_string(original));
+        }
+        return verified;
+    }
+    bool restore_debug_state() {
+        bool restored = true;
+        bool restored_one = false;
+        for (auto& [tid, thread] : threads) {
+            if (!thread.debug_written) continue;
+            CONTEXT current{}, check{};
+            bool ok = birth(thread.handle, false) == thread.created &&
+                      read_context(thread.handle, current) && owns(current) &&
+                      (current.Dr6 & dr6_causes) == 0;
+            if (is(L"recover-partial") && restored_one) ok = false;
+            if (ok) {
+                CONTEXT restore = thread.original;
+                restore.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+                ok = SetThreadContext(thread.handle, &restore) && read_context(thread.handle, check) &&
+                    original_debug_state(check, thread.original) &&
+                    check.Rip == current.Rip && check.Rsp == current.Rsp;
+            }
+            if (ok) {
+                thread.armed = thread.debug_written = false;
+                restored_one = true;
+            }
+            else restored = false;
+            row("restore_debug_state", tid, ",\"verified\":" + std::to_string(ok));
+        }
+        return restored;
+    }
+    bool exact_running_process() const {
+        return created && GetProcessId(child.hProcess) == child.dwProcessId &&
+            birth(child.hProcess, true) == created &&
+            WaitForSingleObject(child.hProcess, 0) == WAIT_TIMEOUT;
     }
     std::string capture(Thread& thread, unsigned site, const CONTEXT& c, Result& result) {
         MEMORY_BASIC_INFORMATION bounds{};
@@ -401,8 +588,8 @@ class Observer {
             fields += ",\"ntdll\":" + std::to_string(ntdll) +
                       ",\"loader_candidate\":" + std::to_string(ntdll + loader_rva);
         if (loader_event(event, addr)) {
-            fields += ",\"owner\":\"loader\"";
-            if (is(L"slot-loss")) {
+            fields += recovery_break_owned ? ",\"owner\":\"recovery_breakin\"" : ",\"owner\":\"loader\"";
+            if (is(L"slot-loss") && !late_attach) {
                 auto& initial = threads.at(event.dwThreadId);
                 CONTEXT c{}, check{};
                 bool changed = false;
@@ -432,7 +619,7 @@ class Observer {
                       ",\"before_flags\":" + std::to_string(c.EFlags) +
                       ",\"before_dr6\":" + std::to_string(c.Dr6);
             if (stopped) ++after_stop[site];
-            else if (!healthy) ++after_gap[site];
+            else if (!healthy || (late_attach && !loader)) ++after_gap[site];
             else {
                 captured_site = site;
                 fields += capture(entry->second, site, c, result);
@@ -460,25 +647,54 @@ class Observer {
         fields += ",\"owner\":\"foreign\"";
         // Only the fixture's deliberately handled, non-debug exception is
         // a known continuity control. Other exceptions could unwind a frame.
-        if (!e.dwFirstChance || code != 0xe1230042) gap();
+        if (late_attach && !loader && e.dwFirstChance && code == EXCEPTION_BREAKPOINT &&
+            addr == ntdll + loader_rva) {
+            fields += ",\"attach_candidate_refused\":1";
+        } else if (late_attach && e.dwFirstChance && code != EXCEPTION_BREAKPOINT &&
+            code != EXCEPTION_SINGLE_STEP && code != 0xe1230042) continuity_gap();
+        else if (!e.dwFirstChance || code != 0xe1230042) gap();
         else if (entry != threads.end()) {
             if (entry->second.frames.awaiting_callback()) gap();
             else entry->second.frames.clear();
         }
         return DBG_EXCEPTION_NOT_HANDLED;
     }
+    // The local run directory ACL is the trust boundary. The payload binds a
+    // statement to the retained process epoch and a single transition.
+    bool marker(const wchar_t* name, const char* label, unsigned ordinal, uint64_t prior = 0) {
+        const auto path = folder / name;
+        const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                        nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return false;
+        char bytes[256]{};
+        DWORD size = 0;
+        BY_HANDLE_FILE_INFORMATION info{};
+        const bool read = GetFileInformationByHandle(file, &info) &&
+            !(info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) &&
+            ReadFile(file, bytes, sizeof bytes, &size, nullptr);
+        CloseHandle(file);
+        const auto expected = run_id + " " + std::to_string(ordinal) + " " + label +
+                              " " + std::to_string(prior) + "\n";
+        return read && std::string_view(bytes, size) == expected;
+    }
     void controls() {
         if (journal.failed && healthy) gap();
         const bool fixture_stop = is(L"stop-burst") && hits[0] >= 256;
-        if (!stopped && phase == 0 && (fixture_stop || cross_phase || fs::exists(folder / "phase"))) {
+        if (!stopped && phase == 0 &&
+            (late_attach ? loader && marker(L"title.request", "TITLE_CARD", 1) :
+             fixture_stop || cross_phase || fs::exists(folder / "phase"))) {
             phase = 1;
             const bool checked = checkpoint();
             if (!checked) gap();
             phase_ack = row("operator_phase", 0, ",\"checkpoint\":" + std::to_string(checked));
+            title_boundary = phase_ack;
             windows.phase(phase_ack, checked && healthy);
             journal.request_flush();
         }
-        if (!stopped && phase == 1 && (cross_menu || fs::exists(folder / "menu"))) {
+        if (!stopped && phase == 1 &&
+            (late_attach ? !phase_ack && title_boundary &&
+                           marker(L"menu.request", "MAIN_MENU", 2, title_boundary) :
+             cross_menu || fs::exists(folder / "menu"))) {
             phase = 2;
             const bool checked = checkpoint();
             if (!checked) gap();
@@ -487,7 +703,9 @@ class Observer {
             menu_ack = marker;
             journal.request_flush();
         }
-        if (!stopped && (fixture_stop || fs::exists(folder / "stop"))) {
+        // STOP is always available, even if a UI phase never arrives.
+        if (!stopped && (late_attach ? marker(L"stop.request", "STOP", 3) :
+                         fixture_stop || fs::exists(folder / "stop"))) {
             stopped = true;
             const bool checked = checkpoint();
             if (!checked) gap();
@@ -495,7 +713,8 @@ class Observer {
                 if (thread.frames.awaiting_callback()) healthy = false;
                 thread.frames.clear();
             }
-            stop_ack = row("stop", 0, ",\"checkpoint\":" + std::to_string(checked));
+            stop_ack = row("stop", 0, ",\"checkpoint\":" + std::to_string(checked), late_attach);
+            stop_boundary = stop_ack;
             windows.stop(stop_ack, checked && healthy);
             journal.request_flush();
         }
@@ -512,21 +731,45 @@ class Observer {
             std::printf("STOP_DURABLE %llu\n", stop_ack);
             std::fflush(stdout);
             stop_ack = 0;
+            stop_durable = true;
         }
         if (menu_ack && journal.durable >= menu_ack) {
             std::printf("MENU_DURABLE %llu\n", menu_ack);
             std::fflush(stdout);
             menu_ack = 0;
         }
-        if (!emergency_requested && fs::exists(folder / "emergency")) terminate_exact();
+        if (late_attach && stop_durable && !retired &&
+            marker(L"retire.request", "RETIRE", 4, stop_boundary)) {
+            retired = true;
+            retire_ack = row("retire", 0, ",\"strategy\":\"observe_exact_process_to_exit\"");
+            journal.request_flush();
+        }
+        if (retire_ack && journal.durable >= retire_ack) {
+            std::printf("RETIRE_DURABLE %llu\n", retire_ack);
+            std::fflush(stdout);
+            retire_ack = 0;
+        }
+        if (non_killing && retired && !retire_ack && !recovery_attempted &&
+            marker(L"recover.request", "RECOVER", 6, stop_boundary)) {
+            recovery_attempted = true;
+            recovery_after_generation = births;
+            recovery_break_pending = exact_running_process() && DebugBreakProcess(child.hProcess);
+            row("recovery_request", 0, ",\"break_requested\":" + std::to_string(recovery_break_pending));
+            if (!recovery_break_pending) recovery_unconfirmed = true;
+        }
+        if (!emergency_requested && (late_attach ? marker(L"emergency.request", "EMERGENCY", 5) :
+                                     fs::exists(folder / "emergency"))) terminate_exact();
     }
     HANDLE loader_file = INVALID_HANDLE_VALUE;
 
 public:
     Observer(Journal& output, fs::path dir, const wchar_t* mode, HANDLE source, std::string sha,
-             ProfileRole role)
+             ProfileRole role, bool attach)
         : journal(output), folder(std::move(dir)), scenario(mode), profile_role(role),
-          image(source), digest(std::move(sha)) {
+          late_attach(attach), non_killing(scenario.starts_with(L"recover-")),
+          image(source), digest(std::move(sha)),
+          windows(attach ? std::array{"fixture_attach_barrier", "fixture_title", "fixture_menu"} :
+                           std::array{"fixture_startup", "fixture_title", "fixture_menu"}) {
         local = reinterpret_cast<Address>(GetModuleHandleW(nullptr));
         const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(local);
         const auto pe = reinterpret_cast<const IMAGE_NT_HEADERS64*>(local + dos->e_lfanew);
@@ -545,6 +788,14 @@ public:
                 // This OS image delivers its startup breakpoint at an
                 // internal ntdll instruction instead of the exported stub.
                 loader_rva = 0xd0860;
+                if (late_attach) {
+                    const auto entry = reinterpret_cast<Address>(GetProcAddress(module, "DbgBreakPoint"));
+                    if (!entry) throw std::runtime_error("missing attach breakpoint export");
+                    loader_rva = entry - reinterpret_cast<Address>(module);
+                    std::memcpy(breakin_call.data(), reinterpret_cast<void*>(
+                        reinterpret_cast<Address>(module) + breakin_return_rva - breakin_call.size()),
+                        breakin_call.size());
+                }
                 std::memcpy(loader_bytes.data(), reinterpret_cast<void*>(reinterpret_cast<Address>(module) +
                             loader_rva), loader_bytes.size());
             }
@@ -567,33 +818,69 @@ public:
         STARTUPINFOW startup{};
         startup.cb = sizeof startup;
         if (!SetEnvironmentVariableW(L"SRR006_FIXTURE_MODE", scenario.c_str()) ||
+            !SetEnvironmentVariableW(L"SRR007_DISPOSABLE_ATTACH", late_attach ? L"1" : nullptr) ||
             !CreateProcessW(self, command.data(), nullptr, nullptr, FALSE,
-                            DEBUG_ONLY_THIS_PROCESS | CREATE_NO_WINDOW, nullptr, nullptr,
+                            (late_attach ? 0 : DEBUG_ONLY_THIS_PROCESS) | CREATE_NO_WINDOW, nullptr, nullptr,
                             &startup, &child))
             return false;
         CloseHandle(child.hThread);
         created = birth(child.hProcess, true);
-        const bool kill_policy = DebugSetProcessKillOnExit(TRUE) != 0;
+        run_id = digest + '-' + std::to_string(child.dwProcessId) + '-' + std::to_string(created);
         std::printf("EXACT_CHILD %lu %llu\n", child.dwProcessId, created);
         std::fflush(stdout);
+        if (late_attach) {
+            row("startup", 0, ",\"covered\":false");
+            // A fixture-only watchdog covers a failed synthetic startup.
+            const auto start = GetTickCount64();
+            while (!fs::exists(folder / "attach-ready")) {
+                if (WaitForSingleObject(child.hProcess, 20) != WAIT_TIMEOUT ||
+                    GetTickCount64() - start >= 10000) {
+                    terminate_exact();
+                    return false;
+                }
+            }
+            const bool preflight = attach_preflight();
+            if (!preflight || !DebugActiveProcess(child.dwProcessId)) {
+                const DWORD error = preflight ? GetLastError() : 0;
+                row("attach_refused", 0, ",\"preflight\":" + std::to_string(preflight) +
+                    ",\"winerror\":" + std::to_string(error));
+                terminate_exact();
+                return false;
+            }
+        }
+        const bool kill_policy = DebugSetProcessKillOnExit(!non_killing) != 0;
+        if (non_killing) row("non_killing_policy", 0, ",\"confirmed\":" + std::to_string(kill_policy));
         if (!kill_policy) gap();
         bool pump_ok = true;
-        while (!exit_event) {
+        bool wait_fault_injected = false;
+        while (!exit_event && !detached) {
             controls();
             DEBUG_EVENT event{};
-            const bool inject_wait = (is(L"wait-persistent") || is(L"combined-failure")) && loader &&
-                                     fs::exists(folder / "fault");
+            const bool transient_wait = is(L"recover-wait") && recovery_break_pending &&
+                                        !wait_fault_injected;
+            if (transient_wait) wait_fault_injected = true;
+            const bool inject_wait = transient_wait || ((is(L"wait-persistent") || is(L"combined-failure")) &&
+                                     loader && fs::exists(folder / "fault"));
             if (inject_wait || !WaitForDebugEvent(&event, 25)) {
                 const DWORD error = inject_wait ? ERROR_INVALID_HANDLE : GetLastError();
                 if (error == ERROR_SEM_TIMEOUT) continue;
                 gap();
                 row("pump_failure", 0, ",\"operation\":\"wait\",\"winerror\":" +
                     std::to_string(error));
+                if (transient_wait) continue;
+                if (non_killing) {
+                    // No verified stopped state exists. Keep the owning pump
+                    // available for recovery or a real EXIT event.
+                    recovery_unconfirmed = true;
+                    Sleep(25);
+                    continue;
+                }
                 terminate_exact();
                 return unqualified_recovery();
             }
             ++event_number;
             const DWORD tid = event.dwThreadId;
+            const bool loader_before = loader;
             DWORD disposition = DBG_CONTINUE;
             bool fatal = false, thread_exit = false;
             std::optional<unsigned> captured_site;
@@ -607,7 +894,10 @@ public:
                 const auto& info = event.u.CreateProcessInfo;
                 base = reinterpret_cast<Address>(info.lpBaseOfImage);
                 const auto verified = verify_creation(info);
-                identity = kill_policy && tid == child.dwThreadId && bool(verified);
+                const bool event_kind = late_attach ? info.lpStartAddress == nullptr : tid == child.dwThreadId;
+                identity = kill_policy && event_kind && bool(verified);
+                fields += ",\"creation_start_address\":" +
+                    std::to_string(reinterpret_cast<Address>(info.lpStartAddress));
                 fields += ",\"profile_sha256\":\"" +
                     std::string(retail_profile() ? retail_profile_sha256 : digest) + "\"";
                 if (!verified) fields += ",\"mapping_failure\":\"" + std::string(verified.failure) + "\"";
@@ -620,9 +910,21 @@ public:
                 fatal = !identity || !add(tid, info.hThread);
                 break;
             }
-            case CREATE_THREAD_DEBUG_EVENT:
-                fatal = !forced && !add(tid, event.u.CreateThread.hThread);
+            case CREATE_THREAD_DEBUG_EVENT: {
+                const auto start = reinterpret_cast<Address>(event.u.CreateThread.lpStartAddress);
+                fields += ",\"thread_start_address\":" + std::to_string(start);
+                fatal = !forced && !add(tid, event.u.CreateThread.hThread, start);
+                if (!fatal && is(L"competing-breakpoint") && ntdll && start == ntdll + remote_breakin_rva) {
+                    if (held_breakin || SuspendThread(event.u.CreateThread.hThread) == DWORD(-1)) {
+                        fatal = true;
+                    } else {
+                        held_breakin = tid;
+                        std::puts("COMPETING_BREAKPOINT_GO");
+                        std::fflush(stdout);
+                    }
+                }
                 break;
+            }
             case EXIT_THREAD_DEBUG_EVENT: {
                 const auto entry = threads.find(tid);
                 if (entry == threads.end() || (!stopped && entry->second.frames.awaiting_callback()))
@@ -638,10 +940,16 @@ public:
                 break;
             case EXCEPTION_DEBUG_EVENT:
                 disposition = exception(event, fields, result, captured_site);
+                if (held_breakin && fields.find("\"attach_candidate_refused\":1") != std::string::npos) {
+                    if (ResumeThread(threads.at(held_breakin).handle) == DWORD(-1)) fatal = true;
+                    held_breakin = 0;
+                }
                 break;
             case EXIT_PROCESS_DEBUG_EVENT:
                 event_exit = event.u.ExitProcess.dwExitCode;
                 fields += ",\"exit_code\":" + std::to_string(event_exit);
+                fields += ",\"after_durable_stop\":" +
+                    std::to_string(stop_boundary && journal.durable >= stop_boundary);
                 for (const auto& [id, thread] : threads) {
                     if (thread.frames.awaiting_callback()) gap();
                 }
@@ -653,21 +961,52 @@ public:
                 row("unsafe_context", tid);
                 terminate_exact();
             }
-            if (result.verdict == Verdict::unknown && captured_site != 3u) gap();
+            if (!late_attach && result.verdict == Verdict::unknown && captured_site != 3u) gap();
             if (result.verdict == Verdict::nonfocal) ++rejected;
             const bool persistent = is(L"continue-persistent") && loader &&
                                     event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT &&
                                     fs::exists(folder / "fault");
             const bool injected = (is(L"continue-error") &&
                                   event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT) || persistent;
-            const bool resumed = !injected && ContinueDebugEvent(event.dwProcessId, tid, disposition) != 0;
-            const DWORD continue_error = resumed ? 0 : injected ? ERROR_GEN_FAILURE : GetLastError();
+            std::vector<Suspension> suspended;
+            bool restored = false;
+            if (recovery_break_owned) {
+                // Exercise the refusal path before any context mutation.
+                if (!is(L"recover-refusal") && suspend_for_detach(suspended)) {
+                    disarmed = true;
+                    restored = restore_debug_state();
+                }
+                if (!restored) row("recovery_unconfirmed", tid);
+            }
+            const bool inject_recovery_continue = recovery_break_owned && is(L"recover-continue");
+            bool resumed = !injected && !inject_recovery_continue &&
+                           ContinueDebugEvent(event.dwProcessId, tid, disposition) != 0;
+            const DWORD continue_error = resumed ? 0 :
+                injected || inject_recovery_continue ? ERROR_GEN_FAILURE : GetLastError();
+            if (!resumed && non_killing) {
+                const auto retry_until = GetTickCount64() + 250;
+                do {
+                    resumed = ContinueDebugEvent(event.dwProcessId, tid, disposition) != 0;
+                    if (!resumed) Sleep(10);
+                } while (!resumed && GetTickCount64() < retry_until);
+                row("recovery_continue", tid, ",\"success\":" + std::to_string(resumed) +
+                    ",\"initial_error\":" + std::to_string(continue_error));
+            }
             if (resumed) ++continued; else gap();
             fields += ",\"disposition\":" + std::to_string(disposition) +
                       ",\"continue_error\":" + std::to_string(continue_error);
             const auto sequence = row("event", tid, fields);
-            if (event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT)
+            if (!late_attach && event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT)
                 windows.open(sequence, identity && healthy && resumed);
+            if (late_attach && !loader_before && loader) {
+                const auto barrier = row("attach_barrier", tid, ",\"continued\":" + std::to_string(resumed));
+                windows.open(barrier, identity && healthy && resumed);
+                journal.request_flush();
+                if (resumed && identity && healthy) {
+                    std::puts("ATTACH_ARMED");
+                    std::fflush(stdout);
+                }
+            }
             if (captured_site && resumed && disposition == DBG_CONTINUE)
                 windows.observe(*captured_site, result, sequence);
             if (is(L"cross-window") && sequence && resumed) {
@@ -679,7 +1018,35 @@ public:
             if (sequence && resumed && result.verdict == Verdict::allocator && !first_allocator)
                 first_allocator = sequence;
             if (thread_exit) threads.erase(tid);
+            if (recovery_break_owned) {
+                recovery_break_owned = false;
+                const bool detach_attempted = resumed && restored &&
+                    verify_released_event_state(suspended) && exact_running_process();
+                detached = detach_attempted && !is(L"recover-detach-error") &&
+                           DebugActiveProcessStop(child.dwProcessId);
+                const DWORD detach_error = detached || !detach_attempted ? 0 :
+                    is(L"recover-detach-error") ? ERROR_ACCESS_DENIED : GetLastError();
+                release_suspensions(suspended);
+                recovery_unconfirmed = !detached;
+                row("recovery_outcome", 0, ",\"detached\":" + std::to_string(detached) +
+                    ",\"detach_attempted\":" + std::to_string(detach_attempted) +
+                    ",\"detach_error\":" + std::to_string(detach_error) +
+                    ",\"suspensions_released\":1");
+                journal.request_flush();
+                if (resumed) {
+                    std::printf("RECOVERY_RESULT %u\n", detached);
+                    std::fflush(stdout);
+                }
+            }
             if (!resumed) {
+                if (non_killing) {
+                    // Keep this exact event and disposition. Dropping the
+                    // pump could strand an armed target or change its fate.
+                    unqualified_recovery();
+                    while (!ContinueDebugEvent(event.dwProcessId, tid, disposition)) Sleep(100);
+                    ++continued;
+                    continue;
+                }
                 // Recovery is fixture-only. Release the exact held event after
                 // requesting termination before waiting on that process.
                 pump_ok = false;
@@ -701,7 +1068,7 @@ public:
         }
         signaled = WaitForSingleObject(child.hProcess, INFINITE) == WAIT_OBJECT_0;
         if (!signaled || !GetExitCodeProcess(child.hProcess, &process_exit) ||
-            !exit_event || event_exit != process_exit) gap();
+            (!detached && (!exit_event || event_exit != process_exit))) gap();
         if (is(L"handoff") && fs::exists(folder / "handoff-pid")) {
             handoff = true;
             windows.gap_all();
@@ -710,6 +1077,10 @@ public:
         }
         row("same_handle_wait", 0, ",\"signaled\":" + std::to_string(signaled) +
             ",\"exit_code\":" + std::to_string(process_exit));
+        if (late_attach)
+            row("retire_outcome", 0, ",\"requested\":" + std::to_string(retired) +
+                ",\"clean\":" + std::to_string(retired && signaled && !recovery_unconfirmed &&
+                                               (detached || event_exit == 0) && process_exit == 0));
         return pump_ok && signaled;
     }
     bool receipt(bool pump_ok) {
@@ -719,16 +1090,21 @@ public:
         const auto hash = sha256(folder / "events.jsonl");
         if (hash.empty()) return false;
         const auto durable = journal.durable.load();
-        const bool complete = healthy && stopped && loader && identity && pump_ok &&
+        const bool complete = !late_attach && healthy && stopped && loader && identity && pump_ok &&
                               !journal.failed && !journal.first_lost && accepted_all(durable);
         const bool invoked = first_invoked && first_invoked <= durable;
         const bool allocator = first_allocator && first_allocator <= durable;
         const char* science = allocator ? "OBSERVED_REACHED_ALLOCATOR" : invoked ? "OBSERVED_INVOKED" :
                               complete ? "NOT_OBSERVED" : "INSTRUMENTATION_INCOMPLETE";
         std::ostringstream out;
-        out << "{\"schema\":1,\"role\":\"fixture\",\"image_sha256\":\"" << digest
+        out << "{\"schema\":1,\"role\":\"fixture\",\"method\":\""
+            << (late_attach ? "late_attach" : "creation") << "\",\"image_sha256\":\"" << digest
             << "\",\"journal_sha256\":\"" << hash << "\",\"pid\":" << child.dwProcessId
             << ",\"process_birth\":" << created << ",\"fixture_complete\":" << complete
+            << ",\"stop_sequence\":" << stop_boundary
+            << ",\"stop_durable\":" << (stop_boundary && stop_boundary <= durable)
+            << ",\"retire_requested\":" << retired
+            << ",\"non_killing\":" << non_killing << ",\"detached\":" << detached
             << ",\"target_failed\":";
         if (signaled && process_exit != UINT32_MAX) out << (process_exit != 0); else out << "null";
         out << ",\"forced\":" << forced
@@ -762,17 +1138,24 @@ private:
 
 int wmain(int argc, wchar_t** argv) {
     if (argc == 4 && wcscmp(argv[1], L"--child") == 0) return fixture_child(argv[2], argv[3]);
-    if (argc != 3) return 2;
-    const std::wstring mode = argv[1];
+    const bool attach = argc == 4 && wcscmp(argv[1], L"--fixture-attach") == 0;
+    if (!attach && argc != 3) return 2;
+    const std::wstring mode = argv[attach ? 2 : 1];
     const std::array<std::wstring, 25> modes{L"baseline", L"busy", L"quiet", L"delay",
         L"conflict", L"readback", L"overflow", L"write-error", L"emergency", L"crash",
         L"callback-only", L"unreadable", L"handoff", L"foreign-step", L"continue-error", L"slot-loss",
         L"stop-burst", L"wait-persistent", L"continue-persistent", L"emergency-denied", L"abrupt-observer",
         L"reject-retail-profile", L"combined-failure", L"cross-window", L"unexpected-module"};
-    if (std::find(modes.begin(), modes.end(), mode) == modes.end()) return 2;
+    const std::array<std::wstring, 22> attach_modes{L"baseline", L"busy", L"overflow", L"write-error",
+        L"unexpected-module", L"reject-retail-profile", L"emergency", L"emergency-denied", L"handoff",
+        L"slot-loss", L"conflict", L"readback", L"crash", L"unreadable", L"anomalous-return",
+        L"competing-breakpoint", L"recover-detach", L"recover-refusal", L"recover-wait",
+        L"recover-continue", L"recover-partial", L"recover-detach-error"};
+    if (attach ? std::find(attach_modes.begin(), attach_modes.end(), mode) == attach_modes.end() :
+                 std::find(modes.begin(), modes.end(), mode) == modes.end()) return 2;
     wchar_t self[32768]{};
     if (!GetModuleFileNameW(nullptr, self, ARRAYSIZE(self))) return 3;
-    const auto folder = fs::absolute(argv[2]);
+    const auto folder = fs::absolute(argv[attach ? 3 : 2]);
     if (!space_available() || !fs::create_directory(folder)) return 3;
     HANDLE image = CreateFileW(self, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     if (image == INVALID_HANDLE_VALUE) return 3;
@@ -783,7 +1166,7 @@ int wmain(int argc, wchar_t** argv) {
         Journal journal(folder / "events.jsonl", mode == L"overflow" ? 32 : 8192,
                         mode == L"write-error", mode == L"overflow", mode == L"abrupt-observer");
         const auto role = mode == L"reject-retail-profile" ? ProfileRole::pinned_retail : ProfileRole::fixture;
-        Observer observer(journal, folder, mode.c_str(), image, digest, role);
+        Observer observer(journal, folder, mode.c_str(), image, digest, role, attach);
         const bool ok = observer.run(self);
         const bool reported = observer.receipt(ok);
         status = reported && (ok || mode == L"continue-error") ? 0 : 4;
