@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "retail_profile.h"
+#include "stage_a.h"
 #include <cassert>
 #include <filesystem>
 #include <fstream>
@@ -11,6 +12,36 @@ using namespace srr006;
 static int marker(int n) { return n + 6006; }
 using Marker = int(*)(int);
 static Marker volatile moved_slot = marker;
+
+static void test_admission_policy() {
+    using enum ModuleRisk;
+    using enum PinState;
+    // Origin-verified overlay: pinned match expected; an independently
+    // updated file drifts and stays admissible; anything unverifiable is a
+    // lookalike. Steam_api64 follows the same rule against its own pin.
+    assert(stage_module(L"gameoverlayrenderer64.dll", false, true, pinned, unmatched, false, true) == expected);
+    assert(stage_module(L"gameoverlayrenderer64.dll", false, true, drifted, unmatched, false, true) == drifting);
+    assert(stage_module(L"gameoverlayrenderer64.dll", false, true, unmatched, unmatched, false, true) == incompatible);
+    assert(stage_module(L"gameoverlayrenderer64.dll", false, false, pinned, unmatched, false, true) == expected);
+    assert(stage_module(L"ntdll.dll", true, false, unmatched, unmatched, false, true) == incompatible);
+    assert(stage_module(L"ntdll.dll", true, false, unmatched, unmatched, true, true) == expected);
+    assert(stage_module(L"nvtelemetrybridge64.dll", false, false, unmatched, unmatched, false, true) == unknown);
+    assert(stage_module(L"steamclient64.dll", false, false, unmatched, unmatched, false, true) == unknown);
+    assert(stage_module(L"steamclient64.dll", false, true, unmatched, unmatched, false, true) == expected);
+    assert(stage_module(L"steam_api64.dll", false, true, unmatched, pinned, false, true) == expected);
+    assert(stage_module(L"steam_api64.dll", false, true, unmatched, drifted, false, true) == drifting);
+    assert(stage_module(L"steam_api64.dll", false, false, unmatched, drifted, false, true) == unknown);
+    assert(stage_module(L"sfse_1_16_244.dll", false, false, unmatched, unmatched, false, true) == incompatible);
+    assert(stage_module(L"optional.dll", false, false, unmatched, unmatched, false, true) == unknown);
+    assert(stage_module(L"optional.dll", false, false, unmatched, unmatched, false, false) == incompatible);
+    const std::string path = R"(C:\Program Files (x86)\Steam\steamapps\common\Starfield\Starfield.exe)";
+    const auto line = "[2026-11-14 16:45:40] AppID 1716740 adding PID 42 as a tracked process \"\"" +
+                      path + "\"\"";
+    assert(steam_matches(line + "\r\n", 42, path) == 1);
+    assert(steam_matches(line + "\r\n" + line + "\r\n", 42, path) == 2);
+    assert(!steam_matches(line + "\r\n", 4, path) && !steam_matches(line, 42, path));
+    assert(!steam_matches(line + ".bak\n", 42, path));
+}
 
 // Read the authenticated disk image as data, then present the exact bytes
 // expected in a rebased image. This tests predicates and arithmetic only.
@@ -153,8 +184,19 @@ static void test_disposable_creation(const wchar_t* self, const wchar_t* other_f
                           &startup, &child));
     CloseHandle(child.hThread);
     const auto born = profile_detail::process_birth(child.hProcess);
+    assert(same_epoch(child.hProcess, child.dwProcessId, born));
+    assert(!same_epoch(child.hProcess, child.dwProcessId, born + 1));
+    const auto runtime = reinterpret_cast<uint64_t>(GetModuleHandleW(L"ntdll.dll"));
+    assert(attach_code(GetCurrentProcess(), runtime));
+    assert(!attach_code(GetCurrentProcess(), runtime + 0x1000));
     DEBUG_EVENT event{};
     assert(WaitForDebugEvent(&event, INFINITE) && event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT);
+    HANDLE process = nullptr;
+    assert(open_attach_target(child.dwProcessId, process));
+    const StageHandle reopened(process);
+    const auto owned_debugger = check_debugger_absent(reopened.get());
+    assert(!owned_debugger && std::string_view(owned_debugger.predicate) == "target_already_debugged");
+    assert(!owned_debugger.winerror);
     const auto& create = event.u.CreateProcessInfo;
     const auto valid = verify_stopped_mapping(child.hProcess, image, create, child.dwProcessId, born, profile);
     if (!valid) std::cerr << "disposable verification failed: " << valid.failure << '\n';
@@ -200,9 +242,11 @@ int wmain(int argc, wchar_t** argv) {
     if (argc == 2 && std::wstring_view(argv[1]) == L"--profile-fixture-child")
         return moved_slot(0);
     if (argc != 2) return 2;
+    test_admission_policy();
     test_retail_bytes(argv[1]);
     wchar_t self[32768]{};
     assert(GetModuleFileNameW(nullptr, self, static_cast<DWORD>(std::size(self))));
     test_disposable_creation(self, argv[1]);
     std::cout << "retail ASLR window/slot controls passed (data only)\n";
+    std::cout << "already-debugged disposable child refused using the revised access mask\n";
 }

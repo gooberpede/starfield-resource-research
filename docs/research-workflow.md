@@ -7,6 +7,9 @@ state, including pre-existing changes. In the dossier record the baseline,
 method, observations, interpretation, limitations, evidence, verification and
 review disposition. Link to the baseline and evidence in place. Preserve
 historical reports and qualify them in the navigation and provenance layer.
+Lead the dossier with the established finding, observation boundary,
+applicability and limitations. Keep operational and engineering history as
+supporting provenance.
 
 Use [provenance](PROVENANCE.md) for executable identities and claim
 applicability. Capture executable product version and SHA-256, tool version,
@@ -22,8 +25,14 @@ baseline before retail native research begins.
   `.local-work/diffs/` for the review patch. Confirm all are ignored and
   untracked. Preserve pre-existing local material.
 - Retain selected evidence with a content identity, source, scientific purpose
-  and named consumer. Record promotion when warranted. Scratch files and review
-  copies have no protected status by default.
+  and named consumer. Classify the method's files as reusable tracked
+  source, versioned lawful external input, rebuildable output or private
+  custody material. Track an exploratory helper once a current documented
+  repeatable procedure requires it, or name its versioned, obtainable
+  external replacement and verify that route. Parameterize machine-specific
+  roots and keep private policies, settings and credentials in ignored
+  local state. Scratch files and review copies have no protected status by
+  default.
 - Identify the protected primary inputs and retained outputs the task consumes.
   Pin content with SHA-256 or Git objects, using an existing MD5 for historical
   reconciliation. Verify before use or at the relevant measurement boundary
@@ -70,6 +79,22 @@ to available space on the drives. There is no fixed size cap on `.local-work/`.
   Add reusable terms to the [glossary](glossary.md) when they resolve an
   ambiguity. Link to existing evidence and keep review metadata distinct.
 
+## Live observation and recovery
+
+An admission or safety gate that can stop acquisition should retain an
+attributable predicate and cause at a verifiable durable boundary. If
+durability fails, report that failure and retain the earlier trusted
+prefix. Assess scientific evidence, coverage, target exit, debugger
+retirement and cleanup separately. An abnormal cleanup can coexist with a
+valid earlier seal.
+
+With explicit authority, an orphaned observer may be administratively
+closed after independently confirming the exact target has exited and
+verifying the observer identity and evidence. Use a proportionate
+procedure. Record the actual exit status and distinguish it from normal
+retirement. A live target requires its own authorization and recovery
+plan.
+
 ## Publication
 
 For each candidate claim, record build applicability, essential evidence,
@@ -85,12 +110,22 @@ material and purpose. Exclude unauthorized third-party content, proprietary
 payloads and means to reconstruct proprietary material. Leave release
 numbering, tagging and publication to the maintainer.
 
+Label the verification route separately from epistemic confidence:
+**Reproducible method** means tracked source and declared lawful inputs
+can rerun the method. **Custody-backed historical observation** means
+retained, hash-identified evidence supports a particular past result.
+**Provisional/unresolved claim** identifies the missing evidence and what
+could resolve it. These routes can coexist in one dossier.
+
 ## Independent review and handoff
 
 Give one independent challenger at a time the original brief and criteria,
 starting state, actual diff and inventory, and access to relevant primary
 records and checks. The challenger tests each criterion and the strongest
-conclusion against a plausible counterexample. Keep detailed round records
+conclusion against a plausible counterexample. Scope publication checks to
+the change. Inspect new imports, commands, prerequisites, clean-checkout
+viability, links and archive entries, privacy and third-party rights where
+they affect the task. Keep detailed round records
 local and durable scientific corrections or material objections in the
 dossier or evidence record.
 

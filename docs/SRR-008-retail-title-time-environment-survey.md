@@ -43,14 +43,10 @@ No debugger or observer ran against Starfield.
 
 ## Offline inventory qualification
 
-The local Python prototype adapts the Tool Help module enumeration pattern
-from the maintainer's outpost research environment reader. Its CLI starts only
-a hidden, disposable x64 CPython child that waits on its own stdin. Run with
-the pinned CPython 3.14.3 executable as `$pinnedPython` and a fresh ignored output name.
-
-```powershell
-& $pinnedPython -B .local-work/codex/SRR-008/inventory.py .local-work/codex/SRR-008/fixture-rerun.json
-```
+The original Python prototype adapted the Tool Help enumeration
+pattern from the outpost environment reader. The
+[tracked inventory fixture](../tools/srr008/README.md#disposable-module-inventory)
+runs on a disposable x64 CPython child with the documented Windows inputs.
 
 The controller retains a handle with
 `PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE` (`0x101000`). It checks
@@ -137,9 +133,8 @@ The installed-file identity is eligible as a scoped claim. From the public
 repository, follow [SRR-001 and provenance](PROVENANCE.md#current-retail-identity)
 on a lawfully obtained copy and compare versions, two SHA-256 reads and the
 local Steam app manifest. This route was exercised against the local install.
-The no-launch disposition is a procedural record. The detailed fixture
-result is locally reproducible and held from public verification pending
-a rights- and privacy-reviewed source promotion. Host-specific paths,
+The no-launch disposition and exact historical fixture result are
+custody-backed. The tracked fixture is the current rerun route. Host-specific paths,
 configuration and save records stay local. Retail process/module claims,
 effective runtime settings, startup coverage and allocator results remain
 held for lack of retail observations.
@@ -290,6 +285,15 @@ and final replay receipts are under
 `.local-work/independent-review/SRR-008/amended/`.
 <!-- amended-review-status:end -->
 
+## Current protection and environment checks
+
+The [tracked offline tools](../tools/srr008/README.md) read explicit
+effective roots, a pinned policy and independent backups. The historical
+`interactive/check-saves.py`, `interactive/environment.ps1` and
+`interactive/survey.py` are custody-only. The two 146-module retail
+snapshots are custody-backed historical observations. A fresh full
+title-time survey would require separate authority and live inputs.
+
 ## Interactive-account survey — 14 November 2026
 
 **Scientific disposition — COMPLETE, scoped to two title-time snapshots of
@@ -339,14 +343,9 @@ of the mapped main-image DOS, COFF and optional headers. It requested
 `0x101000` for the Steam client. The x64 Python 3.14.3 controller and
 inventory core requested no thread handles. Their disposable controls
 reproduced successful acquisition and sealing, and refusal of a mismatched
-title-marker epoch. With the pinned x64 CPython executable assigned to
-$pinnedPython, the disposable controls can be repeated in a fresh local
-copy of the same tool layout:
-
-```powershell
-& $pinnedPython -I -B .local-work/codex/SRR-008/interactive/survey.py fixture
-& $pinnedPython -I -B .local-work/codex/SRR-008/interactive/survey.py fixture-mismatch
-```
+title-marker epoch. The archived interactive controller and its exact
+disposable cases are custody-only. The [tracked inventory fixture](../tools/srr008/README.md#disposable-module-inventory)
+repeats read-only inventory and the wrong-epoch control.
 
 The live journal records the actual source and
 dependency hashes. The interactive controller SHA-256 is

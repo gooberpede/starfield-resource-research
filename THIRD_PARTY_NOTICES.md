@@ -44,3 +44,23 @@ SRR-003 used the maintainer-authored `OutpostRecon.java` from
 data queries. Ghidra and Capstone contributors provided the analysis and
 decoding tools. The [dossier](docs/SRR-003-retail-allocator-invocation-and-dispatch.md#reproduction-publication-and-next-experiment)
 records the tool revisions, local inspection scope and publication holds.
+
+## SRR-008 save policy and inventory tooling
+
+`tools/srr008/save_policy.py` adapts the filename classification and
+policy digest from `starfield-outpost-research`, revision
+`d116bc63ff394b0156539161c8d1addfc902665a`,
+`research/resource-carinae-source-context/save_policy.py`,
+source SHA-256 `d48192098cd8cf80acae0e4096130b635af1c3cd931a4a0b82bff6d695b23ecc`.
+It preserves the upstream GPL-3.0-or-later notice. Copyright remains with
+the respective upstream authors. Only reusable code was adapted.
+
+The SRR-008 inventory fixture uses the outpost repository's Tool Help
+pattern from `research/q-branch-030-procedure/environment.py` at the same
+revision. That source bears GPL-3.0-or-later. The promoted fixture preserves
+the original local adaptation and its attribution. The [tooling notes](tools/srr008/README.md)
+identify both sources and document their use.
+
+Private policies, backup inventories, saves, Steam records and installed
+executable bytes remain in local custody. Inclusion of reusable GPL code
+leaves their existing rights and publication holds in place.

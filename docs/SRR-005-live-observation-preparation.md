@@ -284,7 +284,7 @@ volume decides whether the engine invoked the path.
   after those tests. The fixture and schema qualify prerequisites for
   development. They provide no game-qualified observer binary.
 
-Local reproduction from this repository uses the ignored
+The exact historical checks are custody-only and used the ignored
 `check-sites.py <installed-PE> <SRR-002 identity.tsv>` and
 `test-correlation.py` with Python `-B`, and `build-fixture.cmd` under
 `.local-work/codex/SRR-005/`. The first reads disk PE and retained
@@ -293,8 +293,11 @@ beside its sources and executes that disposable program alone. Redirect
 outputs in the same ignored task directory. These checks do not open or
 write the Ghidra project. A public verification route is the
 [SRR-003 procedure](SRR-003-retail-allocator-invocation-and-dispatch.md#reproduction-publication-and-next-experiment)
-with a lawfully obtained matching PE. Launchability, engine execution
-and Save2's live behavior remain held claims. Private paths, raw listings,
+with a lawfully obtained matching PE. Current synthetic controls use
+the [tracked SRR-006 fixture tooling](SRR-006-four-site-hardware-observer.md#reproduce-the-fixture-controls).
+The privately retained, hash-identified Save2 is an optional input to a
+separately approved Stage B. Launchability, engine execution and Save2's
+live behavior remain held claims. Private paths, raw listings,
 compiled fixtures and detailed receipts stay local.
 
 ## Proposed live run card

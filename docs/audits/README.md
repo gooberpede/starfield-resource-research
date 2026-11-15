@@ -23,3 +23,7 @@ For the current research state, use `docs/v1-research-baseline.md`,
 
 The v1.0 public-release audit cycle is complete and archived here for 
 provenance.
+The SRR-009 read-only publication audit and challenger remain in private
+custody with their start/end receipts and SHA-256 manifest. See the
+[publication dependency inventory](../SRR-009-publication-verification.md)
+for the resulting public verification routes and limits.

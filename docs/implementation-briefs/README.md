@@ -18,3 +18,14 @@ instructions.
 
 For authoritative current behavior, use the repository [README](../../README.md),
 current source, and tests.
+
+## SRR-009 Stage A
+
+The exact Stage A implementation, audit and subsequent authorization texts
+remain in local custody. The [SRR-009 dossier](../SRR-009-retail-debugger-admission-and-stage-a.md)
+records the scope and applicable revisions. Each live attempt required
+written maintainer authorization for one reviewed binary and one launch.
+Admission followed a responsive title card and required verified four-site
+arming. Scientific STOP was sealed before operator-controlled Quit.
+The authorized interval excluded save loading, gameplay and Stage B.
+The historical brief and this summary grant no new authority.

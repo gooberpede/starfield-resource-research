@@ -25,8 +25,11 @@ fresh CK + retail holdout:          10 / 10 exact
 The holdout corroborates CK biome and retail planet-wide outputs for the sampled
 bodies. The CK Galaxy View Apply trace establishes native behavior in its
 recorded address space. See [executable provenance](docs/PROVENANCE.md) for the
-separate build qualifications and the local retail identity baseline. Retail
-native mapping remains open.
+separate build qualifications and the local retail identity baseline.
+[Bounded static mapping](docs/SRR-002-retail-static-reconnaissance.md) is
+established for the pinned image. Actual retail invocation and gameplay
+association remain open. [SRR-009](docs/SRR-009-retail-debugger-admission-and-stage-a.md)
+records the qualified post-title non-observation.
 
 No known algorithmic hole remains within the current v1.0 scope. Future counterexamples, executable/version drift, and new evidence remain valid research targets.
 

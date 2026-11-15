@@ -262,7 +262,9 @@ queries and the explicit-address exporter supplied the evidence. The local
 writes only stdout, redirected to ignored receipts. Its `scan`,
 `describe`, `rtti` and `data` commands take preferred VAs as hexadecimal.
 Neither reader modifies the Ghidra database. Local filenames and hash
-receipts identify exact inputs and outputs.
+receipts identify exact inputs and outputs. These local scripts and the
+sibling query arrangement describe historical custody. The matching-PE
+walk and tracked address exporter above are the supported methods.
 
 | Candidate claim | Build and publication basis |
 | --- | --- |

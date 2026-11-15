@@ -224,7 +224,9 @@ addresses and lawful image data. The search can be reproduced with a PE32+
 reader by enumerating 12-byte exception-directory records, restricting to
 file-backed .text and applying the stated predicates before decoding. Local
 scripts and outputs record the exact filters, matched ranges, address
-coverage, referenced constants and additional lookups.
+coverage, referenced constants and additional lookups. The exact broad
+census and its filters are custody-backed. The tracked export above is
+the supported reproducible method for the bounded static mapping.
 
 The dossier, register and provenance supply project-authored metadata and
 a lawful-image verification route for the static claims, subject to the

@@ -61,6 +61,18 @@ class WindowEvidence {
         return sequence != 0 && sequence <= durable;
     }
 
+    static bool invocation_complete(const Window& window, uint64_t durable) {
+        return window.verified_begin && window.verified_end &&
+               durable_at(window.begin, durable) && durable_at(window.end, durable) &&
+               !window.invocation_gap &&
+               !window.pending_callback && window.invocation_through <= durable;
+    }
+
+    static bool allocator_complete(const Window& window, uint64_t durable) {
+        return invocation_complete(window, durable) && !window.allocator_gap &&
+               !window.pending_allocator && window.allocator_through <= durable;
+    }
+
     static void emit_joins(std::ostream& out, const std::array<Join, 2>& joins, uint64_t durable) {
         out << '[';
         bool comma = false;
@@ -83,6 +95,22 @@ public:
 
     unsigned index() const { return current; }
 
+    bool qualified_zero_since(unsigned first, uint64_t durable) const {
+        if (!stop_seen || first > current) return false;
+        for (unsigned i = first; i <= current; ++i)
+            if (!allocator_complete(windows[i], durable)) return false;
+        return true;
+    }
+
+    bool has_positive(uint64_t durable, bool allocator) const {
+        for (unsigned i = 0; i <= current; ++i) {
+            const auto& joins = allocator ? windows[i].first_allocator : windows[i].first_invocation;
+            for (const auto& join : joins)
+                if (durable_at(allocator ? join.allocator : join.callback, durable)) return true;
+        }
+        return false;
+    }
+
     void open(uint64_t sequence, bool checked) {
         if (started || ended || current) return;
         started = true;
@@ -91,13 +119,17 @@ public:
     }
 
     bool phase(uint64_t sequence, bool checked) {
+        return phase(sequence, checked, checked);
+    }
+
+    bool phase(uint64_t sequence, bool closing_checked, bool opening_checked) {
         if (ended || current + 1 >= windows.size()) return false;
         auto& closing = windows[current];
         closing.end = sequence;
-        closing.verified_end = checked && sequence && sequence > closing.begin;
+        closing.verified_end = closing_checked && sequence && sequence > closing.begin;
         auto& opening = windows[++current];
         opening.begin = sequence;
-        opening.verified_begin = closing.verified_end;
+        opening.verified_begin = opening_checked && sequence && sequence > closing.begin;
         return true;
     }
 

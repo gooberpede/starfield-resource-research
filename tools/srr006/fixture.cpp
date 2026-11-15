@@ -103,8 +103,24 @@ int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
             return 0;
         }, &folder, 0, nullptr);
         if (!parked || fixture_count != 1) return 99;
+        if (is(L"admission-overlay-drift") || is(L"admission-overlay-lookalike")) {
+            // Materialize a simulated Steam root before the attach census. The
+            // drift control loads the origin-verified copy; the lookalike
+            // control loads a same-named image from outside that origin.
+            const std::filesystem::path source(L"C:/Windows/System32/version.dll");
+            std::error_code copy_error;
+            std::filesystem::create_directory(folder / L"steam-root", copy_error);
+            copy_error.clear();
+            const auto loaded = is(L"admission-overlay-drift") ?
+                folder / L"steam-root" / L"gameoverlayrenderer64.dll" :
+                folder / L"gameoverlayrenderer64.dll";
+            if (!std::filesystem::copy_file(source, loaded,
+                    std::filesystem::copy_options::overwrite_existing, copy_error) && copy_error)
+                return 105;
+            if (!LoadLibraryW(loaded.c_str())) return 106;
+        }
         std::ofstream(folder / "attach-ready").put('\n');
-        if (is(L"competing-breakpoint")) {
+        if (is(L"competing-breakpoint") || is(L"admission-competitor")) {
             wait_for(folder / "compete");
             if (!competing_breakpoint()) return 100;
             std::ofstream(folder / "competitor-handled").put('\n');
@@ -205,8 +221,48 @@ int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
         wait_for(folder / "quit");
         return 0;
     }
-    if (is(L"unexpected-module")) {
-        auto module = LoadLibraryExW(L"version.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (is(L"admission-critical") || is(L"admission-quiet") || is(L"admission-slot-replaced")) {
+        std::ofstream(folder / "ready").put('\n');
+        wait_for(folder / "quit");
+        return 0;
+    }
+    if (is(L"admission-overlay-drift") || is(L"admission-overlay-lookalike") ||
+        is(L"admission-drift-arrival")) {
+        if (is(L"admission-drift-arrival")) {
+            // One durable positive in the pre-menu window, then the updated
+            // overlay arrives mid-observation as a real module transition.
+            right_form[0x2e] = 0xba;
+            sweep_later(&receiver, right_form);
+            std::ofstream(folder / "ready").put('\n');
+            wait_for(folder / "menu-done");
+            const auto overlay = folder / L"steam-root" / L"gameoverlayrenderer64.dll";
+            std::error_code copy_error;
+            std::filesystem::create_directory(folder / L"steam-root", copy_error);
+            copy_error.clear();
+            if (!std::filesystem::copy_file(L"C:/Windows/System32/version.dll", overlay,
+                    std::filesystem::copy_options::overwrite_existing, copy_error) && copy_error)
+                return 105;
+            if (!LoadLibraryW(overlay.c_str())) return 107;
+            std::ofstream(folder / "arrived").put('\n');
+        } else {
+            // The origin-verified but updated overlay predates arming; the
+            // chain must still produce a full scientific positive.
+            if (is(L"admission-overlay-drift")) {
+                right_form[0x2e] = 0xba;
+                sweep_later(&receiver, right_form);
+            }
+            std::ofstream(folder / "ready").put('\n');
+        }
+        wait_for(folder / "quit");
+        return 0;
+    }
+    if (is(L"unexpected-module") || is(L"admission-fixture")) {
+        const bool admission = is(L"admission-fixture");
+        const auto source = std::filesystem::path(L"C:/Windows/System32/version.dll");
+        const auto alias = folder / "optional-fixture.dll";
+        if (admission) std::filesystem::copy_file(source, alias);
+        auto module = admission ? LoadLibraryW(alias.c_str()) :
+                                  LoadLibraryExW(L"version.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!module) return 98;
         if (late_attach) {
             FreeLibrary(module);
