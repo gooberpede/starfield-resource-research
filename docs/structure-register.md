@@ -30,6 +30,17 @@ See the [allocator evidence](SRR-002-retail-static-reconnaissance.md#retail-mapp
 | Per-biome family cache argument and configuration pointer | R8 points to `[rbp-0x80]` in the caller. Header +0x00, 4-byte count read. Header +0x10, 8-byte array pointer read. Entries are 8-byte pointers. An appended entry points at work object +0x50, where the five 4-byte configuration IDs begin. | **PROVEN STATIC** `0x140779C7B`, `0x140777986`, `0x1407779C2–0x1407779E6`, `0x140777A88–0x140777A97`, `0x140777B7C–0x140777B96`. | This identifies the referenced storage within the call path. Ownership and lifetime outside it are unresolved. |
 | Per-biome shared resource-ID argument | R9 points to `[rsp+0x30]` in the caller. Header +0x00, 4-byte count read. Header +0x10, 8-byte array pointer read. Elements are 4-byte IDs read during duplicate checks and written on successful append. | **PROVEN STATIC** `0x140779AA1–0x140779AA6`, `0x140779BB3–0x140779BB8`, `0x140779C76`, `0x14077798F` and `0x1403C9986–0x1403C99F9`. | Lifecycle outside this orchestration and behavior under untested data and allocation conditions. |
 
+## Retail retained biome component
+
+Same [retail pin](PROVENANCE.md#current-retail-identity). See
+[SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md#result)
+for the edge-key scope, borrowed work pointers and reader.
+
+| Owning context and field or relationship | Offset, width and operation | Evidence and confidence | Open detail |
+| --- | --- | --- | --- |
+| Context edge index | Embedded tree at +0x300. A 0x90-byte entry has a 16-byte edge key at +0x10 and inline `BSGalaxy::CTPerBiomeData` at +0x20. | **PROVEN STATIC** collector `0x14077BD31–0x14077BD63`, pointer math `0x14077BDA5–0x14077BDB1`, insert copy at `0x1407767A4`. | Full key schema and epoch of each context instance. |
+| CTPerBiomeData biome and resource fields | +0x40 BIOM key read and +0x4C optional RSGD key read, both four bytes. +0x50 through +0x68 hold seven four-byte result IDs. | **PROVEN STATIC** key match `0x140771FB6`, RSGD lookup in `FUN_140777870`, result clear/writes in `FUN_140779760` and `FUN_140777870`, seven-slot copy `0x14076E86A–0x14076E886`. | Formal field names and byte-level save-stream mapping. |
+
 ## Creation Kit reference
 
 Use the separately [fingerprinted CK static evidence](PROVENANCE.md#creation-kit-static-evidence)

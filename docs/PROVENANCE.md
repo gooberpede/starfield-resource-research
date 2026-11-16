@@ -94,6 +94,12 @@ operands in the focal listing. The historical scan builds remain unknown.
 | [SRR-003 retail static dispatch](SRR-003-retail-allocator-invocation-and-dispatch.md) | Same pin, reverified 2026-11-13 UTC against the installed and analysis copies and saved Ghidra program | Resolved native callback dispatch and conditional PNDT enumeration | Ghidra 12.1.2 PUBLIC and Capstone 5.0.7. Static `StarField::ModuleState` construction path. Runtime flag values, named gameplay association and invocation frequency are unobserved. |
 | [SRR-009 Stage A](SRR-009-retail-debugger-admission-and-stage-a.md#finding) | Same pinned retail image, Steam build `23518663` | Custody-backed qualified non-observation | Two verified post-title windows totaling 84.281 seconds, zero hits at the four sites. Coverage excludes startup before arming, loading and gameplay. |
 
+The [SRR-011 allocation lifecycle dossier](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
+reverified the same pin against both retail copies. Its native route
+uses Capstone 5.0.7 on Python 3.14.3. Same-build sibling observations
+qualify earlier startup and menu-return frames. Direct retail allocation
+timing and saved-slot persistence remain open.
+
 The historical PNDT/BIOM/RSGD/IRES extraction timestamp is
 `2026-08-30 11:40:41`. The xEdit version is unknown. The 2026-09-24
 public-release remediation removed the older research-tree CSV snapshots from

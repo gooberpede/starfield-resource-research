@@ -37,6 +37,19 @@ qualifies these retail upstream entries:
 | `FUN_140593280`, `FUN_14077c470` | **PROVEN STATIC** type-bucket iterator and resolved PNDT callback. The call at `0x1405932EF` uses slot +`0x10`. The callback's type-gated direct call is at `0x14077C482`. |
 | `FUN_140779610` | **PROVEN STATIC** form/context adapter. The direct call to `FUN_140779760` is at `0x1407796D2`. |
 
+[SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
+extends the pinned retail graph.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_141893ee0`, `FUN_141896280`, `FUN_140951c80` | **PROVEN STATIC** initial-loader continuation and signed-mode reset/replay path. Teardown can clear the module guard. `PerformGameReset` is diagnostic-derived terminology. |
+| `FUN_141840e60`, `FUN_14183df10`, `FUN_141896020` | **PROVEN STATIC** load-order callback bodies and mode dispatch. Their mode-0x84 path can dispatch reset via state 1. |
+| `FUN_14076ec00`, `FUN_140773180`, `FUN_14077bce0`, `FUN_1407766b0`, `FUN_142322520` | **PROVEN STATIC** PNDT definition reader and queued component creation, collector of existing CTPerBiomeData edges, typed edge insertion and separate typed component insertion/replacement. |
+| `FUN_140771f30`, `FUN_14076e720`, `FUN_14076e810` | **PROVEN STATIC** keyed component lookup with output assignment on hit, typed copy and typed assignment. The seven generated IDs are copied. |
+| `FUN_1407ba9b0`, `FUN_1407bd270`, `FUN_14086a6d0` | **PROVEN STATIC** consumers of the looked-up generated slots on accepted branches. |
+| `FUN_140774970`, `FUN_142409490`, `FUN_1424063b0` | **PROVEN STATIC** scoped edge-range removal and broader context index clear. |
+| `FUN_14231da10`, `FUN_1424058b0` | **PROVEN STATIC** PerBiomeData type-registry disposal from native `BSGalaxy::ModuleState` teardown. |
+
 The CK entries below retain their original build and evidence scope.
 
 ---

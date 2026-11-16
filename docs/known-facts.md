@@ -24,6 +24,15 @@ pointer gates construction, and a separate byte gates the early sweep.
 See [SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md#native-path-and-predicates)
 for the exact predicates and retail evidence scope.
 
+**PROVEN STATIC:** The signed reset branch of `FUN_141896280` can clear
+the module pointer before ordinary file/group replay and a new call to
+`FUN_1409518b0`. Load-order callbacks lead to reset dispatch under
+their own mode predicates. The same image's allocator writes seven
+resource slots in context-owned `BSGalaxy::CTPerBiomeData` edge payloads.
+A keyed reader copies a matching component into caller storage or
+returns failure on a miss. See [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
+for exact predicates, consumers, teardown and historical observation limits.
+
 ## Input Resolution and Biome Order
 
 ```text

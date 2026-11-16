@@ -34,9 +34,12 @@ The exact upstream state represented by `SurveyAggregator` and the historical `p
 
 [SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md) resolves
 the candidate wrapper references from SRR-002 and establishes a conditional
-module-state construction route. The optional sweep flag's source and
-runtime value, the outer callers' association with named player operations
-and any additional allocator routes remain open. The retail descendant
+module-state construction route. [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
+resolves static startup and reset ancestry, a conditional load-order
+route and a retained component lookup. The optional sweep flag's source
+and runtime value, actual qualifying allocation at startup or during
+ordinary Save2 selection, additional demand triggers and slot persistence
+remain open. The retail descendant
 append loop could preserve overlapping child pointers. Actual candidate
 multiplicity depends on the upstream lists and remains unverified.
 
