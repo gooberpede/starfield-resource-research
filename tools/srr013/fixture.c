@@ -12,6 +12,17 @@ static volatile unsigned char image_tail[0x82f0000];
 static unsigned char *image;
 static unsigned char *index_header;
 static const uint16_t discriminator = 37;
+static const unsigned char resource_type = 0x9f;
+static const unsigned resource_vptr_rva = 0x4b6f0b0;
+
+enum {
+    DIVERGENT_RESOURCE = 0xe100,
+    WRONG_TYPE_RESOURCE = 0xe101,
+    ALIASED_RESOURCE = 0xe102,
+    UNRESOLVED_RESOURCE = 0xe103,
+    WRONG_HEADER_RESOURCE = 0xe104,
+    WRONG_VPTR_RESOURCE = 0xe106,
+};
 
 typedef struct { uint64_t first, second; } Key;
 typedef struct {
@@ -47,7 +58,7 @@ typedef struct {
     unsigned char *edges[4];
 } Tree;
 
-static Form forms[32];
+static Form forms[64];
 static size_t form_count;
 static Tree primary, inserted, removed;
 static volatile LONG stop_race;
@@ -109,6 +120,30 @@ static uint32_t hash_slot(uint32_t id, uint32_t capacity)
     return (uint32_t)(hash & (capacity - 1));
 }
 
+static void make_resources(void)
+{
+    for (size_t i = 0; i < _countof(samples); ++i) {
+        for (unsigned slot = 0; slot < _countof(samples[i].slots); ++slot) {
+            uint32_t id = samples[i].slots[slot];
+            if (id) {
+                unsigned char *form = record(id, resource_type);
+                putptr(form, image + resource_vptr_rva);
+                form[0x110] = (unsigned char)slot;
+            }
+        }
+    }
+    putptr(record(DIVERGENT_RESOURCE, resource_type), image + resource_vptr_rva);
+    if (is_mode("structural-wrong-type")) (void)record(WRONG_TYPE_RESOURCE, 0xab);
+    if (is_mode("structural-alias")) (void)record(ALIASED_RESOURCE, resource_type);
+    if (is_mode("structural-wrong-header")) {
+        unsigned char *form = record(WRONG_HEADER_RESOURCE, resource_type);
+        putptr(form, image + resource_vptr_rva);
+        put32(form + 0x28, WRONG_HEADER_RESOURCE + 1);
+    }
+    if (is_mode("structural-resource-vptr"))
+        putptr(record(WRONG_VPTR_RESOURCE, resource_type), image + resource_vptr_rva + 8);
+}
+
 static void make_forms(void)
 {
     for (size_t i = 0; i < _countof(samples); ++i) {
@@ -128,15 +163,19 @@ static void make_forms(void)
         putptr(mountains + 0x400, record(samples[0].biome_rsgd, 0xab));
     }
     if (is_mode("wrong-seed")) put32(record(samples[0].owner, 0xba) + 0x50, 0);
+    if (is_mode("structural-zero-wrong-pndt"))
+        put32(record(samples[0].owner, 0xba) + 0x54, samples[3].owner);
+    make_resources();
 
     /* Reserve every home slot before placing overflow entries in the same table. */
-    enum { CAPACITY = 32, STRIDE = 0x18 };
+    enum { CAPACITY = 64, STRIDE = 0x18 };
     uint32_t homes[CAPACITY] = {0};
     unsigned char *table = make_page();
     for (uint32_t i = 0; i < CAPACITY; ++i) put32(table + i * STRIDE + 0x10, UINT32_MAX);
     for (size_t i = 0; i < form_count; ++i) homes[hash_slot(forms[i].id, CAPACITY)] = 1;
     unsigned collisions = 0;
     unsigned char *mountains_entry = NULL;
+    unsigned char *divergent_entry = NULL;
     for (size_t i = 0; i < form_count; ++i) {
         const uint32_t id = forms[i].id;
         uint32_t slot = hash_slot(id, CAPACITY);
@@ -153,12 +192,45 @@ static void make_forms(void)
         }
         put32(entry, id);
         unsigned char *form = forms[i].form;
-        if (is_mode("wrong-map") && id == samples[1].biome) form = record(samples[0].biome, 0xa0);
+        if ((is_mode("wrong-map") || is_mode("structural-zero-wrong-map")) && id == samples[1].biome)
+            form = record(samples[0].biome, 0xa0);
+        if (id == ALIASED_RESOURCE) form = record(samples[0].slots[0], resource_type);
         if (id == samples[1].biome) mountains_entry = entry;
+        if (id == DIVERGENT_RESOURCE) divergent_entry = entry;
         putptr(entry + 8, form);
         put32(entry + 0x10, CAPACITY);
     }
     require(collisions != 0, "form map collision coverage missing");
+    if (is_mode("structural-table-resource") || is_mode("structural-zero-table-biom")) {
+        /* A plausible object whose header overlaps two unused map entries. */
+        unsigned char *alias = table + (CAPACITY - 2) * STRIDE;
+        require(get32(alias + 0x10) == UINT32_MAX && get32(alias + STRIDE + 0x10) == UINT32_MAX,
+                "expected unused map tail entries");
+        if (is_mode("structural-table-resource")) {
+            require(divergent_entry != NULL, "resource form entry missing");
+            memcpy(alias, record(DIVERGENT_RESOURCE, resource_type), 0x118);
+            putptr(divergent_entry + 8, alias);
+        } else {
+            require(mountains_entry != NULL, "Mountains form entry missing");
+            memcpy(alias, record(samples[1].biome, 0xa0), 0x318);
+            putptr(mountains_entry + 8, alias);
+        }
+    }
+    if (is_mode("structural-duplicate-resource")) {
+        require(divergent_entry != NULL, "resource form entry missing");
+        uint32_t slot = 0;
+        while (slot < CAPACITY && get32(table + slot * STRIDE + 0x10) != UINT32_MAX) ++slot;
+        require(slot < CAPACITY, "form map has no duplicate slot");
+        unsigned char *duplicate = table + slot * STRIDE;
+        unsigned char *form = make_page();
+        putptr(form, image + resource_vptr_rva);
+        put32(form + 0x28, DIVERGENT_RESOURCE);
+        form[0x2e] = resource_type;
+        put32(duplicate, DIVERGENT_RESOURCE);
+        putptr(duplicate + 8, form);
+        put32(duplicate + 0x10, get32(divergent_entry + 0x10));
+        put32(divergent_entry + 0x10, slot);
+    }
     if (is_mode("map-loop")) {
         require(mountains_entry != NULL, "Mountains form entry missing");
         put32(mountains_entry, 0xeeeeeeee);
@@ -178,6 +250,31 @@ static uint64_t owner_key(uint32_t owner)
 static Row sample_row(size_t i)
 {
     return (Row){{owner_key(samples[i].owner), samples[i].biome}, &samples[i], 0x90};
+}
+
+static int zero_slots(size_t sample_index)
+{
+    if (is_mode("zero") || is_mode("structural-zero-wrong-type") || is_mode("structural-zero-wrong-map")
+        || is_mode("structural-zero-wrong-pndt") || is_mode("structural-zero-table-biom")
+        || is_mode("structural-zero-absent")) return 1;
+    if (sample_index == 1 && (is_mode("mixed") || is_mode("ineligible-zero"))) return 1;
+    return sample_index == 3 && is_mode("structural-control-zero");
+}
+
+static void set_structural_slot(unsigned char *edge, size_t sample_index)
+{
+    if (sample_index == 1) {
+        if (is_mode("structural-different") || is_mode("structural-duplicate-resource")
+            || is_mode("structural-table-resource"))
+            put32(edge + 0x70, DIVERGENT_RESOURCE);
+        if (is_mode("structural-missing")) put32(edge + 0x70, UNRESOLVED_RESOURCE);
+        if (is_mode("structural-wrong-type")) put32(edge + 0x70, WRONG_TYPE_RESOURCE);
+        if (is_mode("structural-alias")) put32(edge + 0x70, ALIASED_RESOURCE);
+        if (is_mode("structural-wrong-header")) put32(edge + 0x70, WRONG_HEADER_RESOURCE);
+        if (is_mode("structural-resource-vptr")) put32(edge + 0x70, WRONG_VPTR_RESOURCE);
+    }
+    if (sample_index == 3 && is_mode("structural-control-bad"))
+        put32(edge + 0x70, UNRESOLVED_RESOURCE);
 }
 
 static Node block(const Row *rows, unsigned count, Tree *tree, int faults)
@@ -202,15 +299,15 @@ static Node block(const Row *rows, unsigned count, Tree *tree, int faults)
             putptr(edge, image + 0x4b3d258);
             put32(edge + 0x60, sample->biome);
             put32(edge + 0x6c, sample->override_id);
-            int zero = faults && (is_mode("zero") ||
-                                   ((is_mode("mixed") || is_mode("ineligible-zero")) && sample_index == 1));
-            if (!zero)
+            if (!faults || !zero_slots(sample_index))
                 memcpy(edge + 0x70, sample->slots, sizeof(sample->slots));
-            if (faults && sample_index == 1 && is_mode("wrong-type")) putptr(edge, image + 0x4b3d260);
+            if (faults && sample_index == 1 && (is_mode("wrong-type") || is_mode("structural-zero-wrong-type")))
+                putptr(edge, image + 0x4b3d260);
             if (faults && sample_index == 1 && (is_mode("wrong-override") || is_mode("ineligible-zero")))
                 put32(edge + 0x6c, 0);
             if (faults && sample_index == 1 && is_mode("wrong-biom")) put32(edge + 0x60, samples[0].biome);
             if (faults && sample_index == 2 && is_mode("mixed")) put32(edge + 0x70, 0x57eb);
+            if (faults) set_structural_slot(edge, sample_index);
             if (tree->edges[sample_index] == NULL) tree->edges[sample_index] = edge;
         }
     }
@@ -266,7 +363,8 @@ static void make_tree(Tree *tree, int depth, int variant, int faults)
     unsigned second_count = 1;
     unsigned third_count = 3;
     unsigned fourth_count = faults && is_mode("root-end") ? 1 : (unsigned)_countof(fourth);
-    if (variant < 0 || (faults && (is_mode("absent") || is_mode("wrong-owner")))) {
+    if (variant < 0 || (faults && (is_mode("absent") || is_mode("wrong-owner") ||
+                                  is_mode("structural-zero-absent")))) {
         second_count = 0;
     }
     if (faults && is_mode("wrong-owner")) {
@@ -423,6 +521,16 @@ static void end_race(HANDLE *worker)
     slots(&primary, 1);
 }
 
+static void drift_image(void)
+{
+    /* Change only this fixture's non-code mapped PE timestamp. */
+    DWORD protection, unused;
+    unsigned char *timestamp = image + get32(image + 0x3c) + 8;
+    require(VirtualProtect(timestamp, 4, PAGE_READWRITE, &protection), "header protection change failed");
+    put32(timestamp, get32(timestamp) ^ 1u);
+    require(VirtualProtect(timestamp, 4, protection, &unused), "header protection restore failed");
+}
+
 static void build_target(void)
 {
     image = (unsigned char *)GetModuleHandleW(NULL);
@@ -465,14 +573,7 @@ static void build_target(void)
         putptr(image + 0x82eebb0, context);
     }
     if (is_mode("wrong-context-vptr")) putptr(context, image + 0x4d6a6c8);
-    if (is_mode("mapped-image")) {
-        /* Change only this fixture's non-code mapped PE timestamp; retain the disk file. */
-        DWORD protection, unused;
-        unsigned char *timestamp = image + get32(image + 0x3c) + 8;
-        require(VirtualProtect(timestamp, 4, PAGE_READWRITE, &protection), "header protection change failed");
-        put32(timestamp, get32(timestamp) ^ 1u);
-        require(VirtualProtect(timestamp, 4, protection, &unused), "header protection restore failed");
-    }
+    if (is_mode("mapped-image")) drift_image();
     if (is_mode("no-read-rights")) {
         SECURITY_DESCRIPTOR security;
         ACL empty_acl;
@@ -492,7 +593,11 @@ int main(int argc, char **argv)
         "wrong-override", "ineligible-zero", "wrong-biom", "unaligned", "unreadable", "loop", "bad-count", "overlap",
         "bad-directory", "bad-minimum", "excessive", "leaf-decoy", "empty", "mapped-image",
         "no-read-rights", "context-absent", "context-decoy", "wrong-context-vptr", "unregistered", "predecessor",
-        "lying-minimum",
+        "lying-minimum", "structural-different", "structural-missing", "structural-wrong-type",
+        "structural-alias", "structural-wrong-header", "structural-control-zero", "structural-control-bad",
+        "structural-zero-wrong-type", "structural-zero-wrong-map", "structural-zero-absent", "structural-resource-vptr",
+        "structural-duplicate-resource", "structural-zero-wrong-pndt",
+        "structural-table-resource", "structural-zero-table-biom",
     };
     require(argc == 2, "provide one fixture scenario");
     mode = argv[1];
@@ -515,6 +620,8 @@ int main(int argc, char **argv)
             else if (!strcmp(command, "insert")) publish_tree(&inserted);
             else if (!strcmp(command, "remove")) publish_tree(&removed);
             else if (!strcmp(command, "restore-tree")) publish_tree(&primary);
+            else if (!strcmp(command, "drift-image")) drift_image();
+            else if (!strcmp(command, "drift-resource")) record(samples[1].slots[0], resource_type)[0x2e] = 0xab;
             else if (!strcmp(command, "aba")) {
                 slots(&primary, 0);
                 publish_tree(&inserted);

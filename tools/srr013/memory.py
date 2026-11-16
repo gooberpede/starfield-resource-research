@@ -1,4 +1,4 @@
-"""Query and exact-read adapter for an AMD64 fixture started by this inspector."""
+"""Fixed-rights query and exact reads shared by the explicit admission profiles."""
 
 from contextlib import contextmanager
 import ctypes
@@ -20,6 +20,13 @@ PE32_PLUS = 0x20B
 ROOT_END = 0x82EEC30
 STILL_ACTIVE = 259
 FIXTURE_NAME = "srr013-fixture.exe"
+RETAIL_CODE = (
+    (0x23FF660, 24),  # Context getter and its RIP-relative object reference.
+    (0x5F7A9A, 33),   # Keyed reader's context + 0x300 index query.
+    (0x3832EE, 30),   # Unsigned first/second key comparison.
+    (0x779B16, 28),   # Allocation writer's inline slot clears.
+)
+RETAIL_BASE = 0x140000000
 
 
 class ReadFailure(Exception):
@@ -60,7 +67,7 @@ class Windows:
         require(
             sys.platform == "win32" and ctypes.sizeof(ctypes.c_void_p) == 8,
             "unsupported_platform",
-            "owned fixture inspection requires 64-bit Windows Python",
+            "read-side inspection requires 64-bit Windows Python",
         )
         dll = ctypes.WinDLL("kernel32", use_last_error=True)
         ptr = ctypes.c_void_p
@@ -102,7 +109,7 @@ def epoch(api, handle):
     exit_code = wintypes.DWORD()
     win_call(api.GetExitCodeProcess(handle, ctypes.byref(exit_code)), "epoch_unverified", "GetExitCodeProcess")
     require(exit_code.value == STILL_ACTIVE and not (exit_.dwLowDateTime or exit_.dwHighDateTime),
-            "process_exited", "owned process is no longer active")
+            "process_exited", "selected process is no longer active")
     pid = win_call(api.GetProcessId(handle), "epoch_unverified", "GetProcessId")
     return pid, creation.dwHighDateTime << 32 | creation.dwLowDateTime
 
@@ -128,8 +135,8 @@ def native_disk_path(api, stream):
     return buffer.value
 
 
-def disk_profile(stream):
-    """Pin full PE headers and bounded relocation-free fixture code windows."""
+def disk_profile(stream, *, retail=False):
+    """Pin full headers and bounded code windows of the selected disk PE."""
     stream.seek(0)
     dos = stream.read(64)
     require(len(dos) == 64 and dos[:2] == b"MZ", "mapping_unverified", "invalid disk DOS header")
@@ -152,14 +159,18 @@ def disk_profile(stream):
         magic == PE32_PLUS and ROOT_END <= image_size < 1 << 31
         and pe_offset + 24 + opt_size + len(table) <= header_size <= 0x10000,
         "mapping_unverified",
-        "fixture image extent or disk PE header bounds disagree",
+        "supported image extent or disk PE header bounds disagree",
     )
     stream.seek(0)
     headers = stream.read(header_size)
     require(len(headers) == header_size, "mapping_unverified", "truncated disk PE headers")
     windows = [(0, headers)]
     fixture_section = False
-    for row in struct.iter_unpack("<8sIIIIIIHHI", table):
+    sections = list(struct.iter_unpack("<8sIIIIIIHHI", table))
+    require(any(row[2] <= entry < row[2] + min(row[1], row[3]) and row[-1] & 0x20000000 for row in sections),
+            "mapping_unverified", "PE entry point is outside executable file-backed code")
+    text_sections = 0
+    for row in sections:
         name, virtual_size, rva, physical_size, physical_offset = row[:5]
         name = name.rstrip(b"\0")
         if name == b".srr":
@@ -169,25 +180,65 @@ def disk_profile(stream):
                 and physical_size == 0 and flags & 0x80000000 and not flags & 0x20000000
             )
         elif name == b".text":
+            text_sections += 1
             size = min(virtual_size, physical_size)
-            require(size >= 64 and rva <= entry <= rva + size - 32 and rva + size <= image_size,
+            require(size >= 64 and rva + size <= image_size and (retail or rva <= entry <= rva + size - 32),
                     "mapping_unverified", "unsupported .text shape or entry point")
-            for start in sorted({rva, entry, rva + size - 32}):
+            planned = RETAIL_CODE if retail else tuple((start, 32) for start in sorted({rva, entry, rva + size - 32}))
+            for start, width in planned:
+                require(rva <= start and start + width <= rva + size and row[-1] & 0x20000000,
+                        "mapping_unverified", "focused code interval is outside executable .text")
                 stream.seek(physical_offset + start - rva)
-                code = stream.read(32)
-                require(len(code) == 32, "mapping_unverified", "truncated disk .text window")
+                code = stream.read(width)
+                require(len(code) == width, "mapping_unverified", "truncated disk .text window")
                 windows.append((start, code))
-    require(fixture_section and len(windows) > 1, "mapping_unverified",
-            "fixture code or synthetic zero-fill image section is absent")
+    require(text_sections == 1 and (retail or fixture_section), "mapping_unverified",
+            "supported code or synthetic zero-fill image section is absent")
+    if retail:
+        require(struct.unpack_from("<Q", opt, 24)[0] == RETAIL_BASE,
+                "mapping_unverified", "preferred retail base differs from the evidence profile")
+        verify_relocation_free(stream, opt, sections)
     return image_size, entry, pe_offset + 48, tuple(windows)
 
 
-class OwnedReader:
-    def __init__(self, api, handle, expected_epoch, path, stream, expected_sha256, profile, query_only):
+def verify_relocation_free(stream, optional, sections):
+    """Refuse an ASLR-sensitive focused instruction window rather than mask bytes."""
+    directory = 112 + 5 * 8
+    require(len(optional) >= directory + 8 and struct.unpack_from("<I", optional, 108)[0] > 5,
+            "mapping_unverified", "retail base-relocation directory is missing")
+    start, length = struct.unpack_from("<II", optional, directory)
+    require(8 <= length <= 16 * 1024 * 1024, "mapping_unverified", "retail relocation extent is unsupported")
+    for _, virtual_size, rva, raw_size, raw, *_ in sections:
+        if rva <= start and start + length <= rva + min(virtual_size, raw_size):
+            stream.seek(raw + start - rva)
+            table = stream.read(length)
+            break
+    else:
+        raise ReadFailure("mapping_unverified", "retail relocation directory is not file-backed")
+    require(len(table) == length, "mapping_unverified", "retail relocation directory is truncated")
+    position = 0
+    while position < length:
+        require(position + 8 <= length, "mapping_unverified", "truncated relocation block")
+        page, size = struct.unpack_from("<II", table, position)
+        require(page % 4096 == 0 and size >= 8 and size % 2 == 0 and position + size <= length,
+                "mapping_unverified", "invalid relocation block")
+        for (entry,) in struct.iter_unpack("<H", table[position + 8:position + size]):
+            kind, offset = entry >> 12, page + (entry & 0xFFF)
+            if kind:
+                require(kind == 10 and all(offset + 8 <= code or code + width <= offset for code, width in RETAIL_CODE),
+                        "mapping_unverified", "retail code windows have unsupported relocation coverage")
+        position += size
+
+
+class ImageReader:
+    def __init__(self, api, handle, expected_epoch, path, stream, expected_sha256, profile, query_only,
+                 *, profile_name="srr013-owned-amd64", attribution=None):
         self.api, self.handle, self.expected_epoch = api, handle, expected_epoch
         self.path, self.stream = path, stream
         self.sha256, self.profile = expected_sha256, profile
         self.query_only = query_only
+        self.profile_name = profile_name
+        self.attribution = attribution
         self.stat = pinned_stat(os.fstat(stream.fileno()))
         self.native_path = native_disk_path(api, stream)
         self.base = None
@@ -236,6 +287,7 @@ class OwnedReader:
         api, handle = self.api, self.handle
         actual_epoch = epoch(api, handle)
         require(actual_epoch == self.expected_epoch, "epoch_mismatch", "opened process epoch disagrees")
+        source = self.attribution(handle, actual_epoch) if self.attribution is not None else None
         executable = ctypes.create_unicode_buffer(32768)
         length = wintypes.DWORD(len(executable))
         win_call(api.QueryFullProcessImageNameW(handle, 0, executable, ctypes.byref(length)),
@@ -287,7 +339,7 @@ class OwnedReader:
             require(actual == expected, "mapped_image_mismatch",
                     f"mapped PE header or code window at RVA {start:#x} disagrees")
         for offset, width in (
-            (0x4B3D258, 8), (0x4D5FAC8, 8), (0x4D6A6C0, 8),
+            (0x4B3D258, 8), (0x4B6F0B0, 8), (0x4D5FAC8, 8), (0x4D6A6C0, 8),
             (0x5E60EA0, 8), (0x61DFA4C, 2), (0x61FA160, 8),
             (0x82EE5C0, 8), (0x82EE8C0, 8), (0x82EE908, 8),
             (0x82EEBB0, 8), (0x82EEC20, 16),
@@ -297,14 +349,17 @@ class OwnedReader:
                     f"fixed profile RVA {offset:#x} lacks an admitted image region")
         require(epoch(api, handle) == actual_epoch, "epoch_mismatch", "process changed during admission")
         self.base = main.base
-        return {
+        identity = {
             "pid": actual_epoch[0],
             "creation": actual_epoch[1],
             "image_base": self.base,
             "image_size": size,
             "image_sha256": self.sha256,
-            "profile": "srr013-owned-amd64",
+            "profile": self.profile_name,
         }
+        if source is not None:
+            identity["attribution"] = source
+        return identity
 
 
 @contextmanager
@@ -346,7 +401,7 @@ def open_owned(process, image_path, expected_sha256, *, expected_creation=None, 
         access = PROCESS_QUERY_INFORMATION | (0 if query_only else PROCESS_VM_READ)
         handle = win_call(api.OpenProcess(access, False, pid), "read_access_denied", "OpenProcess")
         try:
-            reader = OwnedReader(api, handle, (pid, creation), path, stream, expected_sha256, profile, query_only)
+            reader = ImageReader(api, handle, (pid, creation), path, stream, expected_sha256, profile, query_only)
             yield reader
         finally:
             api.CloseHandle(handle)

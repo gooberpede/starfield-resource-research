@@ -18,6 +18,11 @@ RECEIVER_SLOT = 0x61FA160
 RECEIVER_VPTR = 0x4D5FAC8
 EDGE_VPTR = 0x4B3D258
 FORM_MAP_SLOT = 0x5E60EA0
+# Pinned retail BGSResource ctor stores the vptr at VA 0x1409E74E6
+# and the type byte at VA 0x1409E75D9. The factory returns the same type.
+RESOURCE_VPTR = 0x4B6F0B0
+RESOURCE_TYPE = 0x9F
+MAX_BIOM_RSGDS = 32
 
 MAX_LEVEL = 8
 MAX_NODES = 128
@@ -74,9 +79,10 @@ class Record:
 
 
 class Collection:
-    def __init__(self, reader, base):
+    def __init__(self, reader, base, *, structural=False):
         self.reader = reader
         self.base = pointer(base)
+        self.structural = structural
         self.deadline = time.monotonic() + MAX_SECONDS
         self.read_count = self.byte_count = self.entries = 0
         self.structure = {}
@@ -152,6 +158,11 @@ class Collection:
             "registry_unverified",
             "PerBiomeData registry descriptor or registration receiver disagrees",
         )
+        if self.structural:
+            self.claim(owner, 0x350, "published context and index header")
+            self.claim(base + REGISTRY, 0x10, "type registry header")
+            self.claim(table, count * 0x18, "type registry table")
+            self.claim(receiver, 0x108, "registration receiver and descriptor")
 
         index = owner + 0x300
         self.root = self.scalar(index, "Q")
@@ -457,6 +468,10 @@ class Collection:
             "FormID capacity is not a supported power of two",
         )
         pointer(table, capacity * 0x18)
+        if self.structural:
+            # Reserve the full known allocation so unvisited bucket bytes
+            # cannot also pass as independently owned form storage.
+            self.claim(table, capacity * 0x18, "form map table")
         return {"map": map_, "table": table, "capacity": capacity}
 
     def form(self, form_id, expected_type):
@@ -468,28 +483,68 @@ class Collection:
             for byte in form_id.to_bytes(4, "little"):
                 h = ((h ^ byte) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
             index, seen = h & (capacity - 1), set()
+            matched = None
             while True:
                 require(index < capacity and index not in seen, "form_map_unverified", "invalid or cyclic FormID chain index")
                 require(len(seen) < MAX_CHAIN, "traversal_budget", "FormID chain cap exceeded")
                 seen.add(index)
                 entry = table + 0x18 * index
-                self.claim(entry, 0x18, "form map entry")
+                if not self.structural:
+                    self.claim(entry, 0x18, "form map entry")
                 key, address, next_ = unpack("I4xQI", self.read(entry, 20, 8))
                 if next_ == 0xFFFFFFFF:
                     code = "form_absent" if len(seen) == 1 else "form_map_unverified"
                     raise NativeFailure(code, f"empty FormID chain slot for {form_id:08X}")
                 require(next_ <= capacity, "form_map_unverified", "unknown FormID next sentinel")
                 if key == form_id:
+                    require(matched is None, "form_duplicate", f"duplicate FormID {form_id:08X} in chain")
+                    matched = address
+                    if not self.structural:
+                        break
+                if next_ == capacity:
+                    require(matched is not None, "form_absent", f"FormID {form_id:08X} not in chain")
                     break
-                require(next_ != capacity, "form_absent", f"FormID {form_id:08X} not in chain")
                 index = next_
-            self.claim(address, {0xBA: 0x58, 0xA0: 0x318}.get(expected_type, 0x2F), f"form {form_id:08X}")
+            address = matched
+            size = {0xBA: 0x58, 0xA0: 0x318, RESOURCE_TYPE: 0x118}.get(expected_type, 0x2F)
+            self.claim(address, size, f"form {form_id:08X}")
             actual_id, actual_type = unpack("I2xB", self.read(address + 0x28, 7, 4))
             require(actual_id == form_id, "form_id_mismatch", f"mapped form ID disagrees for {form_id:08X}")
             self.forms[form_id] = (address, actual_type)
         address, actual_type = self.forms[form_id]
         require(actual_type == expected_type, "form_type_mismatch", f"wrong record type for {form_id:08X}")
         return address
+
+    def biome_rsgds(self, count, list_):
+        """Join the actual BIOM pointer list to independent typed RSGD entries."""
+        require(count <= MAX_BIOM_RSGDS, "rsgd_list_budget", "BIOM RSGD pointer count exceeds bound")
+        if not count:
+            return []
+        self.claim(list_, count * 8, "BIOM RSGD list")
+        addresses = unpack(f"{count}Q", self.read(list_, count * 8, 8))
+        result = []
+        for address in addresses:
+            pointer(address, 0x2F)
+            form_id = self.scalar(address + 0x28, "I")
+            require(form_id != 0 and self.form(form_id, 0xAB) == address,
+                    "rsgd_list_identity", "BIOM RSGD pointer differs from the authoritative form")
+            result.append({"form_id": form_id, "address": address})
+        return result
+
+    def resource_forms(self, words, evidence):
+        """Verify every observed nonzero ID independently of reference predictions."""
+        for slot, form_id in enumerate(words):
+            if not form_id:
+                continue
+            try:
+                address = self.form(form_id, RESOURCE_TYPE)
+                vptr = self.scalar(address, "Q")
+                require(vptr == self.base + RESOURCE_VPTR, "form_vptr_mismatch", "wrong BGSResource vptr")
+            except (NativeFailure, ReadFailure) as error:
+                code = error.code if error.code in ("read_incomplete", "traversal_budget") else f"resource_{error.code}"
+                raise NativeFailure(code, f"output slot {slot}, FormID {form_id:08X}: {error.detail}") from error
+            evidence.append({"slot": slot, "form_id": form_id, "address": address, "type": RESOURCE_TYPE,
+                             "vptr": vptr})
 
     def sample(self, request, range_):
         sample = {
@@ -501,6 +556,8 @@ class Collection:
             "words": None,
             "reason": None,
         }
+        if self.structural:
+            sample["resource_forms"] = []
         try:
             matches = [entry for entry in range_["entries"] if entry["biom"] == request.biom]
             if len(matches) == 1:
@@ -510,15 +567,22 @@ class Collection:
             require(len(matches) == 1, "component_duplicate", "multiple matching typed edges")
             pndt = self.form(request.pndt, 0xBA)
             seed, key = unpack("II", self.read(pndt + 0x50, 8, 4))
-            require(key == request.pndt and seed == request.seed, "input_drift", "PNDT seed or generation key differs")
+            if self.structural:
+                require(key == request.pndt, "pndt_key_mismatch", "PNDT generation key disagrees")
+            else:
+                require(key == request.pndt and seed == request.seed, "input_drift", "PNDT seed or generation key differs")
             biom = self.form(request.biom, 0xA0)
             count = self.scalar(biom + 0x308, "I")
             list_ = self.scalar(biom + 0x310, "Q")
-            expected = self.form(request.biom_rsgd, 0xAB)
-            require(count == 1, "input_drift", "expected singleton BIOM RSGD list")
-            require(self.scalar(list_, "Q") == expected, "input_drift", "BIOM RSGD pointer disagrees with independent map")
             override = sample["override"]
-            require(override == request.override, "input_drift", "raw PNDT RSGD override differs")
+            if self.structural:
+                rsgd = {"biom_rsgds": self.biome_rsgds(count, list_)}
+            else:
+                expected = self.form(request.biom_rsgd, 0xAB)
+                require(count == 1, "input_drift", "expected singleton BIOM RSGD list")
+                require(self.scalar(list_, "Q") == expected, "input_drift", "BIOM RSGD pointer disagrees with independent map")
+                require(override == request.override, "input_drift", "raw PNDT RSGD override differs")
+                rsgd = {"biom_rsgd": expected}
             override_form = self.form(override, 0xAB) if override else None
             sample["forms"] = {
                 "pndt": pndt,
@@ -526,10 +590,12 @@ class Collection:
                 "pndt_key": key,
                 "biom": biom,
                 "biom_rsgd_list": list_,
-                "biom_rsgd": expected,
+                **rsgd,
                 "override": override_form,
             }
             require(range_["coverage_verified"], "range_coverage", "BIOM order or cardinality differs")
+            if self.structural:
+                self.resource_forms(sample["words"], sample["resource_forms"])
         except (NativeFailure, ReadFailure) as error:
             sample["reason"], sample["detail"] = error.code, error.detail
         return sample
@@ -553,9 +619,11 @@ class Collection:
         return digest.hexdigest()
 
 
-def collect(reader, image_base, requests):
+def collect(reader, image_base, requests, *, mode="strict"):
     """Collect one address-bearing typed witness from an admitted reader."""
-    collection = Collection(reader, image_base)
+    if mode not in ("strict", "structural"):
+        raise ValueError("unknown observation mode")
+    collection = Collection(reader, image_base, structural=mode == "structural")
     anchors = collection.anchors()
     anchor_reads = tuple(collection.structure)
     expected = {}

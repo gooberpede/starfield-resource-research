@@ -41,6 +41,12 @@ leads through native key ranges to inline biome payloads. See
 [SRR-012](SRR-012-retained-planetary-allocation-state-observation-feasibility.md)
 for the qualified external read design and its unmeasured runtime scope.
 
+**PROVEN STATIC:** The pinned retail `BGSResource` constructor writes
+type byte `0x9F` and primary vptr `0x144B6F0B0`. The retained-result consumer
+resolves staged output IDs through the native FormID map and also checks
+type `0x9F`. See [SRR-013 structural observation](SRR-013-structural-state-observation.md#native-resource-identity)
+for the instruction anchors and the independent runtime identity predicate.
+
 ## Input Resolution and Biome Order
 
 ```text

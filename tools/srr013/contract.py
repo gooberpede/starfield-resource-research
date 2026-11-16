@@ -1,10 +1,15 @@
-"""Pinned SRR-012 samples and per-sample classification for disposable evidence."""
+"""Pinned sample identities and separate exact-tuple and structural verdicts."""
 
 from dataclasses import asdict, dataclass
 
 POPULATED = "POPULATED_RESULT_OBSERVED"
 UNPOPULATED = "QUALIFIED_UNPOPULATED"
 INDETERMINATE = "STATE_INDETERMINATE"
+STRUCTURALLY_POPULATED = "STRUCTURALLY_POPULATED"
+STRUCTURALLY_ZERO = "STRUCTURALLY_ZERO"
+STRICT_MODE = "strict"
+STRUCTURAL_MODE = "structural"
+MODES = (STRICT_MODE, STRUCTURAL_MODE)
 EMPTY = (0,) * 7
 CHECKPOINTS = ("title", "menu", "settled-gameplay")
 SLOT_ROLES = ("Common", "Uncommon", "Rare", "Exotic", "Unique", "Special", "Everywhere")
@@ -62,15 +67,35 @@ def _precheck(sample, observed, input_profile):
     return None
 
 
-def classify(collections, input_profile, window_failure=None):
+def _structural_check(observed):
+    if observed["reason"]:
+        return observed["reason"]
+    words = observed["words"]
+    if words is None or len(words) != len(EMPTY) or any(
+        type(word) is not int or not 0 <= word <= 0xFFFFFFFF for word in words
+    ):
+        return "output_invalid"
+    witnesses = observed.get("resource_forms")
+    if witnesses is None or [(form["slot"], form["form_id"]) for form in witnesses] != [
+        (slot, word) for slot, word in enumerate(words) if word
+    ]:
+        return "resource_witness_incomplete"
+    return None
+
+
+def classify(collections, input_profile, window_failure=None, *, mode=STRICT_MODE):
     """Interpret complete native collections, requiring the declared control per sample."""
     first, second = (collections + [None, None])[:2]
     paired = window_failure is None and first is not None and first == second
     failure = window_failure or (None if paired else "inconsistent_pair")
     first_rows = first["samples"] if first is not None else [{} for _ in SAMPLES]
     second_rows = second["samples"] if second is not None else [{} for _ in SAMPLES]
+    if mode not in MODES:
+        raise ValueError("unknown observation mode")
+    structural = mode == STRUCTURAL_MODE
     checks = [] if failure else [
-        _precheck(sample, row, input_profile) for sample, row in zip(SAMPLES, first_rows, strict=True)
+        _structural_check(row) if structural else _precheck(sample, row, input_profile)
+        for sample, row in zip(SAMPLES, first_rows, strict=True)
     ]
     results = []
     for index, (sample, row, repeat) in enumerate(zip(SAMPLES, first_rows, second_rows, strict=True)):
@@ -82,15 +107,21 @@ def classify(collections, input_profile, window_failure=None):
         if reason is not None:
             outcome = INDETERMINATE
         elif tuple(words) == EMPTY:
-            outcome, reason = UNPOPULATED, "validated_all_zero"
+            outcome, reason = ((STRUCTURALLY_ZERO, "validated_zero_fields") if structural
+                               else (UNPOPULATED, "validated_all_zero"))
         else:
-            outcome, reason = POPULATED, "tuple_match"
-        results.append({
+            outcome, reason = ((STRUCTURALLY_POPULATED, "validated_nonzero_resource_ids") if structural
+                               else (POPULATED, "tuple_match"))
+        result = {
             "sample": asdict(sample), "outcome": outcome, "reason": reason,
             "comparison_control_reason": control_reason,
-            "prediction_comparison": "applicable" if paired and not row.get("reason")
+            "prediction_comparison": "applicable" if not structural and paired and not row.get("reason")
             and input_profile == DISPOSABLE_INPUTS else "conditional",
             "observed_words": words, "repeat_words": repeat.get("words"),
             "slot_roles": SLOT_ROLES,
-        })
+        }
+        if structural:
+            result["resource_forms"] = row.get("resource_forms")
+            result["repeat_resource_forms"] = repeat.get("resource_forms")
+        results.append(result)
     return results

@@ -5,13 +5,15 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-from time import monotonic_ns, sleep
+from time import monotonic_ns, sleep, time_ns
 
-from contract import CHECKPOINTS, DISPOSABLE_INPUTS, SAMPLES, classify
+from contract import CHECKPOINTS, DISPOSABLE_INPUTS, MODES, SAMPLES, STRICT_MODE, STRUCTURAL_MODE, classify
 from memory import ReadFailure
 from native import NativeFailure, collect
 
 SCHEMA = "srr013-disposable-observation-v1"
+BOUND_SCHEMA = "srr013-epoch-bound-observation-v2"
+MODE_SCHEMA = "srr013-mode-bound-observation-v3"
 MAX_EVENTS = 8192
 MAX_BYTES = 2 * 1024 * 1024
 WINDOW_NS = 5_000_000_000
@@ -73,8 +75,9 @@ class RecordingReader:
         self.bytes += size
         return self._record("read", [address, size, alignment], self.reader.read)
 
-    def identity(self):
-        return self._record("identity", [], self.reader.identity)
+    def identity(self, mode=None):
+        args = [] if mode is None else [mode]
+        return self._record("identity", args, lambda *_: self.reader.identity())
 
 
 class ReplayReader:
@@ -98,21 +101,25 @@ class ReplayReader:
             raise ValueError("receipt contains a truncated successful read")
         return data
 
-    def identity(self):
-        return self._take("identity", [])
+    def identity(self, mode=None):
+        return self._take("identity", [] if mode is None else [mode])
 
 
-def _pair(reader, base, inputs, between):
+def _pair(reader, base, inputs, between, binding=None, mode=None):
     collections = []
     brackets = []
     failure = None
     detail = None
     try:
         for ordinal in range(2):
-            beginning = reader.identity()
-            data = collect(reader, base, SAMPLES)
+            beginning = reader.identity(mode)
+            if binding is not None:
+                from checkpoint import validate_identity
+
+                validate_identity(binding, beginning)
+            data = collect(reader, base, SAMPLES, mode=mode or STRICT_MODE)
             collections.append(data)
-            end = reader.identity()
+            end = reader.identity(mode)
             brackets.append([beginning, end])
             if beginning != end or beginning != brackets[0][0]:
                 raise ReadFailure("process_identity_changed", "process or mapped image drifted")
@@ -120,63 +127,117 @@ def _pair(reader, base, inputs, between):
                 between()
     except (NativeFailure, ReadFailure) as error:
         failure, detail = error.code, error.detail
-    return _report(collections, brackets, inputs, failure, detail, reader.calls, reader.bytes)
+    return _report(collections, brackets, inputs, failure, detail, reader.calls, reader.bytes, mode)
 
 
-def _report(collections, brackets, inputs, failure, detail, calls, byte_count):
+def _report(collections, brackets, inputs, failure, detail, calls, byte_count, mode=None):
     if failure is None and len(collections) == 2 and collections[0] != collections[1]:
         failure = "inconsistent_pair"
-    results = classify(collections, inputs, failure)
-    return {
+    results = classify(collections, inputs, failure, mode=mode or STRICT_MODE)
+    report = {
         "failure": failure, "detail": detail, "samples": results,
         "collections": collections, "identity_brackets": brackets,
         "read_and_identity_calls": calls, "requested_bytes": byte_count,
         "counts": {outcome: sum(row["outcome"] == outcome for row in results)
                    for outcome in sorted({row["outcome"] for row in results})},
     }
+    if mode is not None:
+        report["mode"] = mode
+    return report
 
 
-def capture(path, reader, checkpoint, inputs=DISPOSABLE_INPUTS, *, between=None, after_read=None):
+def _input_decision(binding, evidence):
+    from retail_inputs import verify_inputs
+
+    return verify_inputs(binding["target_kind"], evidence)
+
+
+def _declare_mode(header, binding, mode):
+    if mode is None:
+        return
+    if binding is None or mode not in MODES:
+        raise ValueError("an explicit mode requires an epoch-bound observation")
+    header.update(schema=MODE_SCHEMA, mode=mode)
+
+
+def _attach_input_result(report, decision, mode):
+    if decision is not None:
+        report["input_admission"] = decision.as_dict()
+        if mode == STRUCTURAL_MODE:
+            report["input_admission"]["required_for_mode"] = False
+
+
+def _refusal(kind, error, mode):
+    event = {"kind": kind, "failure": [error.code, error.detail]}
+    if mode is not None:
+        event["mode"] = mode
+    return event
+
+
+def capture(path, reader, checkpoint, inputs=DISPOSABLE_INPUTS, *, between=None, after_read=None, binding=None,
+            mode=None):
     if checkpoint not in CHECKPOINTS:
         raise ValueError("unknown operator-supplied checkpoint label")
     start = monotonic_ns()
+    started_utc = time_ns()
+    decision = None if binding is None else _input_decision(binding, inputs)
     with Path(path).open("xb") as stream:
         journal = Journal(stream)
-        journal.write({"kind": "start", "schema": SCHEMA, "checkpoint": checkpoint,
-                       "label_source": "disposable operator metadata", "base": reader.base,
-                       "inputs": inputs, "limits": LIMITS, "start_ns": start,
-                       "utc": datetime.now(timezone.utc).isoformat()})
+        header = {"kind": "start", "schema": SCHEMA, "checkpoint": checkpoint,
+                  "label_source": "disposable operator metadata", "base": reader.base,
+                  "inputs": inputs, "limits": LIMITS, "start_ns": start,
+                  "utc": datetime.now(timezone.utc).isoformat()}
+        if binding is not None:
+            header.update(schema=BOUND_SCHEMA, binding=binding, start_utc_ns=started_utc,
+                          label_source="operator responsiveness declaration")
+        _declare_mode(header, binding, mode)
+        journal.write(header)
 
         def gap():
             if between is not None:
                 between()
             sleep(GAP_SEC)
 
-        bounded = RecordingReader(reader, journal, start + WINDOW_NS, after_read)
-        report = _pair(bounded, reader.base, inputs, gap)
+        try:
+            if binding is not None:
+                from checkpoint import validate_marker
+
+                validate_marker(binding, checkpoint, start, started_utc, mode)
+            bounded = RecordingReader(reader, journal, start + WINDOW_NS, after_read)
+            report = _pair(bounded, reader.base, inputs if decision is None else decision.profile, gap, binding, mode)
+        except ReadFailure as error:
+            journal.write(_refusal("marker_refused", error, mode))
+            report = _report([], [], None, error.code, error.detail, 0, 0, mode)
+        _attach_input_result(report, decision, mode)
         journal.write({"kind": "report", "data": report, "end_ns": monotonic_ns()})
         journal.seal()
     return report
 
 
-def capture_refusal(path, checkpoint, error):
+def capture_refusal(path, checkpoint, error, *, binding=None, inputs=None, mode=None):
     if checkpoint not in CHECKPOINTS:
         raise ValueError("unknown operator-supplied checkpoint label")
     start = monotonic_ns()
-    report = _report([], [], None, error.code, error.detail, 0, 0)
+    report = _report([], [], None, error.code, error.detail, 0, 0, mode)
+    header = {"kind": "start", "schema": SCHEMA, "checkpoint": checkpoint,
+              "label_source": "disposable operator metadata", "base": None,
+              "inputs": None, "limits": LIMITS, "start_ns": start,
+              "utc": datetime.now(timezone.utc).isoformat()}
+    if binding is not None:
+        header.update(schema=BOUND_SCHEMA, binding=binding, inputs=inputs, start_utc_ns=time_ns(),
+                      label_source="operator responsiveness declaration")
+        _attach_input_result(report, _input_decision(binding, inputs), mode)
+    _declare_mode(header, binding, mode)
     with Path(path).open("xb") as stream:
         journal = Journal(stream)
-        journal.write({"kind": "start", "schema": SCHEMA, "checkpoint": checkpoint,
-                       "label_source": "disposable operator metadata", "base": None,
-                       "inputs": None, "limits": LIMITS, "start_ns": start,
-                       "utc": datetime.now(timezone.utc).isoformat()})
-        journal.write({"kind": "admission_refused", "failure": [error.code, error.detail]})
+        journal.write(header)
+        journal.write(_refusal("admission_refused", error, mode))
         journal.write({"kind": "report", "data": report, "end_ns": monotonic_ns()})
         journal.seal()
     return report
 
 
-def replay(path):
+def replay(path, *, expected_mode=None):
     with Path(path).open("rb") as stream:
         lines = stream.read(8 * MAX_BYTES + 1).splitlines(keepends=True)
     if not 3 <= len(lines) <= MAX_EVENTS + 8 or sum(map(len, lines)) > 8 * MAX_BYTES:
@@ -186,23 +247,52 @@ def replay(path):
         raise ValueError("receipt seal missing or invalid")
     header = json.loads(lines[0])
     trailer = json.loads(lines[-2])
-    if (header.get("schema"), header.get("kind"), trailer.get("kind")) != (SCHEMA, "start", "report"):
+    if header.get("schema") not in (SCHEMA, BOUND_SCHEMA, MODE_SCHEMA) or (header.get("kind"), trailer.get("kind")) != ("start", "report"):
         raise ValueError("unrecognized receipt schema")
     if header["limits"] != LIMITS or header["checkpoint"] not in CHECKPOINTS:
         raise ValueError("unrecognized receipt configuration")
     if trailer["end_ns"] < header["start_ns"]:
         raise ValueError("receipt has a reversed acquisition interval")
+    mode = header.get("mode")
+    if (header["schema"] == MODE_SCHEMA and mode not in MODES) or (header["schema"] != MODE_SCHEMA and "mode" in header):
+        raise ValueError("invalid observation mode declaration")
+    if expected_mode is not None and expected_mode != (mode or STRICT_MODE):
+        raise ValueError("receipt mode differs from expected mode")
+    binding = header["binding"] if header["schema"] != SCHEMA else None
+    decision = None if binding is None else _input_decision(binding, header["inputs"])
     if header["base"] is None:
         refusal = json.loads(lines[1])
-        if len(lines) != 4 or refusal.get("kind") != "admission_refused" or header["inputs"] is not None:
+        if (len(lines) != 4 or refusal.get("kind") != "admission_refused" or refusal.get("mode") != mode
+                or (binding is None and header["inputs"] is not None)):
             raise ValueError("invalid refusal receipt")
         code, detail = refusal["failure"]
-        reproduced = _report([], [], None, code, detail, 0, 0)
+        reproduced = _report([], [], None, code, detail, 0, 0, mode)
+    elif binding is not None and (refusal := json.loads(lines[1])).get("kind") == "marker_refused":
+        if len(lines) != 4 or refusal.get("mode") != mode:
+            raise ValueError("marker refusal includes acquisition events")
+        from checkpoint import validate_marker
+
+        code, detail = refusal["failure"]
+        if code not in ("marker_duplicate", "marker_token"):
+            try:
+                validate_marker(binding, header["checkpoint"], header["start_ns"], header["start_utc_ns"], mode)
+            except ReadFailure as error:
+                if (code, detail) != (error.code, error.detail):
+                    raise ValueError("marker refusal reason differs") from error
+            else:
+                raise ValueError("receipt refused a valid marker")
+        reproduced = _report([], [], None, code, detail, 0, 0, mode)
     else:
+        if binding is not None:
+            from checkpoint import validate_marker
+
+            validate_marker(binding, header["checkpoint"], header["start_ns"], header["start_utc_ns"], mode)
         reader = ReplayReader(map(json.loads, lines[1:-2]))
-        reproduced = _pair(reader, header["base"], header["inputs"], lambda: None)
+        profile = header["inputs"] if decision is None else decision.profile
+        reproduced = _pair(reader, header["base"], profile, lambda: None, binding, mode)
         if next(reader.events, None) is not None:
             raise ValueError("receipt contains extra acquisition events")
+    _attach_input_result(reproduced, decision, mode)
     if encode(reproduced) != encode(trailer["data"]):
         raise ValueError("receipt result differs from native-traversal replay")
     return reproduced

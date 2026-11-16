@@ -59,6 +59,14 @@ and traversal anchors.
 | `FUN_1405f7a80`, `FUN_1403832a0`, `FUN_1403833e0`, `FUN_1403a4250` | **PROVEN STATIC** planet/type range construction, directory and record lookup, and successor iteration on the +0x300 index. |
 | `FUN_1405de3b0` | **PROVEN STATIC** FormID lookup sourced from an image-relative locator for the form map. The map contents and per-form addresses require fresh resolution in a later observation. |
 
+[SRR-013 structural observation](SRR-013-structural-state-observation.md#native-resource-identity)
+qualifies the independent resource type check on the same retail image.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_1409e7440`, `FUN_1409e9b40`, `FUN_1409e9bc0` | **PROVEN STATIC** `BGSResource` construction, factory type return `0x9F`, and factory call to the constructor. The constructor installs the primary vptr and record type byte. |
+| `FUN_1407bc3d0`, `FUN_14079b520` | **PROVEN STATIC** retained-slot staging and consumer path that resolves resource IDs by the native FormID getter and checks type `0x9F`. |
+
 The CK entries below retain their original build and evidence scope.
 
 ---

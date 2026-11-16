@@ -12,3 +12,24 @@
 | Reading other native state to infer execution or persistence | Excluded | Read only the selected retained payloads and required identity and range witnesses. Lifecycle and save questions require independent evidence. |
 | Actual title, menu and gameplay access and mapping attribution | Blocked for retail | The executable pin limits future applicability to 1.16.244.0. Retail path, Steam and session attribution, OS access, focused mapped-code attestation and checkpoint availability require an approved retail adapter and separate written authorization. |
 | Save2 versus Save52 and travel | Excluded from disposable qualification | State-only inspection is independent of travel. Any future authorized travel plan uses Save52 under the separate copy, custody and comparability conditions in the [proposed run card](SRR-013-proposed-title-run-card.md). |
+
+## Retail-readiness continuation
+
+| Lead | Disposition | Evidence or next gate |
+| --- | --- | --- |
+| Retail code-window offsets and legitimate PE rebasing | Resolved offline for the pinned file | Derive windows from the lawful hashed PE and exclude relocation intersections. Verify the actual mapped image, backing path and fixed RVAs in a future authorized epoch. |
+| Steam launch attribution without debugger inheritance | Qualified in simulation, conditional for retail | Require a retained ordinary-account Steam prelaunch epoch, exact file-identity-checked log append, Windows parent and candidate census, unique game epoch, account and session. A retail session with valid provenance must satisfy the same reviewed predicates. |
+| Mapping drift, insufficient rights and duplicate process | Resolved in owned disposable processes | The external reader refused hash and backing substitutions, two plausible children, denied and query-only handles, and mapped drift at the closing bracket. No access fallback. |
+| Offline source equivalence and runtime input winners | Blocked for retail classification | The disk master and prediction pack match. They cannot establish the active full/medium/light load order, winning form content, or native CSV/replacement source for the marked epoch. Require a qualified, bounded runtime source witness and independent dependency comparison. [Effective-input gate](SRR-013-retail-effective-inputs.md) |
+| Responsive-phase claim and lifetime | Qualified for disposable operator binding | Consume the attempt token once. Check wall/monotonic ordering, freshness, profile and exact epoch. The declaration supplies responsiveness evidence. The paired reads can agree after ABA or during a stable intermediate clear. |
+| Launch, save and wider phase proof | Excluded from this continuation | Only a separately authorized title-card read is proposed. The engineering phase supplies no launch or gameplay evidence and leaves saves untouched. [Future run card](SRR-013-retail-title-run-card.md) |
+
+## Structural observation continuation
+
+| Lead | Disposition | Evidence or next gate |
+| --- | --- | --- |
+| Native resource type independent of predictions | Resolved statically and qualified in disposable reads | Factory and constructor establish `BGSResource` type `0x9F` and primary vptr. The native retained-result consumer independently checks the same type. The structural reader joins every nonzero ID to the authoritative map. [Resource identity](SRR-013-structural-state-observation.md#native-resource-identity) |
+| Resource or BIOM decoy inside an unvisited map bucket | Resolved after independent challenge | Reserve the complete known map table extent and other proven owner/registry extents without reading unrelated contents. Both resource and biome map aliases refuse, including with seven zero values. |
+| Changed seed or RSGD path | Resolved for mode separation | Structural measurement checks observed typed PNDT/BIOM and RSGD joins. It neither verifies nor depends on effective prediction inputs. Strict exact-tuple applicability remains blocked on the previously identified runtime evidence. |
+| Mode relabelling or duplicate authority | Resolved for disposable/custody controls | Bind the selected mode to issuance, marker, ordered identity requests and report. Bind the future external written approval reference to the reviewed source identity and approved canonical custody. Reserve that custody's single attempt before opening process handles. |
+| Actual title-card state and retail process predicates | Conditional runtime | A separately authorized operator run must verify the Steam/session and mapped-image evidence, access, responsive phase, published context and typed records. Failures refuse. No save or travel is part of the title proposal. |

@@ -33,6 +33,8 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-011 planetary allocation execution and result lifecycle](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
 - [SRR-012 retained planetary allocation state observation feasibility](SRR-012-retained-planetary-allocation-state-observation-feasibility.md)
 - [SRR-013 read-only allocation state inspector](SRR-013-read-only-allocation-state-inspector.md)
+- [SRR-013 retail-readiness continuation](SRR-013-retail-readiness-continuation.md)
+- [SRR-013 structural allocation-state observation](SRR-013-structural-state-observation.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence
