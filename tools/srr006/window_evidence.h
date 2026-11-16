@@ -12,7 +12,7 @@ namespace srr006 {
 
 enum class Coverage { invocation, allocator, both };
 
-// Receipts describe three named windows separated by two operator markers.
+// Receipts describe named windows separated by operator markers.
 // A marker closes one window and opens the next. Event membership is
 // [begin, end), but the closing marker must itself be durable.
 class WindowEvidence {
@@ -35,8 +35,9 @@ class WindowEvidence {
     // Only constant sizes depend on the experiment's named phases and sweeps.
     // The event-pump correlator owns active per-thread tokens. These counters
     // retain unresolved effects when a token is overwritten or discarded.
-    std::array<Window, 3> windows{};
-    std::array<const char*, 3> labels;
+    std::array<Window, 7> windows{};
+    std::array<const char*, 7> labels{};
+    size_t count;
     unsigned current = 0;
     bool started = false, ended = false, stop_seen = false;
 
@@ -90,16 +91,32 @@ class WindowEvidence {
     }
 
 public:
-    explicit WindowEvidence(std::array<const char*, 3> names = {"startup", "title_card", "main_menu"})
-        : labels(names) {}
+    template <size_t N>
+    explicit WindowEvidence(const std::array<const char*, N>& names) : count(N) {
+        static_assert(N <= 7);
+        std::copy(names.begin(), names.end(), labels.begin());
+    }
+
+    WindowEvidence() : WindowEvidence(std::array{"startup", "title_card", "main_menu"}) {}
 
     unsigned index() const { return current; }
 
-    bool qualified_zero_since(unsigned first, uint64_t durable) const {
-        if (!stop_seen || first > current) return false;
-        for (unsigned i = first; i <= current; ++i)
+    bool can_bridge_boundary() const {
+        const auto& window = windows[current];
+        return window.verified_begin && !window.invocation_gap && !window.allocator_gap;
+    }
+
+    bool qualified_zero_between(unsigned first, unsigned last, uint64_t durable) const {
+        if (!stop_seen || first > last || last > current) return false;
+        for (unsigned i = 0; i < first; ++i)
+            if (windows[i].pending_callback || windows[i].pending_allocator) return false;
+        for (unsigned i = first; i <= last; ++i)
             if (!allocator_complete(windows[i], durable)) return false;
         return true;
+    }
+
+    bool qualified_zero_since(unsigned first, uint64_t durable) const {
+        return qualified_zero_between(first, current, durable);
     }
 
     bool has_positive(uint64_t durable, bool allocator) const {
@@ -123,7 +140,7 @@ public:
     }
 
     bool phase(uint64_t sequence, bool closing_checked, bool opening_checked) {
-        if (ended || current + 1 >= windows.size()) return false;
+        if (ended || current + 1 >= count) return false;
         auto& closing = windows[current];
         closing.end = sequence;
         closing.verified_end = closing_checked && sequence && sequence > closing.begin;
@@ -234,7 +251,7 @@ public:
         }
     }
 
-    void write_json(std::ostream& out, uint64_t durable) const {
+    void write_json(std::ostream& out, uint64_t durable, bool qualify_negatives = true) const {
         out << '[';
         bool callback_unresolved = false, allocator_unresolved = false;
         for (unsigned i = 0; i <= current; ++i) {
@@ -249,9 +266,9 @@ public:
             allocator_unresolved |= window.pending_allocator != 0;
             const bool callback_coverage = verified && !window.invocation_gap && !callback_unresolved;
             const bool allocator_coverage = callback_coverage && !window.allocator_gap && !allocator_unresolved;
-            const bool invocation_complete = durable_window && callback_coverage &&
+            const bool invocation_complete = qualify_negatives && durable_window && callback_coverage &&
                                              window.invocation_through <= durable;
-            const bool allocator_complete = durable_window && allocator_coverage &&
+            const bool allocator_complete = qualify_negatives && durable_window && allocator_coverage &&
                                             window.allocator_through <= durable;
             bool invoked = false, reached = false;
             for (unsigned sweep = 0; sweep < 2; ++sweep) {

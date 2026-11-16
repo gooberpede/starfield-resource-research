@@ -29,6 +29,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-007 retail launch boundary and Stage A qualification](SRR-007-retail-launch-and-stage-a-qualification.md)
 - [SRR-008 retail title-time environment survey](SRR-008-retail-title-time-environment-survey.md)
 - [SRR-009 retail four-site Stage A observation](SRR-009-retail-debugger-admission-and-stage-a.md)
+- [SRR-010 Stage B save-load observation](SRR-010-stage-b-save-load-observation.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence

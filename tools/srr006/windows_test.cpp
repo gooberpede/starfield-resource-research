@@ -25,6 +25,21 @@ static void expect(std::string_view value, std::string_view substring) {
 
 int main() {
     {
+        WindowEvidence evidence{std::array{"uncovered", "title", "menu", "load", "post_load"}};
+        evidence.open(1, false);
+        assert(evidence.phase(2, false, true));
+        assert(evidence.phase(3, true));
+        evidence.observe(1, {Verdict::iterator, 4}, 4);
+        evidence.gap();
+        assert(evidence.phase(5, true));
+        assert(evidence.phase(6, true));
+        evidence.stop(7, true);
+        assert(!evidence.qualified_zero_between(3, 4, 7));
+        const auto durable = receipt(evidence, 7);
+        expect(window(durable, 3), "\"incoming_unresolved_callback\":1");
+        expect(window(durable, 4), "\"allocator\":\"INSTRUMENTATION_INCOMPLETE\"");
+    }
+    {
         WindowEvidence evidence;
         evidence.open(1, true);
         assert(evidence.phase(3, true));
@@ -42,7 +57,7 @@ int main() {
         expect(window(retroactive, 1), "\"invocation_gap\":1");
     }
     {
-        WindowEvidence evidence{{"fixture_startup", "fixture_title", "fixture_main_menu"}};
+        WindowEvidence evidence{std::array{"fixture_startup", "fixture_title", "fixture_main_menu"}};
         evidence.open(1, true);
         evidence.observe(1, {Verdict::iterator, 2}, 2);
         assert(evidence.phase(3, true));

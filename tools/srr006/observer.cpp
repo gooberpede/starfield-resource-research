@@ -31,9 +31,17 @@ static uint64_t birth(HANDLE handle, bool process) {
                             : GetThreadTimes(handle, &created, &ended, &kernel, &user);
     return ok ? ticks(created) : 0;
 }
-static bool read_context(HANDLE thread, CONTEXT& c) {
+static bool read_context(HANDLE thread, CONTEXT& c, bool floating = false) {
     c.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_DEBUG_REGISTERS;
+    if (floating) c.ContextFlags |= CONTEXT_FLOATING_POINT;
     return GetThreadContext(thread, &c);
+}
+// Compare x64 architectural state covered by the D5B resume check.
+static bool same_execution_state(const CONTEXT& a, const CONTEXT& b) {
+    return std::memcmp(&a.Rax, &b.Rax, 17 * sizeof(DWORD64)) == 0 &&
+        std::memcmp(&a.FltSave, &b.FltSave, sizeof(a.FltSave)) == 0 &&
+        a.MxCsr == b.MxCsr && a.SegCs == b.SegCs && a.SegSs == b.SegSs &&
+        ((a.EFlags ^ b.EFlags) & ~DWORD{2}) == 0;
 }
 static std::array<Address, 4> slots(const CONTEXT& c) { return {c.Dr0,c.Dr1,c.Dr2,c.Dr3}; }
 static constexpr uint64_t dr7_fields = 0xffff20ff;
@@ -80,7 +88,28 @@ struct Thread {
     Correlation frames;
 };
 
-enum class ProfileRole { fixture, pinned_retail, stage_a };
+enum class ProfileRole { fixture, pinned_retail, retail };
+
+struct OperatorPhase {
+    const char* label;
+    const char* row;
+    const char* ack;
+};
+static constexpr OperatorPhase load_phases[]{
+    {"MAIN_MENU_CONFIRMED", "operator_menu", "MENU_DURABLE"},
+    {"LOAD_BEGIN", "load_begin", "LOAD_BEGIN_DURABLE"},
+    {"PLAYER_CONTROL", "player_control", "PLAYER_CONTROL_DURABLE"},
+    {"LODGE_BEGIN", "lodge_begin", "LODGE_BEGIN_DURABLE"},
+    {"LODGE_END", "lodge_end", "LODGE_END_DURABLE"},
+};
+static constexpr OperatorPhase control_phases[]{
+    {"CONTROL_MENU_CONFIRMED", "control_menu", "CONTROL_MENU_DURABLE"},
+    {"CONTROL_LOAD_BEGIN", "control_load_begin", "CONTROL_LOAD_BEGIN_DURABLE"},
+    {"SETTLED_GAMEPLAY", "control_settled", "SETTLED_GAMEPLAY_DURABLE"},
+    {"CONTROL_END", "control_end", "CONTROL_END_DURABLE"},
+};
+static constexpr auto load_windows = std::array{"uncovered_startup", "post_arming_title",
+    "menu_preload", "load_in_progress", "post_load", "lodge_transition", "lodge_interior"};
 
 class Observer {
     Journal& journal;
@@ -106,13 +135,16 @@ class Observer {
     uint64_t created = 0, births = 0, continued = 0, foreign = 0;
     uint64_t phase_ack = 0, menu_ack = 0, stop_ack = 0, event_number = 0;
     uint64_t title_boundary = 0, stop_boundary = 0, retire_ack = 0;
+    uint64_t load_phase_prior = 0, load_phase_ack = 0, load_refusal_ack = 0;
+    std::string load_challenge;
     uint64_t recovery_after_generation = 0;
     uint64_t attach_requested_at = 0, arm_barrier = 0, armed_ack = 0;
     uint64_t steam_birth = 0;
     DWORD steam_pid = 0, session = 0;
     StageHandle steam_client;
     uint64_t first_invoked = 0, first_allocator = 0, rejected = 0;
-    unsigned phase = 0;
+    unsigned phase = 0, control_durable_phase = 0;
+    uint64_t control_end = 0, context_writes = 0, blocked_context_writes = 0;
     bool loader = false, identity = false, healthy = true, stopped = false;
     bool handoff = false;
     bool retired = false, stop_durable = false;
@@ -138,8 +170,21 @@ class Observer {
 
     bool is(const wchar_t* name) const { return scenario == name; }
     bool retail_profile() const { return profile_role != ProfileRole::fixture; }
-    bool retail_run() const { return profile_role == ProfileRole::stage_a; }
+    bool retail_run() const { return profile_role == ProfileRole::retail; }
     bool staged_arming() const { return retail_run() || scenario.starts_with(L"admission-"); }
+    bool stage_b() const { return is(L"stage-b") || scenario.starts_with(L"admission-stage-b-"); }
+
+    bool control_b() const { return is(L"control-b") || scenario.starts_with(L"admission-control-b-"); }
+
+    bool write_context(HANDLE thread, CONTEXT* context) {
+        if (control_b()) {
+            ++blocked_context_writes;
+            gap();
+            return false;
+        }
+        ++context_writes;
+        return SetThreadContext(thread, context) != 0;
+    }
 
     static uint64_t utc_now() {
         FILETIME utc{};
@@ -154,7 +199,8 @@ class Observer {
     }
 
     void continuity_gap() {
-        windows.gap();
+        if (control_b()) healthy = false;
+        else windows.gap();
         for (auto& [tid, thread] : threads) thread.frames.clear();
     }
     void gap() {
@@ -181,6 +227,7 @@ class Observer {
             << ",\"image_sha256\":\"" << digest << "\",\"identity\":" << identity
             << ",\"phase\":" << phase << ",\"stopped\":" << stopped
             << ",\"healthy\":" << healthy << ",\"event\":" << event_number << fields;
+        if (control_b()) out << ",\"control_mode\":\"debugger_only\"";
         if (!journal.append(out.str(), seal_stop)) { gap(); return 0; }
         return journal.accepted;
     }
@@ -288,7 +335,7 @@ class Observer {
         if (auto result = check_interactive_user(child.hProcess, child.dwProcessId, session); !result)
             return result;
         if (control_file(L"cancel-before-target")) return {"operator_cancel"};
-        if (marker(L"stop.request", "STOP", 3)) return {"operator_stop"};
+        if (!control_b() && marker(L"stop.request", "STOP", 3)) return {"operator_stop"};
         return {};
     }
     RetailVerification verify_creation(const CREATE_PROCESS_DEBUG_INFO& info) const {
@@ -330,9 +377,13 @@ class Observer {
         return !(c.Dr7 & dr7_fields) && !(c.Dr6 & dr6_causes) &&
                !(c.EFlags & (tf | rf)) && slots(c) == std::array<Address, 4>{};
     }
-    // Called between events using only balanced, observer-owned suspensions.
-    // A thread born/exiting around the check can make the census indeterminate.
-    bool thread_census(bool held, bool require_slots = true) {
+    enum class Census { running, held, prearm, inventory };
+
+    // Only the running slot check takes balanced, observer-owned suspensions.
+    // A thread born/exiting around a snapshot can make it indeterminate.
+    bool thread_census(Census mode) {
+        const bool require_slots = !control_b() && mode != Census::prearm;
+        const bool held = mode == Census::held || mode == Census::prearm;
         if (!identity) return false;
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
         if (snapshot == INVALID_HANDLE_VALUE) return false;
@@ -350,6 +401,11 @@ class Observer {
                 continue;
             }
             const auto& thread = entry->second;
+            if (mode == Census::inventory) {
+                if (birth(thread.handle, false) != thread.created ||
+                    WaitForSingleObject(thread.handle, 0) != WAIT_TIMEOUT) complete = false;
+                continue;
+            }
             if (!held && SuspendThread(thread.handle) == DWORD(-1)) { complete = false; continue; }
             CONTEXT c{};
             const bool readback = read_context(thread.handle, c);
@@ -405,8 +461,8 @@ class Observer {
         CloseHandle(snapshot);
         return complete && ntdll && count == modules.size();
     }
-    bool checkpoint() {
-        return loader && thread_census(false) && (!late_attach || module_census()) &&
+    bool checkpoint(Census mode = Census::running) {
+        return loader && thread_census(mode) && (!late_attach || module_census()) &&
                (!staged_arming() || (stage_owner() && critical_mapping()));
     }
     bool held_slots() const {
@@ -419,21 +475,29 @@ class Observer {
         return true;
     }
     void periodic_readback(bool held) {
-        if (!staged_arming() || !loader || stopped || !healthy) return;
+        if (control_b() || !staged_arming() || !loader || stopped || !healthy) return;
         const auto now = GetTickCount64();
         auto& next = held ? next_held_readback : next_readback;
         if (now < next) return;
         next = now + 2000;
         // Tool Help census while another debug event is pending can see a
         // born/exiting thread outside our processed-event prefix.
-        const bool checked = (held ? held_slots() : thread_census(false) && module_census()) &&
+        // Stage B uses delivered debug events for periodic slot sampling.
+        // Keep exact identity/mapping on idle ticks and full operator checkpoints.
+        const bool defer_threads = !held && stage_b();
+        const bool checked = (defer_threads ||
+                              (held ? held_slots() : thread_census(Census::running) && module_census())) &&
                              stage_owner() && critical_mapping();
         if (!checked) gap();
         row("periodic_readback", 0, ",\"checkpoint\":" + std::to_string(checked) +
-            ",\"census_attempted\":" + std::to_string(!held));
+            ",\"census_attempted\":" + std::to_string(!held && !defer_threads) +
+            ",\"thread_readback_deferred\":" + std::to_string(defer_threads));
     }
     bool acknowledged(uint64_t sequence) const {
         return sequence && sequence <= journal.durable.load();
+    }
+    bool stop_acknowledged() const {
+        return late_attach ? journal.stop_sealed(stop_boundary) : acknowledged(stop_boundary);
     }
     bool wait_durable(uint64_t sequence) const {
         if (!sequence) return false;
@@ -450,13 +514,13 @@ class Observer {
         if (!inserted) return false;
         auto& thread = entry->second;
         thread.start_address = start_address;
-        if (disarmed || (staged_arming() && (!loader || !healthy))) return true;
+        if (control_b() || disarmed || (staged_arming() && (!loader || !healthy))) return true;
         return arm(tid, thread);
     }
     bool arm(DWORD tid, Thread& thread) {
         const HANDLE handle = thread.handle;
         auto& c = thread.original;
-        if (!read_context(handle, c)) return false;
+        if (!read_context(handle, c, stage_b())) return false;
         // Inject a conflicting original snapshot at the decision boundary.
         CONTEXT before = c;
         if (is(L"conflict") && tid == child.dwThreadId) before.Dr7 |= 1;
@@ -466,22 +530,45 @@ class Observer {
               << ",\"original_dr7\":" << before.Dr7 << ",\"original_flags\":" << before.EFlags;
         if (!row("arm_attempt", tid, state.str()) && staged_arming()) return false;
         if (!unowned(before)) return false;
+        const bool recovered = stage_b();
+        const bool disposable = recovered && !retail_run();
+        if (disposable && control_file(L"fixture-omit-arm")) {
+            row("fixture_arm_omitted", tid);
+            return false;
+        }
         CONTEXT armed = c;
         armed.ContextFlags = CONTEXT_DEBUG_REGISTERS;
         armed.Dr0 = addresses[0]; armed.Dr1 = addresses[1];
         armed.Dr2 = addresses[2]; armed.Dr3 = addresses[3];
         armed.Dr7 = (armed.Dr7 & ~dr7_fields) | 0x55;
+        if (recovered) armed.Dr6 = 0;
         CONTEXT check{};
-        if (!SetThreadContext(handle, &armed)) return false;
+        if (!write_context(handle, &armed)) return false;
         thread.debug_written = true;
-        if (!read_context(handle, check)) return false;
+        const bool withheld = disposable && control_file(L"fixture-withhold-arm-readback");
+        const bool sampled = !withheld && read_context(handle, check, recovered);
+        if (!sampled && !recovered) return false;
         if (is(L"readback") && tid == child.dwThreadId) check.Dr3 ^= 1;
-        const bool verified = owns(check) && !(check.EFlags & rf) &&
-                              (check.Dr6 & dr6_causes) == 0;
+        const bool preserved = !recovered || (sampled && same_execution_state(c, check));
+        const bool verified = sampled && owns(check) && !(check.EFlags & rf) &&
+                              (check.Dr6 & dr6_causes) == 0 && preserved;
         std::ostringstream actual;
         actual << ",\"dr\":[" << check.Dr0 << ',' << check.Dr1 << ',' << check.Dr2 << ','
                << check.Dr3 << "],\"dr6\":" << check.Dr6 << ",\"dr7\":" << check.Dr7
                << ",\"flags\":" << check.EFlags << ",\"verified\":" << verified;
+        if (recovered)
+            actual << ",\"context_sampled\":" << sampled
+                   << ",\"execution_state_preserved\":" << preserved;
+        if (recovered && !verified) {
+            // Restore only the debug registers changed on this exact held
+            // thread. A failed readback never counts as a qualified arm.
+            CONTEXT original = c, restored{};
+            original.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+            const bool restored_ok = write_context(handle, &original) &&
+                read_context(handle, restored) && unowned(restored) && slots(restored) == slots(c);
+            thread.debug_written = !restored_ok;
+            row("arm_rollback", tid, ",\"verified\":" + std::to_string(restored_ok));
+        }
         const auto recorded = row("arm_readback", tid, actual.str());
         thread.armed = verified;
         return verified && (!staged_arming() || recorded);
@@ -655,14 +742,14 @@ class Observer {
                            "\",\"module_file_handle\":" + std::to_string(bool(backing)) +
                            ",\"loader_path_match\":" + std::to_string(loader_path) + stage_fields;
             if (!at || !modules.try_emplace(at, ModuleRecord{"", risk == ModuleRisk::unknown ||
-                    risk == ModuleRisk::drifting}).second ||
+                    (!control_b() && risk == ModuleRisk::drifting)}).second ||
                 risk == ModuleRisk::incompatible ||
                 (loader_path && at != ntdll)) gap();
             // Existing joins cannot span a change involving unclassified or
             // credibly updated code arriving during observation. Pre-session
             // drift of an origin-verified component stays admissible.
             else if (loader && !stopped &&
-                     (risk == ModuleRisk::unknown || risk == ModuleRisk::drifting)) continuity_gap();
+                     (risk == ModuleRisk::unknown || (!control_b() && risk == ModuleRisk::drifting))) continuity_gap();
         }
         const bool expected = mapped_image && (at == ntdll || (!retail_profile() && in_system &&
             std::any_of(fixture_modules.begin(), fixture_modules.end(),
@@ -748,7 +835,7 @@ class Observer {
             const bool owner = identity && stage_owner();
             const bool mapped = owner && critical_mapping();
             const bool modules_checked = owner && module_census();
-            const bool threads_checked = owner && thread_census(true, false);
+            const bool threads_checked = owner && thread_census(Census::prearm);
             const bool checked = !stopped && healthy && fresh_breakin_threads == 1 &&
                                  mapped && modules_checked && threads_checked;
             row("stopped_admission", event.dwThreadId, ",\"prearm_checks\":" + std::to_string(checked) +
@@ -757,19 +844,19 @@ class Observer {
                 ",\"module_census_checked\":" + std::to_string(modules_checked) +
                 ",\"thread_census_checked\":" + std::to_string(threads_checked) +
                 ",\"fresh_breakin_threads\":" + std::to_string(fresh_breakin_threads));
-            if (checked && healthy) {
+            if (checked && healthy && !control_b()) {
                 for (auto& [tid, thread] : threads) {
                     if (!arm(tid, thread)) { gap(); break; }
                 }
-                if (!thread_census(true)) gap();
-            } else gap();
+                if (!thread_census(Census::held)) gap();
+            } else if (!checked || !healthy) gap();
         }
         if (recovery_break_pending) {
             recovery_break_owned = true;
             recovery_break_pending = false;
             return true;
         }
-        if (late_attach && !staged_arming() && (!thread_census(true) || !module_census())) gap();
+        if (late_attach && !staged_arming() && (!thread_census(Census::held) || !module_census())) gap();
         return loader = true;
     }
     // The debugger event keeps all threads stopped while we validate the census
@@ -777,7 +864,7 @@ class Observer {
     // valid after debug-event continuation and detach.
     struct Suspension { DWORD tid; HANDLE handle; };
     bool suspend_for_detach(std::vector<Suspension>& suspended) {
-        if (!thread_census(true)) return false;
+        if (!thread_census(Census::held)) return false;
         suspended.reserve(threads.size());
         for (const auto& [tid, thread] : threads) {
             HANDLE owned{};
@@ -843,7 +930,7 @@ class Observer {
             if (ok) {
                 CONTEXT restore = thread.original;
                 restore.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-                ok = SetThreadContext(thread.handle, &restore) && read_context(thread.handle, check) &&
+                ok = write_context(thread.handle, &restore) && read_context(thread.handle, check) &&
                     original_debug_state(check, thread.original) &&
                     check.Rip == current.Rip && check.Rsp == current.Rsp;
             }
@@ -914,12 +1001,16 @@ class Observer {
                 if (read_context(initial.handle, c)) {
                     c.Dr0 = c.Dr1 = c.Dr2 = c.Dr3 = c.Dr7 = 0;
                     c.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-                    changed = SetThreadContext(initial.handle, &c) &&
+                    changed = write_context(initial.handle, &c) &&
                               read_context(initial.handle, check) && !owns(check);
                 }
                 fields += ",\"fixture_slot_loss\":" + std::to_string(changed);
             }
             return DBG_CONTINUE;
+        }
+        if (control_b()) {
+            fields += ",\"owner\":\"foreign\"";
+            return DBG_EXCEPTION_NOT_HANDLED;
         }
         auto entry = threads.find(event.dwThreadId);
         const auto found = std::find(addresses.begin(), addresses.end(), addr);
@@ -927,7 +1018,7 @@ class Observer {
         if (code == EXCEPTION_SINGLE_STEP && e.dwFirstChance && site < addresses.size() &&
             entry != threads.end() && entry->second.armed) {
             CONTEXT c{};
-            if (!read_context(entry->second.handle, c) || !owns(c) || c.Rip != addr ||
+            if (!read_context(entry->second.handle, c, stage_b()) || !owns(c) || c.Rip != addr ||
                 (c.Dr6 & dr6_causes) != (1ULL << site)) {
                 gap();
                 return DBG_EXCEPTION_NOT_HANDLED;
@@ -947,12 +1038,14 @@ class Observer {
             c.Dr6 &= ~(1ULL << site);
             c.EFlags |= rf;
             CONTEXT check{};
-            const bool readback = SetThreadContext(entry->second.handle, &c) &&
-                                  read_context(entry->second.handle, check);
+            const bool readback = write_context(entry->second.handle, &c) &&
+                                  read_context(entry->second.handle, check, stage_b());
+            const bool preserved = !stage_b() || (readback && same_execution_state(c, check));
+            if (stage_b()) fields += ",\"execution_state_preserved\":" + std::to_string(preserved);
             fields += ",\"resume_flags\":" + std::to_string(check.EFlags) +
                       ",\"resume_dr6\":" + std::to_string(check.Dr6) +
                       ",\"readback\":" + std::to_string(readback);
-            if (!readback || !owns(check) ||
+            if (!readback || !preserved || !owns(check) ||
                 check.Rip != c.Rip || check.Rsp != c.Rsp ||
                 ((check.EFlags ^ c.EFlags) & ~DWORD{2}) || (check.Dr6 & dr6_causes)) {
                 result = {Verdict::unknown};
@@ -980,11 +1073,12 @@ class Observer {
     }
     // The local run directory ACL is the trust boundary. The payload binds a
     // statement to the retained process epoch and a single transition.
-    bool marker(const wchar_t* name, const char* label, unsigned ordinal, uint64_t prior = 0) const {
-        const auto path = folder / name;
-        const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
-                                        nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-        if (file == INVALID_HANDLE_VALUE) return false;
+    std::optional<std::string> read_marker(const wchar_t* name, bool consume = false) const {
+        const HANDLE file = CreateFileW((folder / name).c_str(), GENERIC_READ | (consume ? DELETE : 0),
+                                        FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                        FILE_FLAG_OPEN_REPARSE_POINT | (consume ? FILE_FLAG_DELETE_ON_CLOSE : 0),
+                                        nullptr);
+        if (file == INVALID_HANDLE_VALUE) return {};
         char bytes[256]{};
         DWORD size = 0;
         BY_HANDLE_FILE_INFORMATION info{};
@@ -992,12 +1086,146 @@ class Observer {
             !(info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) &&
             ReadFile(file, bytes, sizeof bytes, &size, nullptr);
         CloseHandle(file);
-        const auto expected = run_id + " " + std::to_string(ordinal) + " " + label +
-                              " " + std::to_string(prior) + "\n";
-        return read && std::string_view(bytes, size) == expected;
+        return read ? std::string(bytes, size) : std::string{};
+    }
+    bool marker(const wchar_t* name, const char* label, unsigned ordinal, uint64_t prior = 0) const {
+        const auto payload = read_marker(name);
+        return payload && *payload == run_id + " " + std::to_string(ordinal) + " " + label +
+                                      " " + std::to_string(prior) + "\n";
+    }
+    bool load_acknowledge(const char* label, uint64_t sequence) {
+        // A new challenge is issued only after the predecessor is durable.
+        // Files published early cannot become valid by predicting a sequence.
+        HCRYPTPROV provider{};
+        BYTE nonce[16]{};
+        const bool opened = CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_AES,
+                                                  CRYPT_VERIFYCONTEXT) != 0;
+        const bool generated = opened && CryptGenRandom(provider, sizeof nonce, nonce);
+        if (opened) CryptReleaseContext(provider, 0);
+        if (!generated) {
+            row("phase_ack_refused", 0, ",\"prior\":" + std::to_string(sequence) +
+                                       ",\"reason\":\"challenge_unavailable\"");
+            journal.request_flush();
+            return false;
+        }
+        static constexpr char hex[] = "0123456789abcdef";
+        load_challenge.clear();
+        for (const auto byte : nonce) {
+            load_challenge += hex[byte >> 4];
+            load_challenge += hex[byte & 15];
+        }
+        load_phase_prior = sequence;
+        std::printf("%s %llu %s\n", label, sequence, load_challenge.c_str());
+        std::fflush(stdout);
+        return true;
+    }
+    void load_controls() {
+        if (acknowledged(load_phase_ack)) {
+            const bool ok = !stopped && healthy &&
+                            load_acknowledge(load_phases[phase - 2].ack, load_phase_ack);
+            if (!ok) std::puts("PHASE_BOUNDARY_UNCONFIRMED");
+            std::fflush(stdout);
+            load_phase_ack = 0;
+        }
+        if (acknowledged(load_refusal_ack)) {
+            std::printf("PHASE_REFUSED %llu\n", load_refusal_ack);
+            std::fflush(stdout);
+            load_refusal_ack = 0;
+        }
+        if (load_refusal_ack || journal.failed || journal.first_lost) return;
+        const auto payload = read_marker(L"phase.request", true);
+        if (!payload) return;
+        const auto* next = phase && phase <= std::size(load_phases) ? &load_phases[phase - 1] : nullptr;
+        const bool ready = !stopped && armed_ack && healthy && next && !load_challenge.empty();
+        if (!ready || *payload != run_id + " " + next->label + " " + std::to_string(load_phase_prior) +
+                                  " " + load_challenge + "\n") {
+            load_refusal_ack = row("phase_request_refused", 0,
+                ",\"reason\":\"" + std::string(ready ? "binding_mismatch" : "phase_unavailable") + "\"" +
+                ",\"expected\":\"" + (ready ? next->label : "") + "\"" +
+                ",\"prior\":" + std::to_string(ready ? load_phase_prior : 0));
+            journal.request_flush();
+            return;
+        }
+        load_challenge.clear();
+        const bool inventory = phase == 2;  // LOAD_BEGIN
+        ++phase;
+        const bool checked = checkpoint(inventory ? Census::inventory : Census::running);
+        if (!checked) gap();
+        // A read-only LOAD_BEGIN can open a load covered by the enclosing
+        // menu/control slot samples. It cannot close a qualified menu zero.
+        const bool opening = checked && healthy && (!inventory || windows.can_bridge_boundary());
+        load_phase_ack = row(next->row, 0, ",\"checkpoint\":" + std::to_string(checked) +
+                             ",\"thread_slot_readback\":" + std::to_string(!inventory && checked) +
+                             ",\"opening_eligible\":" + std::to_string(opening) +
+                             ",\"prior\":" + std::to_string(load_phase_prior));
+        if (load_phase_ack) windows.phase(load_phase_ack, !inventory && opening, opening);
+        journal.request_flush();
+    }
+    void control_b_phases() {
+        if (acknowledged(arm_barrier)) {
+            if (healthy && load_acknowledge("DEBUGGER_ONLY_READY", arm_barrier))
+                control_durable_phase = 1;
+            else {
+                healthy = false;
+                std::puts("DEBUGGER_ONLY_REFUSED");
+                std::fflush(stdout);
+            }
+            arm_barrier = 0;
+        }
+        if (acknowledged(load_phase_ack)) {
+            const auto& boundary = control_phases[phase - 2];
+            const bool terminal = phase == std::size(control_phases) + 1;
+            if (control_end && !journal.stop_sealed(control_end) && !journal.failed) return;
+            if (healthy && !journal.failed &&
+                (terminal || load_acknowledge(boundary.ack, load_phase_ack))) {
+                control_durable_phase = phase;
+                if (terminal) {
+                    retired = true;
+                    std::printf("%s %llu\n", boundary.ack, load_phase_ack);
+                }
+            } else {
+                healthy = false;
+                std::puts("CONTROL_BOUNDARY_UNCONFIRMED");
+            }
+            std::fflush(stdout);
+            load_phase_ack = 0;
+        }
+        if (acknowledged(load_refusal_ack)) {
+            std::printf("PHASE_REFUSED %llu\n", load_refusal_ack);
+            std::fflush(stdout);
+            load_refusal_ack = 0;
+        }
+        if (load_refusal_ack || load_phase_ack || journal.failed || journal.first_lost) return;
+        const auto payload = read_marker(L"phase.request", true);
+        if (!payload) return;
+        const auto* next = control_durable_phase && control_durable_phase <= std::size(control_phases)
+            ? &control_phases[control_durable_phase - 1] : nullptr;
+        const bool ready = healthy && next && !load_challenge.empty();
+        if (!ready || *payload != run_id + " " + next->label + " " + std::to_string(load_phase_prior) +
+                                  " " + load_challenge + "\n") {
+            load_refusal_ack = row("phase_request_refused", 0,
+                ",\"reason\":\"" + std::string(ready ? "binding_mismatch" : "phase_unavailable") + "\"" +
+                ",\"expected\":\"" + (ready ? next->label : "") + "\"" +
+                ",\"prior\":" + std::to_string(ready ? load_phase_prior : 0));
+            journal.request_flush();
+            return;
+        }
+        load_challenge.clear();
+        ++phase;
+        const bool checked = exact_running_process() && checkpoint(Census::inventory);
+        if (!checked) gap();
+        const bool seal = checked && phase == std::size(control_phases) + 1;
+        load_phase_ack = row(next->row, 0, ",\"checkpoint\":" + std::to_string(checked) +
+                             ",\"prior\":" + std::to_string(load_phase_prior), seal);
+        if (seal) control_end = load_phase_ack;
+        journal.request_flush();
     }
     void controls() {
         if (journal.failed && healthy) gap();
+        if (control_b()) {
+            control_b_phases();
+            return;
+        }
         for (auto item = pending_release.begin(); item != pending_release.end();) {
             const auto thread = threads.find(*item);
             if (thread != threads.end() && ResumeThread(thread->second.handle) == DWORD(-1) &&
@@ -1010,8 +1238,10 @@ class Observer {
         }
         if (staged_arming() && acknowledged(arm_barrier)) {
             if (healthy && !stopped) {
-                armed_ack = arm_barrier;
-                std::printf("ATTACH_ARMED %llu\n", armed_ack);
+                if (!stage_b() || load_acknowledge("ATTACH_ARMED", arm_barrier)) {
+                    armed_ack = arm_barrier;
+                    if (!stage_b()) std::printf("ATTACH_ARMED %llu\n", armed_ack);
+                } else std::puts("ARMING_REFUSED");
             } else std::puts("ARMING_REFUSED");
             std::fflush(stdout);
             arm_barrier = 0;
@@ -1028,7 +1258,7 @@ class Observer {
             windows.phase(phase_ack, checked && healthy);
             journal.request_flush();
         }
-        if (!stopped && phase == 1 &&
+        if (!stage_b() && !stopped && phase == 1 &&
             (late_attach ? !phase_ack && (staged_arming() ? armed_ack != 0 : title_boundary != 0) &&
                            marker(L"menu.request", staged_arming() ? "MAIN_MENU_CONFIRMED" : "MAIN_MENU",
                                   2, staged_arming() ? armed_ack : title_boundary) :
@@ -1051,9 +1281,23 @@ class Observer {
                 if (thread.frames.awaiting_callback()) healthy = false;
                 thread.frames.clear();
             }
-            stop_ack = row("stop", 0, ",\"checkpoint\":" + std::to_string(checked), late_attach);
+            std::string fields = ",\"checkpoint\":" + std::to_string(checked);
+            const bool missing_end = stage_b() && (phase == 3 || phase == 5);
+            if (stage_b()) {
+                const char* missing = !armed_ack ? "ATTACH_ARMED" : phase == 1 ? "MAIN_MENU_CONFIRMED" :
+                                      phase == 2 ? "LOAD_BEGIN" : phase == 3 ? "PLAYER_CONTROL" :
+                                      phase == 5 ? "LODGE_END" : "";
+                const uint64_t sequence = journal.attempted + 1;
+                auto sealed = windows;
+                sealed.stop(sequence, checked && healthy && !missing_end);
+                std::ostringstream summary;
+                summary << ",\"missing_boundary\":\"" << missing << "\",\"windows\":";
+                sealed.write_json(summary, sequence);
+                fields += summary.str();
+            }
+            stop_ack = row("stop", 0, fields, late_attach);
             stop_boundary = stop_ack;
-            windows.stop(stop_ack, checked && healthy);
+            windows.stop(stop_ack, checked && healthy && !missing_end);
             journal.request_flush();
         }
         if (phase_ack && journal.durable >= phase_ack) {
@@ -1065,7 +1309,7 @@ class Observer {
                 row("abrupt_probe", 0);
             }
         }
-        if (stop_ack && journal.durable >= stop_ack) {
+        if (stop_ack && stop_acknowledged()) {
             std::printf("STOP_DURABLE %llu\n", stop_ack);
             std::fflush(stdout);
             stop_ack = 0;
@@ -1076,6 +1320,7 @@ class Observer {
             std::fflush(stdout);
             menu_ack = 0;
         }
+        if (stage_b()) load_controls();
         if (late_attach && stop_durable && !retired &&
             marker(L"retire.request", staged_arming() ? "QUIT_REQUESTED" : "RETIRE", 4, stop_boundary)) {
             retired = true;
@@ -1167,7 +1412,8 @@ class Observer {
             std::fflush(stdout);
             while (!journal.failed && exact_running_process() &&
                    exact_steam() && space_available()) {
-                if (control_file(L"cancel-before-target") || marker(L"stop.request", "STOP", 3))
+                if (control_file(L"cancel-before-target") ||
+                    (!control_b() && marker(L"stop.request", "STOP", 3)))
                     return false;
                 if (marker(L"title.request", "TITLE_CONFIRMED", 1)) {
                     const auto attribution = log.check(target.pid);
@@ -1192,12 +1438,14 @@ public:
     Observer(Journal& output, fs::path dir, const wchar_t* mode, HANDLE source, std::string sha,
              ProfileRole role, bool attach)
         : journal(output), folder(std::move(dir)), scenario(mode), profile_role(role),
-          late_attach(attach), non_killing(role == ProfileRole::stage_a ||
+          late_attach(attach), non_killing(role == ProfileRole::retail ||
                   scenario.starts_with(L"recover-") || scenario.starts_with(L"admission-")),
           image(source), digest(std::move(sha)),
-          windows(staged_arming() ? std::array{"uncovered_startup", "post_arming_title", "main_menu"} :
+          windows(stage_b() ? WindowEvidence(load_windows) :
+                  WindowEvidence(staged_arming() ?
+                           std::array{"uncovered_startup", "post_arming_title", "main_menu"} :
                   attach ? std::array{"fixture_attach_barrier", "fixture_title", "fixture_menu"} :
-                           std::array{"fixture_startup", "fixture_title", "fixture_menu"}) {
+                           std::array{"fixture_startup", "fixture_title", "fixture_menu"})) {
         local = reinterpret_cast<Address>(GetModuleHandleW(nullptr));
         const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(local);
         const auto pe = reinterpret_cast<const IMAGE_NT_HEADERS64*>(local + dos->e_lfanew);
@@ -1265,14 +1513,25 @@ public:
             if (!prepare_stage()) { row("admission_refused", 0); return false; }
         } else if (!start_fixture(self)) return false;
         if (late_attach) {
-            const auto preflight = attach_preflight();
+            const auto preflight = is(L"admission-control-b-epoch")
+                ? check_process_epoch(child.hProcess, child.dwProcessId, created + 1) : attach_preflight();
             attach_requested_at = utc_now();
             const auto decision = decide_attach(preflight, [&] { return attach_eligibility(); },
-                                                [&] { return DebugActiveProcess(child.dwProcessId); });
+                                                [&] {
+                if (is(L"admission-control-b-attach-failure")) {
+                    if (!publish_record(folder / "advance", "disposable fixture\n") ||
+                        !publish_record(folder / "quit", "disposable attach race\n") ||
+                        WaitForSingleObject(child.hProcess, 5000) != WAIT_OBJECT_0) {
+                        SetLastError(ERROR_TIMEOUT);
+                        return FALSE;
+                    }
+                }
+                return DebugActiveProcess(child.dwProcessId);
+            });
             if (!decision) {
                 report_attach_refusal(journal, decision,
                     [&](const std::string& fields) { return row("attach_refused", 0, fields); });
-                if (!retail_run()) terminate_exact();
+                if (!retail_run() && !control_b()) terminate_exact();
                 return false;
             }
         }
@@ -1307,7 +1566,7 @@ private:
                     return false;
                 }
             }
-            if (is(L"admission-fixture")) {
+            if (is(L"admission-fixture") || control_b()) {
                 // Exercise the retail handle acquisition in a disposable
                 // four-slot session instead of using CreateProcess's handle.
                 HANDLE process = nullptr;
@@ -1455,8 +1714,10 @@ private:
             case EXIT_PROCESS_DEBUG_EVENT:
                 event_exit = event.u.ExitProcess.dwExitCode;
                 fields += ",\"exit_code\":" + std::to_string(event_exit);
-                fields += ",\"after_durable_stop\":" +
-                    std::to_string(stop_boundary && journal.durable >= stop_boundary);
+                if (control_b())
+                    fields += ",\"after_durable_control_end\":" +
+                        std::to_string(control_durable_phase == std::size(control_phases) + 1);
+                else fields += ",\"after_durable_stop\":" + std::to_string(stop_acknowledged());
                 for (const auto& [id, thread] : threads) {
                     if (thread.frames.awaiting_callback()) gap();
                 }
@@ -1509,13 +1770,22 @@ private:
             if (resumed) ++continued; else gap();
             fields += ",\"disposition\":" + std::to_string(disposition) +
                       ",\"continue_error\":" + std::to_string(continue_error);
+            if (control_b()) fields += ",\"continued\":" + std::to_string(resumed);
             const auto sequence = row("event", tid, fields);
             if (!late_attach && event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT)
                 windows.open(sequence, identity && healthy && resumed);
             if (late_attach && !loader_before && loader) {
-                const auto barrier = row("attach_barrier", tid, ",\"continued\":" + std::to_string(resumed));
+                const auto barrier = row(control_b() ? "debugger_only_barrier" : "attach_barrier", tid,
+                    ",\"continued\":" + std::to_string(resumed) +
+                    (control_b() ? ",\"research_context_writes\":" + std::to_string(context_writes) : ""));
                 const bool verified = identity && healthy && resumed && barrier && !stopped;
-                if (staged_arming()) {
+                if (control_b()) {
+                    if (verified) arm_barrier = barrier;
+                    else {
+                        std::puts("DEBUGGER_ONLY_REFUSED");
+                        std::fflush(stdout);
+                    }
+                } else if (staged_arming()) {
                     if (!stopped) {
                         windows.open(title_boundary, false);
                         windows.phase(barrier, false, verified);
@@ -1610,26 +1880,33 @@ private:
     }
 public:
     bool receipt(bool pump_ok) {
-        if (retail_run() && !signaled && child.hProcess &&
+        if ((retail_run() || control_b()) && !signaled && child.hProcess &&
             WaitForSingleObject(child.hProcess, 0) == WAIT_OBJECT_0) {
             signaled = true;
             GetExitCodeProcess(child.hProcess, &process_exit);
             row("same_handle_wait", 0, ",\"signaled\":1,\"exit_code\":" + std::to_string(process_exit));
         }
+        if (control_b()) return control_b_receipt(pump_ok);
         windows.interrupt(journal.accepted);
         journal.finish();
         if (!space_available()) return false;
         const auto hash = sha256(folder / "events.jsonl");
         if (hash.empty()) return false;
         const auto durable = journal.durable.load();
+        const bool sealed = stop_acknowledged();
+        // A failed STOP sidecar can leave the STOP row in the operational
+        // watermark. Its planned closing boundary is ineligible for science.
+        const auto scientific_prefix = late_attach && stop_boundary && !sealed ?
+            std::min(durable, stop_boundary - 1) : durable;
         const bool complete = !late_attach && healthy && stopped && loader && identity && pump_ok &&
                               !journal.failed && !journal.first_lost && accepted_all(durable);
-        const bool invoked = staged_arming() ? windows.has_positive(durable, false) :
+        const bool invoked = staged_arming() ? windows.has_positive(scientific_prefix, false) :
                              first_invoked && first_invoked <= durable;
-        const bool allocator = staged_arming() ? windows.has_positive(durable, true) :
+        const bool allocator = staged_arming() ? windows.has_positive(scientific_prefix, true) :
                                 first_allocator && first_allocator <= durable;
-        const bool qualified_zero = staged_arming() &&
-                                    windows.qualified_zero_since(1, durable);
+        const bool qualified_zero = stage_b() ?
+            sealed && windows.qualified_zero_between(3, 4, scientific_prefix) :
+            staged_arming() && windows.qualified_zero_since(1, scientific_prefix);
         const char* science = allocator ? "OBSERVED_REACHED_ALLOCATOR" : invoked ? "OBSERVED_INVOKED" :
                               complete || qualified_zero ? "NOT_OBSERVED" : "INSTRUMENTATION_INCOMPLETE";
         std::ostringstream out;
@@ -1638,7 +1915,7 @@ public:
             << "\",\"journal_sha256\":\"" << hash << "\",\"pid\":" << child.dwProcessId
             << ",\"process_birth\":" << created << ",\"fixture_complete\":" << complete
             << ",\"stop_sequence\":" << stop_boundary
-            << ",\"stop_durable\":" << (stop_boundary && stop_boundary <= durable)
+            << ",\"stop_durable\":" << sealed
             << ",\"retire_requested\":" << retired
             << ",\"non_killing\":" << non_killing << ",\"detached\":" << detached
             << ",\"observer_healthy\":" << healthy << ",\"pump_completed\":" << pump_ok
@@ -1665,34 +1942,76 @@ public:
             << after_stop[2] << ',' << after_stop[3] << "],\"after_gap\":["
             << after_gap[0] << ',' << after_gap[1] << ',' << after_gap[2] << ',' << after_gap[3]
             << "],\"windows\":";
-        windows.write_json(out, durable);
+        windows.write_json(out, scientific_prefix, !stage_b() || sealed);
         out << "}\n";
         return publish_record(folder / "receipt.json", out.str());
     }
 private:
+    bool control_b_receipt(bool pump_ok) {
+        journal.finish();
+        const auto hash = sha256(folder / "events.jsonl");
+        if (hash.empty() || !space_available()) return false;
+        const auto durable = journal.durable.load();
+        const bool sealed = journal.stop_sealed(control_end);
+        const bool complete = identity && loader && healthy && pump_ok && exit_event && signaled &&
+            process_exit == event_exit && continued == event_number && !recovery_unconfirmed &&
+            !journal.failed && !journal.first_lost && accepted_all(durable) &&
+            !context_writes && !blocked_context_writes;
+        const bool survived = complete && sealed && control_durable_phase == std::size(control_phases) + 1 &&
+                              process_exit == 0;
+        const bool load_failed = complete && phase == 3 && control_durable_phase == 3 && process_exit != 0;
+        std::ostringstream out;
+        out << "{\"schema\":1,\"control_mode\":\"debugger_only\",\"run\":\"" << run_id
+            << "\",\"observer_pid\":" << GetCurrentProcessId()
+            << ",\"observer_birth\":" << birth(GetCurrentProcess(), true)
+            << ",\"pid\":" << child.dwProcessId << ",\"process_birth\":" << created
+            << ",\"image_sha256\":\"" << digest << "\",\"journal_sha256\":\"" << hash
+            << "\",\"result\":\"" << (survived ? "LOAD_SURVIVED_DEBUGGER_ONLY" :
+                                      load_failed ? "LOAD_FAILED_DEBUGGER_ONLY" : "CONTROL_INCOMPLETE")
+            << "\",\"last_durable_phase\":" << control_durable_phase
+            << ",\"last_requested_phase\":" << phase
+            << ",\"native_event_service_complete\":" << complete
+            << ",\"continued_events\":" << continued << ",\"native_events\":" << event_number
+            << ",\"target_signaled\":" << signaled << ",\"native_exit_event\":" << exit_event
+            << ",\"native_exit_code\":" << (exit_event ? std::to_string(event_exit) : "null")
+            << ",\"handle_exit_code\":" << (signaled ? std::to_string(process_exit) : "null")
+            << ",\"operational_end_sealed\":" << sealed << ",\"operational_end_sequence\":" << control_end
+            << ",\"durable_sequence\":" << durable << ",\"writer_failed\":" << journal.failed.load()
+            << ",\"research_context_writes\":" << context_writes
+            << ",\"blocked_research_context_writes\":" << blocked_context_writes
+            << ",\"research_hardware_hits\":" << hits[0] + hits[1] + hits[2] + hits[3] << "}\n";
+        return publish_record(folder / "control-receipt.json", out.str());
+    }
     bool accepted_all(uint64_t durable) const { return durable == journal.attempted; }
 };
 
 int wmain(int argc, wchar_t** argv) {
     if (argc == 4 && wcscmp(argv[1], L"--child") == 0) return fixture_child(argv[2], argv[3]);
     const bool attach = argc == 4 && wcscmp(argv[1], L"--fixture-attach") == 0;
-    const bool stage = argc == 4 && wcscmp(argv[1], L"--stage-a") == 0 &&
-                       wcscmp(argv[2], L"--approved-stage-a") == 0;
+    const bool stage_a = argc == 4 && wcscmp(argv[1], L"--stage-a") == 0 &&
+                         wcscmp(argv[2], L"--approved-stage-a") == 0;
+    const bool stage_b = argc == 4 && wcscmp(argv[1], L"--stage-b") == 0 &&
+                         wcscmp(argv[2], L"--approved-stage-b") == 0;
+    const bool control_b = argc == 4 && wcscmp(argv[1], L"--control-b") == 0 &&
+                           wcscmp(argv[2], L"--approved-control-b") == 0;
+    const bool stage = stage_a || stage_b || control_b;
     if (!attach && !stage && argc != 3) return 2;
-    const std::wstring mode = stage ? L"stage-a" : argv[attach ? 2 : 1];
+    const std::wstring mode = control_b ? L"control-b" : stage_b ? L"stage-b" : stage_a ? L"stage-a" : argv[attach ? 2 : 1];
     const std::array<std::wstring, 25> modes{L"baseline", L"busy", L"quiet", L"delay",
         L"conflict", L"readback", L"overflow", L"write-error", L"emergency", L"crash",
         L"callback-only", L"unreadable", L"handoff", L"foreign-step", L"continue-error", L"slot-loss",
         L"stop-burst", L"wait-persistent", L"continue-persistent", L"emergency-denied", L"abrupt-observer",
         L"reject-retail-profile", L"combined-failure", L"cross-window", L"unexpected-module"};
-    const std::array<std::wstring, 31> attach_modes{L"baseline", L"busy", L"overflow", L"write-error",
+    const std::array<std::wstring, 36> attach_modes{L"baseline", L"busy", L"overflow", L"write-error",
         L"unexpected-module", L"reject-retail-profile", L"emergency", L"emergency-denied", L"handoff",
         L"slot-loss", L"conflict", L"readback", L"crash", L"unreadable", L"anomalous-return",
         L"competing-breakpoint", L"recover-detach", L"recover-refusal", L"recover-wait",
         L"recover-continue", L"recover-partial", L"recover-detach-error",
         L"admission-fixture", L"admission-critical", L"admission-quiet",
         L"admission-competitor", L"admission-slot-replaced", L"admission-continue",
-        L"admission-overlay-drift", L"admission-drift-arrival", L"admission-overlay-lookalike"};
+        L"admission-overlay-drift", L"admission-drift-arrival", L"admission-overlay-lookalike",
+        L"admission-stage-b-quiet", L"admission-stage-b-cross",
+        L"admission-control-b-load", L"admission-control-b-epoch", L"admission-control-b-attach-failure"};
     if (!stage && (attach ? std::find(attach_modes.begin(), attach_modes.end(), mode) == attach_modes.end() :
                  std::find(modes.begin(), modes.end(), mode) == modes.end())) return 2;
     wchar_t self[32768]{};
@@ -1706,8 +2025,10 @@ int wmain(int argc, wchar_t** argv) {
         const std::string digest = stage ? std::string(retail_image_profile.image_sha256) : sha256(self);
         if (digest.empty()) throw std::runtime_error("self hash");
         Journal journal(folder / "events.jsonl", mode == L"overflow" ? 32 : 8192,
-                        mode == L"write-error", mode == L"overflow", mode == L"abrupt-observer");
-        const auto role = stage ? ProfileRole::stage_a :
+                        mode == L"write-error", mode == L"overflow", mode == L"abrupt-observer",
+                        control_b || mode.starts_with(L"admission-control-b-") ?
+                            L"operational-end-prefix.json" : L"stop-prefix.json");
+        const auto role = stage ? ProfileRole::retail :
             mode == L"reject-retail-profile" ? ProfileRole::pinned_retail : ProfileRole::fixture;
         Observer observer(journal, folder, mode.c_str(), image.get(), digest, role, attach || stage);
         const bool ok = observer.run(self);

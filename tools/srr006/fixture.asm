@@ -3,6 +3,7 @@ option casemap:none
 
 EXTERN fixture_count:DWORD
 EXTERN fixture_guard:QWORD
+EXTERN fixture_pause:BYTE, fixture_callback_pause:PROC
 
 .code
 PUBLIC guard_site, iterator_site, callback_site, allocator_site
@@ -60,6 +61,12 @@ callback_site LABEL BYTE
     lock inc DWORD PTR [fixture_count]
     cmp BYTE PTR [rdx+2eh], 0bah
     jne callback_done
+    cmp BYTE PTR [fixture_pause], 0
+    je callback_allocate
+    mov QWORD PTR [rsp+20h], rdx
+    call fixture_callback_pause
+    mov rdx, QWORD PTR [rsp+20h]
+callback_allocate:
     mov rcx, rdx
     call adapter
 callback_return LABEL BYTE

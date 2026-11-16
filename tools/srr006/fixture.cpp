@@ -1,3 +1,4 @@
+#include <string_view>
 #include <cstdint>
 #include <cwchar>
 #include <filesystem>
@@ -8,6 +9,7 @@ extern "C" {
 volatile LONG fixture_count = 0;
 uint64_t fixture_guard = 0;
 unsigned char fixture_flag = 1;
+unsigned char fixture_pause = 0;
 const void* const fixture_vtable[3]{nullptr, &callback_site, &callback_site};
 }
 static const void* const other_vtable[3]{nullptr, nullptr, fixture_other_callback};
@@ -86,6 +88,140 @@ static bool competing_breakpoint() {
 
 static void wait_for(const std::filesystem::path& path) {
     while (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) Sleep(20);
+}
+
+static std::filesystem::path fixture_folder;
+
+extern "C" void fixture_callback_pause() {
+    std::ofstream(fixture_folder / "callback-reached").put('\n');
+    wait_for(fixture_folder / "release-callback");
+}
+
+struct LoadWork {
+    bool busy;
+    DWORD alter_thread;
+};
+
+// Disposable adverse control. Displace a real slot on the fixture's own
+// waiting thread without manufacturing a debugger event or journal result.
+static bool replace_fixture_slot(DWORD tid) {
+    const HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
+                                     FALSE, tid);
+    if (!thread) return false;
+    bool changed = false;
+    if (SuspendThread(thread) != DWORD(-1)) {
+        CONTEXT state{};
+        state.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+        if (GetThreadContext(thread, &state) && state.Dr3 && (state.Dr7 & 0xff) == 0x55) {
+            state.Dr3 ^= 1;
+            CONTEXT verify{};
+            verify.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+            changed = SetThreadContext(thread, &state) && GetThreadContext(thread, &verify) &&
+                      verify.Dr3 == state.Dr3;
+        }
+        if (ResumeThread(thread) == DWORD(-1)) changed = false;
+    }
+    CloseHandle(thread);
+    return changed;
+}
+
+static DWORD WINAPI load_worker(void* argument) {
+    const auto& work = *static_cast<const LoadWork*>(argument);
+    const auto module = LoadLibraryExW(L"version.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!module) return 1;
+    Sleep(150);
+    if (work.busy) {
+        for (unsigned i = 0; i < 64; ++i) {
+            sample_guard();
+            sweep_later(&receiver, right_form);
+            Sleep(10);
+        }
+    }
+    if (work.alter_thread && !replace_fixture_slot(work.alter_thread)) return 3;
+    return FreeLibrary(module) ? 0 : 2;
+}
+
+static bool stage_b_module_gap(const std::filesystem::path& folder) {
+    const auto alias = folder / "unknown-stage-b.dll";
+    std::filesystem::copy_file(L"C:/Windows/System32/version.dll", alias);
+    const auto module = LoadLibraryW(alias.c_str());
+    return module && FreeLibrary(module);
+}
+
+static void paused_stage_b_chain(const std::filesystem::path& folder) {
+    fixture_folder = folder;
+    fixture_pause = 1;
+    right_form[0x2e] = 0xba;
+    sweep_later(&receiver, right_form);
+}
+
+static int stage_b_fixture(const std::filesystem::path& folder, bool cross) {
+    std::ofstream(folder / "ready").put('\n');
+    if (std::filesystem::exists(folder / "preload-gap-fixture")) {
+        wait_for(folder / "introduce-preload-gap");
+        if (!stage_b_module_gap(folder)) return 103;
+        std::ofstream(folder / "preload-gap-complete").put('\n');
+    }
+    if (std::filesystem::exists(folder / "preload-chain-fixture")) {
+        wait_for(folder / "start-preload-chain");
+        paused_stage_b_chain(folder);
+    }
+    wait_for(folder / "simulate-load");
+    LoadWork work{std::filesystem::exists(folder / "busy-load"),
+                  std::filesystem::exists(folder / "replace-load-slot") ? GetCurrentThreadId() : 0};
+    if (work.busy) right_form[0x2e] = 0xba;
+    for (unsigned wave = 0; wave < (work.busy ? 2u : 1u); ++wave) {
+        HANDLE workers[4]{};
+        const DWORD count = work.busy ? ARRAYSIZE(workers) : 1;
+        for (DWORD i = 0; i < count; ++i) {
+            workers[i] = CreateThread(nullptr, 0, load_worker, &work, 0, nullptr);
+            if (!workers[i]) return 100;
+        }
+        if (WaitForMultipleObjects(count, workers, TRUE, INFINITE) != WAIT_OBJECT_0) return 101;
+        for (DWORD i = 0; i < count; ++i) {
+            DWORD status = 1;
+            if (!GetExitCodeThread(workers[i], &status) || status) return 102;
+            CloseHandle(workers[i]);
+        }
+    }
+    if (cross) paused_stage_b_chain(folder);
+    std::ofstream(folder / "load-complete").put('\n');
+    wait_for(folder / "simulate-lodge");
+    if (std::filesystem::exists(folder / "inject-gap") && !stage_b_module_gap(folder)) return 103;
+    std::ofstream(folder / "lodge-complete").put('\n');
+    wait_for(folder / "quit");
+    if (std::filesystem::exists(folder / "crash-after-stop") ||
+        std::filesystem::exists(folder / "crash-before-stop")) RaiseException(0xe1230043, 0, 0, nullptr);
+    return 0;
+}
+
+static int control_b_fixture(const std::filesystem::path& folder) {
+    std::ofstream(folder / "ready").put('\n');
+    while (!std::filesystem::exists(folder / "simulate-load")) {
+        if (std::filesystem::exists(folder / "quit")) return 0;
+        Sleep(20);
+    }
+    if (std::filesystem::exists(folder / "abrupt-load")) ExitProcess(EXCEPTION_SINGLE_STEP);
+    if (unowned_step() || !competing_breakpoint()) return 108;
+    LoadWork work{};
+    if (std::filesystem::exists(folder / "churn-load")) {
+        for (unsigned i = 0; i < 4; ++i) {
+            DWORD status = 1;
+            HANDLE worker = CreateThread(nullptr, 0, load_worker,
+                &work, 0, nullptr);
+            if (!worker || WaitForSingleObject(worker, INFINITE) != WAIT_OBJECT_0 ||
+                !GetExitCodeThread(worker, &status) || status) return 109;
+            CloseHandle(worker);
+        }
+    }
+    // Execute the fixture's research sites while the no-DR debugger owns the
+    // process. The old scientific fixtures still capture these same sites.
+    right_form[0x2e] = 0xba;
+    sample_guard();
+    sweep_later(&receiver, right_form);
+    std::ofstream(folder / "load-complete").put('\n');
+    wait_for(folder / "quit");
+    return std::filesystem::exists(folder / "abnormal-quit") ? 110 : 0;
 }
 
 int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
@@ -256,6 +392,10 @@ int fixture_child(const wchar_t* scenario, const wchar_t* directory) {
         wait_for(folder / "quit");
         return 0;
     }
+    if (std::wstring_view(scenario).starts_with(L"admission-control-b-"))
+        return control_b_fixture(folder);
+    if (is(L"admission-stage-b-quiet") || is(L"admission-stage-b-cross"))
+        return stage_b_fixture(folder, is(L"admission-stage-b-cross"));
     if (is(L"unexpected-module") || is(L"admission-fixture")) {
         const bool admission = is(L"admission-fixture");
         const auto source = std::filesystem::path(L"C:/Windows/System32/version.dll");

@@ -50,10 +50,10 @@ inline bool publish_record(const std::filesystem::path& path, const std::string&
 class Journal {
     std::vector<std::string> queue;
     HANDLE file;
-    std::filesystem::path watermark;
+    std::filesystem::path watermark, seal_path;
     std::atomic<bool> done{false};
     std::atomic<uint64_t> head{0}, tail{0}, checkpoint{0};
-    std::atomic<uint64_t> sealed_stop{0};
+    std::atomic<uint64_t> stop_requested{0}, stop_published{0};
     std::thread writer;
     bool inject_failure, slow_writer, abrupt_fixture;
     uint64_t peak = 0;
@@ -93,7 +93,7 @@ class Journal {
                 offset += count;
                 row.clear();
                 tail = ++written;
-                if (written == sealed_stop.load() ||
+                if (written == stop_requested.load() ||
                     (written >= checkpoint.load() && durable.load() < checkpoint.load()))
                     break;
             }
@@ -103,10 +103,18 @@ class Journal {
                     std::to_string(written) + ",\"bytes\":" + std::to_string(offset) +
                     ",\"sha256\":\"" + prefix_digest + "\"}\n";
                 if (prefix_digest.empty() || !FlushFileBuffers(file) ||
-                    !publish_record(watermark, prefix) ||
-                    (written == sealed_stop.load() &&
-                     !publish_record(watermark.parent_path() / "stop-prefix.json", prefix))) failed = true;
-                else durable.store(written);
+                    !publish_record(watermark, prefix)) {
+                    failed = true;
+                    break;
+                }
+                durable.store(written);
+                if (written == stop_requested.load()) {
+                    if (!publish_record(seal_path, prefix)) {
+                        failed = true;
+                        break;
+                    }
+                    stop_published.store(written);
+                }
             }
             if (finishing && written == head.load()) break;
         }
@@ -117,11 +125,14 @@ public:
     std::atomic<uint64_t> durable{0};
     uint64_t attempted = 0, accepted = 0, first_lost = 0;
     uint64_t high_water() const { return peak; }
+    bool stop_sealed(uint64_t sequence) const { return sequence && sequence == stop_published.load(); }
 
-    Journal(const std::filesystem::path& path, unsigned capacity, bool cut, bool slow, bool abrupt)
+    Journal(const std::filesystem::path& path, unsigned capacity, bool cut, bool slow, bool abrupt,
+            const wchar_t* seal_name = L"stop-prefix.json")
         : queue(capacity), file(CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                                nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)),
-          watermark(path.parent_path() / "durable-prefix.json"), inject_failure(cut),
+          watermark(path.parent_path() / "durable-prefix.json"),
+          seal_path(path.parent_path() / seal_name), inject_failure(cut),
           slow_writer(slow), abrupt_fixture(abrupt) {
         if (file == INVALID_HANDLE_VALUE) throw std::runtime_error("create journal");
         try { writer = std::thread(&Journal::write_loop, this); }
@@ -133,13 +144,14 @@ public:
         ++attempted;
         const uint64_t next = head.load();
         const auto depth = next - tail.load();
-        if (first_lost || failed || depth >= queue.size() || fields.size() > 4096) {
+        // A Stage B STOP includes the bounded per-window verdicts in the seal.
+        if (first_lost || failed || depth >= queue.size() || fields.size() > (seal_stop ? 16384u : 4096u)) {
             if (!first_lost) first_lost = attempted;
             return false;
         }
         queue[next % queue.size()] =
             "{\"schema\":1,\"seq\":" + std::to_string(attempted) + ',' + fields + "}\n";
-        if (seal_stop) sealed_stop = attempted;
+        if (seal_stop) stop_requested = attempted;
         head = ++accepted;
         if (peak < depth + 1) peak = depth + 1;
         return true;
