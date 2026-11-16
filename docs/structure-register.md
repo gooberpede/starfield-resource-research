@@ -35,9 +35,14 @@ See the [allocator evidence](SRR-002-retail-static-reconnaissance.md#retail-mapp
 Same [retail pin](PROVENANCE.md#current-retail-identity). See
 [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md#result)
 for the edge-key scope, borrowed work pointers and reader.
+See [SRR-012 acquisition evidence](SRR-012-acquisition-evidence.md) for
+the supported root, node and record decoding and acquisition limits.
 
 | Owning context and field or relationship | Offset, width and operation | Evidence and confidence | Open detail |
 | --- | --- | --- | --- |
+| Image owner context publication | Owner at module RVA `0x82EE300`. Embedded context at owner +0x2C0. Published context pointer at owner +0x8B0, 8 bytes. | **PROVEN STATIC** getter `0x1423FF660/0x1423FF69F`, initializer and publish `0x1418993C6–0x1418993E3`, allocator read `0x140779676`, shutdown store `0x141882F4E`. | Which measurement phases expose a published, ready context. |
+| Context edge-index root and size | Tree = context +0x300. Tree +0x00 qword root pointer. Tree +0x48 qword mixed-entry count. | **PROVEN STATIC** root read `0x1405F7AF0`, entry count increments `0x1403827DF/0x140382FE0`. | Actual tree shape, key population and readiness at each phase. |
+| Edge record descriptor within a block | At block +0x10+4×slot, 2-byte record size, then 2-byte record offset. A record of the admitted type begins at block + stored offset. | **PROVEN STATIC** descriptor read `0x14077BDA5` and payload address `0x14077BDB1`. | Runtime stability of the block and descriptor across reads. |
 | Context edge index | Embedded tree at +0x300. A 0x90-byte entry has a 16-byte edge key at +0x10 and inline `BSGalaxy::CTPerBiomeData` at +0x20. | **PROVEN STATIC** collector `0x14077BD31–0x14077BD63`, pointer math `0x14077BDA5–0x14077BDB1`, insert copy at `0x1407767A4`. | Full key schema and epoch of each context instance. |
 | CTPerBiomeData biome and resource fields | +0x40 BIOM key read and +0x4C optional RSGD key read, both four bytes. +0x50 through +0x68 hold seven four-byte result IDs. | **PROVEN STATIC** key match `0x140771FB6`, RSGD lookup in `FUN_140777870`, result clear/writes in `FUN_140779760` and `FUN_140777870`, seven-slot copy `0x14076E86A–0x14076E886`. | Formal field names and byte-level save-stream mapping. |
 

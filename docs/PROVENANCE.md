@@ -100,6 +100,14 @@ uses Capstone 5.0.7 on Python 3.14.3. Same-build sibling observations
 qualify earlier startup and menu-return frames. Direct retail allocation
 timing and saved-slot persistence remain open.
 
+The [SRR-012 feasibility dossier](SRR-012-retained-planetary-allocation-state-observation-feasibility.md)
+reverified the same two PE files and checked the existing retail Ghidra
+project's file identity and custody. The new owner and index observations
+are static on that pin. Sample tuples are conditional predictions from
+versioned data and model inputs. The disposable decision fixture uses
+fabricated inputs. Retail checkpoint state and ordinary process-read
+feasibility remain untested.
+
 The historical PNDT/BIOM/RSGD/IRES extraction timestamp is
 `2026-08-30 11:40:41`. The xEdit version is unknown. The 2026-09-24
 public-release remediation removed the older research-tree CSV snapshots from

@@ -31,6 +31,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-009 retail four-site Stage A observation](SRR-009-retail-debugger-admission-and-stage-a.md)
 - [SRR-010 Stage B save-load observation](SRR-010-stage-b-save-load-observation.md)
 - [SRR-011 planetary allocation execution and result lifecycle](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
+- [SRR-012 retained planetary allocation state observation feasibility](SRR-012-retained-planetary-allocation-state-observation-feasibility.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence

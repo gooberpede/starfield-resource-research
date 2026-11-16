@@ -50,6 +50,15 @@ extends the pinned retail graph.
 | `FUN_140774970`, `FUN_142409490`, `FUN_1424063b0` | **PROVEN STATIC** scoped edge-range removal and broader context index clear. |
 | `FUN_14231da10`, `FUN_1424058b0` | **PROVEN STATIC** PerBiomeData type-registry disposal from native `BSGalaxy::ModuleState` teardown. |
 
+[SRR-012](SRR-012-acquisition-evidence.md) resolves these retail acquisition
+and traversal anchors.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_1423ff640`, `FUN_1424059f0` | **PROVEN STATIC** lazy accessor returning a fixed image object on both arms and initializer for its embedded context. Publication at `0x1418993E3` supplies the context consumed by the allocator at `0x140779676`. |
+| `FUN_1405f7a80`, `FUN_1403832a0`, `FUN_1403833e0`, `FUN_1403a4250` | **PROVEN STATIC** planet/type range construction, directory and record lookup, and successor iteration on the +0x300 index. |
+| `FUN_1405de3b0` | **PROVEN STATIC** FormID lookup sourced from an image-relative locator for the form map. The map contents and per-form addresses require fresh resolution in a later observation. |
+
 The CK entries below retain their original build and evidence scope.
 
 ---

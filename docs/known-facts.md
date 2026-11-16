@@ -33,6 +33,14 @@ A keyed reader copies a matching component into caller storage or
 returns failure on a miss. See [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
 for exact predicates, consumers, teardown and historical observation limits.
 
+**PROVEN STATIC:** On the same image, `FUN_1423FF640` returns the
+image object at preferred VA `0x1482EE300`. Startup initializes its
+embedded context at +0x2C0 and publishes it through the qword at +0x8B0.
+The allocation adapter reads that qword. The context's +0x300 index
+leads through native key ranges to inline biome payloads. See
+[SRR-012](SRR-012-retained-planetary-allocation-state-observation-feasibility.md)
+for the qualified external read design and its unmeasured runtime scope.
+
 ## Input Resolution and Biome Order
 
 ```text
