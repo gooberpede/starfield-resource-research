@@ -36,26 +36,27 @@ def canonical(word):
     return f"fixture.esm:{word:06X}" if word else None
 
 
-def check_identity(value, word, signature, *, defining_only=False):
+def check_identity(value, word, signature, *, defining_only=False, native_only=False):
     assert value["runtime_form_id"] == word
     if word:
         assert value["native_status"] == "VERIFIED"
         assert value["source"]["signature"] == signature
         assert value["source"]["plugin"] == "fixture.esm"
         assert value["source"]["local_id"] == f"{word:06X}"
-        assert value["source"]["source_record_id"] == f"{word:08X}"
+        assert value["source"]["source_record_id"] == (None if native_only else f"{word:08X}")
         assert value["source"]["winning_plugin"] == (None if defining_only else "fixture.esm")
         assert value["source"]["winning_record_id"] == (None if defining_only else f"{word:08X}")
         if defining_only:
             assert value["source"]["attribution"] == "WINNING_CONTENT_UNRESOLVED"
-            assert value["source"]["candidate_plugins"] == ["fixture.esm"]
+            if not native_only:
+                assert value["source"]["candidate_plugins"] == ["fixture.esm"]
         assert value["source"]["comparator_id"] == canonical(word)
     else:
         assert value["native_status"] == "ZERO"
         assert value["source"] is None
 
 
-def check_fields(case, dataset, *, expected_namespace=False, defining_only=False):
+def check_fields(case, dataset, *, expected_namespace=False, defining_only=False, native_only=False):
     expected = qualify_census.independent_truth(case)
     reference = [(first, second, lanes) for first, second, width, *lanes in expected if width == 144]
     assert dataset["acquisition"] == "QUALIFIED"
@@ -80,26 +81,28 @@ def check_fields(case, dataset, *, expected_namespace=False, defining_only=False
         key = canonical(owner), canonical(second)
         assert native["raw_key"] == [f"{first:016X}", f"{second:016X}"]
         assert native["source_issues"] == []
-        check_identity(native["pndt"], owner, "PNDT", defining_only=defining_only)
-        check_identity(native["biom"], second, "BIOM", defining_only=defining_only)
+        check_identity(native["pndt"], owner, "PNDT", defining_only=defining_only, native_only=native_only)
+        check_identity(native["biom"], second, "BIOM", defining_only=defining_only, native_only=native_only)
         assert native["pndt_seed"] == (owner * 17) & 0xFFFFFFFF
         assert native["biome_seed"] == (second * 313) & 0xFFFFFFFF
         assert native["coverage_word"] == 0x3F800000
         biome_relative = second - 0x200000
         for index, ref in enumerate(native["biom_rsgds"]):
-            check_identity(ref, 0x300000 + (biome_relative + index) % 5, "RSGD", defining_only=defining_only)
+            check_identity(ref, 0x300000 + (biome_relative + index) % 5, "RSGD",
+                           defining_only=defining_only, native_only=native_only)
         assert len(native["biom_rsgds"]) == 2
         override = native["override_rsgd"]
         if case == "optional-absent" and ordinal == 0:
             assert override == {"runtime_form_id": 0x750000, "source": None,
                                 "native_status": "RESOLVED_NULL", "reason": "form_absent"}
         else:
-            check_identity(override, 0x300000 if second & 1 else 0, "RSGD", defining_only=defining_only)
+            check_identity(override, 0x300000 if second & 1 else 0, "RSGD",
+                           defining_only=defining_only, native_only=native_only)
         for index, (word, slot) in enumerate(zip(lanes, native["slots"], strict=True)):
             assert (slot["ordinal"], slot["payload_offset"], slot["role"]) == (
                 index, 80 + 4 * index, ("Common", "Uncommon", "Rare", "Exotic", "Unique",
                                         "Special", "Everywhere")[index])
-            check_identity(slot, word, "IRES", defining_only=defining_only)
+            check_identity(slot, word, "IRES", defining_only=defining_only, native_only=native_only)
         assert projected[key]["raw_key"] == [first, second]
         assert projected[key]["raw_slots"] == lanes
         assert projected[key]["slots"] == list(map(canonical, lanes))

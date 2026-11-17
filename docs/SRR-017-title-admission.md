@@ -1,5 +1,9 @@
 # SRR-017 title admission and work envelope
 
+The [native FormID identity correction](SRR-017-identity-correction.md)
+supersedes physical ESM provenance release gates. The native work envelope
+and original fixture measurements below retain their historical scope.
+
 **PROVEN on owned AMD64 fixtures.** The single-use controller completed
 two full collections with an authoritative synthetic FormID table capacity
 of 8,388,608. Both collections agreed on every rooted descriptor and every

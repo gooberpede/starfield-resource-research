@@ -361,6 +361,76 @@ def bind_source_files(native_namespace, snapshot, *, authority="RETAIL_NATIVE_WI
     return index
 
 
+def bind_native_namespace(native_namespace, *, authority="RETAIL_NATIVE_WITNESS"):
+    """Resolve defining identities from a checked native loaded-plugin roster."""
+    if not isinstance(native_namespace, dict):
+        raise SourceIdentityError("invalid_namespace", "native namespace is missing")
+    return NativeIdentityIndex({
+        "schema": NAMESPACE_SCHEMA, "authority": authority,
+        "plugins": native_namespace.get("compiled"),
+    })
+
+
+class NativeIdentityIndex:
+    """Join native-validated FormIDs to the independently collected plugin slots.
+
+    The acquisition validates each form's stored ID, native type and relevant
+    resource vptr. The index supplies its defining namespace and local bits.
+    """
+
+    def __init__(self, namespace):
+        if (not isinstance(namespace, dict) or set(namespace) != {"schema", "authority", "plugins"}
+                or namespace["schema"] != NAMESPACE_SCHEMA
+                or namespace["authority"] not in ("OWNED_DISPOSABLE", "RETAIL_NATIVE_WITNESS")
+                or not isinstance(namespace["plugins"], list)
+                or not 0 < len(namespace["plugins"]) <= MAX_PLUGINS):
+            raise SourceIdentityError("invalid_namespace", NAMESPACE_SCHEMA)
+        self.by_slot = {}
+        names = set()
+        plugins = []
+        for entry in namespace["plugins"]:
+            if not isinstance(entry, dict) or set(entry) != {"plugin", "kind", "index"}:
+                raise SourceIdentityError("invalid_namespace_entry", "expected plugin/kind/index")
+            name, kind, index = _plugin(entry["plugin"]), entry["kind"], entry["index"]
+            if not isinstance(kind, str) or kind not in INDEX_MAX or not _integer(index, INDEX_MAX[kind]):
+                raise SourceIdentityError("invalid_namespace_slot", name)
+            if name in names or (kind, index) in self.by_slot:
+                raise SourceIdentityError("ambiguous_namespace", name)
+            names.add(name)
+            self.by_slot[kind, index] = name
+            plugins.append({"plugin": name, "kind": kind, "index": index})
+        ordered = sorted(plugins, key=lambda entry: (entry["kind"], entry["index"]))
+        normalized = {**namespace, "plugins": ordered}
+        self.identity_sha256 = digest(normalized)
+        self.provenance = {
+            "authority": namespace["authority"], "namespace_sha256": self.identity_sha256,
+            "identity_method": "NATIVE_LOADED_PLUGIN_NAMESPACE",
+            "type_evidence": "NATIVE_FORM_MAP",
+            "plugins": ordered,
+        }
+        self.signatures = {}
+
+    def resolve(self, runtime_id, signature):
+        if not isinstance(signature, str) or signature not in SIGNATURES:
+            raise SourceIdentityError("unsupported_native_signature", repr(signature))
+        kind, index, local = _split(runtime_id)
+        plugin = self.by_slot.get((kind, index))
+        if plugin is None:
+            raise SourceIdentityError("unwitnessed_runtime_namespace", f"{runtime_id:08X}")
+        previous = self.signatures.setdefault(runtime_id, signature)
+        if previous != signature:
+            raise SourceIdentityError("native_form_type_conflict", f"{runtime_id:08X}")
+        return {
+            "plugin": plugin, "local_id": f"{local:06X}", "signature": signature,
+            "source_record_id": None, "winning_record_id": None, "winning_plugin": None,
+            "comparator_id": f"{plugin}:{local:06X}", "attribution": "WINNING_CONTENT_UNRESOLVED",
+        }
+
+    def validate_observed_sources(self, resolved, observed):
+        """Retain attribution independently from defining identity and native type."""
+        return None
+
+
 class SourceIndex:
     """Consume ordered loaded plugin slots from a separately authenticated witness.
 

@@ -305,22 +305,21 @@ def replay_export(receipt, source, expected_receipt_sha256):
 
 
 def bound_dataset(report, receipt_sha256, reader_sha256):
-    """Join checked memory replay to independently retained pre/post file evidence."""
-    from .source import bind_source_files
+    """Resolve defining identities from the checked paired native namespace."""
+    from .source import bind_native_namespace
 
     if report.get("title_flow") != census.RETAIL_NAMESPACE_PROFILE:
         raise ValueError("unsupported evidence for a bound title export")
     failure = report.get("source_binding_failure")
-    snapshot = report.get("source_snapshot")
     source = None
-    if not failure and snapshot is not None and len(report["collections"]) == 2:
+    if not failure and len(report["collections"]) == 2:
         try:
             witnesses = [item.get("source_witness", {}).get("namespace") for item in report["collections"]]
             if not all(witnesses):
                 raise SourceIdentityError("loaded_namespace_incomplete", "paired namespace was not witnessed")
             kind = report["observation"]["source"]
             authority = "RETAIL_NATIVE_WITNESS" if kind == "RETAIL_ATTESTED" else "OWNED_DISPOSABLE"
-            indices = [bind_source_files(witness, snapshot, authority=authority) for witness in witnesses]
+            indices = [bind_native_namespace(witness, authority=authority) for witness in witnesses]
             if indices[0].identity_sha256 != indices[1].identity_sha256:
                 raise SourceIdentityError("loaded_namespace_changed", "source file join differs across passes")
             source = indices[0]

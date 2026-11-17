@@ -25,6 +25,10 @@ tmp/
 *.dd32
 *.dd64
 
+# Bytecode
+__pycache__/
+*.pyc
+
 # Evidence-transfer archives are ignored by default. A deliberately reviewed
 # archive must be force-added explicitly.
 *.zip

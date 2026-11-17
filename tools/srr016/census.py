@@ -35,6 +35,10 @@ RETAIL_SHA256 = RETAIL_APPLICABILITY["sha256"]
 CANONICAL = re.compile(r"[^:/\\\x00-\x1f]{1,255}\.(?:esm|esl|esp):[0-9A-F]{6}")
 RUNTIME_ID = re.compile(r"[0-9A-F]{8}")
 ERRORS = (NativeFailure, ReadFailure, AcquisitionStop)
+FATAL_SOURCE_READS = {
+    "backend_budget", "observation_budget", "operator_cancelled", "process_exited",
+    "epoch_mismatch", "process_identity_changed",
+}
 FIXTURE_NAME = "srr016-fixture.exe"
 
 # Disposable envelope. The large fixture reaches 5,120 descriptors in under 512
@@ -413,8 +417,7 @@ class WholeCollection(Collection):
             return data
 
         try:
-            options = {"include_paths": True} if retail_flow else {}
-            namespace = collect_namespace(source_read, self.base, claim=self.claim, **options)
+            namespace = collect_namespace(source_read, self.base, claim=self.claim)
             rows = {}
             private_namespace = {**namespace, "file_pointers": {
                 f"{address:016X}": fields for address, fields in namespace["file_pointers"].items()}}
@@ -438,6 +441,10 @@ class WholeCollection(Collection):
                 self.source_witness["provenance_failure"] = error.code
             else:
                 self.source_failure = [error.code, error.detail]
+        except ReadFailure as error:
+            if not retail_flow or not hasattr(self, "source_identity_sha256") or error.code in FATAL_SOURCE_READS:
+                raise
+            self.source_witness["provenance_failure"] = error.code
 
     def revalidate(self, anchors):
         if self.namespace_profile != RETAIL_NAMESPACE_PROFILE:
@@ -445,11 +452,18 @@ class WholeCollection(Collection):
         digest = sha256()
         for bounds, prior in self.structure.items():
             self.reader.pulse()
-            current = self.exact(*bounds)
             if bounds in self.provenance_windows:
+                try:
+                    current = self.exact(*bounds)
+                except ReadFailure as error:
+                    if error.code in FATAL_SOURCE_READS:
+                        raise
+                    self.source_witness["provenance_failure"] = error.code
+                    continue
                 if current != prior:
                     self.source_witness["provenance_failure"] = "source_vector_changed_during_collection"
                 continue
+            current = self.exact(*bounds)
             require(current == prior, "structural_change", f"structural witness changed at {bounds[0]:#x}")
             digest.update(struct.pack("<QII", *bounds))
             digest.update(prior)

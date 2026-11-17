@@ -16,7 +16,6 @@ from retail_admission import open_simulated
 from . import retail_title as title
 from .export import bound_dataset, file_sha256, output_bytes
 from .qualify_export import check_fields, fixture_sources
-from .source import FILE_PROFILE_SCHEMA
 
 
 PRIVATE = title.ROOT / ".local-work" / "codex" / "SRR-017-retail-readiness"
@@ -77,12 +76,6 @@ def make_receipts(directory, phase, changed=False):
 
 def authorize(directory, steam, fixture_source, key, trust, *, stale=False, changes=None):
     make_receipts(directory, "pre")
-    sources = fixture_source if isinstance(fixture_source, tuple) else (fixture_source,)
-    profile = {"schema": FILE_PROFILE_SCHEMA, "files": [
-        {"plugin": source.name.casefold(), "path": str(source), "bytes": source.stat().st_size,
-         "sha256": file_sha256(source)} for source in sources]}
-    profile_path = directory / "source-files.json"
-    title.write_exclusive(profile_path, profile)
     manifest = title.candidate_manifest()
     approval = directory / "authorization.json"
     start = time_ns() - (60_000_000_000 if stale else 500_000_000)
@@ -91,7 +84,7 @@ def authorize(directory, steam, fixture_source, key, trust, *, stale=False, chan
         "approval_id": f"{start:032x}", "purpose": "one-responsive-title-readonly-pair",
         "operator_sid": SID, "steam_session": current_session(), "steam_root": str(steam), "custody": str(directory),
         "source_sha256": title.digest_manifest(manifest), "work_sha256": title.digest_manifest(manifest["work"]),
-        "input_sha256": file_sha256(profile_path), "trust_sha256": file_sha256(trust),
+        "input_sha256": title.digest_manifest(title.IDENTITY_CONTRACT), "trust_sha256": file_sha256(trust),
         "verifier_sha256": file_sha256(title.SSH_PATH), "retail_sha256": census.RETAIL_SHA256,
         "issued_utc_ns": start, "expires_utc_ns": start + (1_000_000_000 if stale else 600_000_000_000),
         "pre_environment_sha256": file_sha256(directory / "pre-environment" / "receipt.json"),
@@ -101,7 +94,7 @@ def authorize(directory, steam, fixture_source, key, trust, *, stale=False, chan
     title.write_exclusive(approval, value)
     subprocess.run([str(title.SSH_PATH), "-Y", "sign", "-f", str(key), "-n", title.SIGN_NAMESPACE, str(approval)],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    return approval, directory / "authorization.json.sig", profile_path
+    return approval, directory / "authorization.json.sig"
 
 
 def current_session():
@@ -140,7 +133,7 @@ def gate_tests(directory, steam, fixture_source, key, untrusted, trust):
     custody = directory / "real-unapproved"
     custody.mkdir()
     args = [sys.executable, "-E", "-B", "-m", "tools.srr017.retail_title", "observe-title", str(steam), str(custody),
-            *(str(custody / name) for name in ("authorization.json", "authorization.json.sig", "source-files.json"))]
+            *(str(custody / name) for name in ("authorization.json", "authorization.json.sig"))]
     result = subprocess.run(args, capture_output=True, cwd=title.ROOT, check=False)
     assert result.returncode == 1 and b"Refused:" in result.stderr and not (custody / title.CLAIM).exists()
     findings["unapproved-production-command"] = result.returncode
@@ -151,7 +144,7 @@ def gate_tests(directory, steam, fixture_source, key, untrusted, trust):
 def owned_services(directory, target, steam, trust, scenario, case, fixture_source):
     processes = {}
     observed = {"begin_calls": 0, "open_calls": 0}
-    original_plugin = fixture_source.read_bytes()
+    original_plugin = fixture_source.read_bytes() if fixture_source.exists() else None
     with ExitStack() as resources:
         @contextmanager
         def begin(approved, *, digest_file):
@@ -210,6 +203,8 @@ def owned_services(directory, target, steam, trust, scenario, case, fixture_sour
                 processes["process"].wait(timeout=30)
             elif case in {"namespace-drift", "vector-drift"}:
                 processes["command"](case)
+            elif case == "pair-values":
+                processes["command"]("clear")
 
         services = title.Services("simulated", lambda: (SID, current_session()), lambda: (trust, title.SSH_PATH),
                                   begin, select, respond, fake_space, between)
@@ -230,13 +225,18 @@ CONTROLS = (
     ("corpus", "corpus", None, None, {}),
     ("upper", "upper", None, None, {}),
     ("source-filtered", "source-filtered", None, None, {}),
+    ("source-unreadable", "source-unreadable", None, None, {}),
     ("vector-drift", "direct", None, None, {}),
-    ("signed-roster-order", "direct", None, None, {}),
+    ("relative-data", "relative-data", None, None, {}),
     ("namespace-drift", "direct", "pair_namespace_mismatch", None, {}),
     ("namespace-invalid", "namespace-invalid", "namespace_witness_refused", None, {}),
-    ("missing-plugin", "direct", None, "missing_plugin_source", {}),
-    ("swapped-path", "direct", None, "native_source_path_disagreement", {}),
-    ("changed-esm", "direct", None, "source_file_digest_mismatch", {}),
+    ("absent-esm", "direct", None, None, {}),
+    ("changed-esm", "direct", None, None, {}),
+    ("bad-owner", "bad-owner-key", "pndt_key_mismatch", None, {}),
+    ("bad-biome-type", "bad-biome-type", "form_type_mismatch", None, {}),
+    ("bad-resource-type", "bad-resource-type", "resource_form_type_mismatch", None, {}),
+    ("bad-resource-vptr", "bad-resource-vptr", "resource_form_vptr_mismatch", None, {}),
+    ("pair-values", "direct", "pair_value_mismatch", None, {}),
     ("map-cross-region", "map-region-crossing", "unreadable_region", None, {}),
     ("volume", "direct", "traversal_budget", None, {"entries": 5}),
     ("journal", "direct", "journal_budget", None, {"journal_bytes": 24 * 1024}),
@@ -261,14 +261,9 @@ def run(directory):
         custody = directory / name
         custody.mkdir()
         source = fixture_source
-        if name in {"missing-plugin", "swapped-path"}:
-            source = custody / ("not-loaded.esm" if name == "missing-plugin" else fixture_source.name)
-            source.write_bytes(fixture_source.read_bytes())
-        elif name == "signed-roster-order":
-            spare = custody / "z-unloaded.esm"
-            spare.write_bytes(fixture_source.read_bytes())
-            source = (spare, fixture_source)
         paths = authorize(custody, steam, source, key, trust)
+        if name == "absent-esm":
+            fixture_source.unlink()
         limits = {**census.RETAIL_LIMITS, **overrides}
         with owned_services(custody, target, steam, trust, scenario, name, fixture_source) as (services, called):
             state = title.acquire(steam, custody, *paths, services=services, limits=limits)
@@ -276,6 +271,8 @@ def run(directory):
             assert state["source_binding_failure"] == source_failure, (name, state)
             expected_error(lambda: title.acquire(steam, custody, *paths, services=services, limits=limits))
             assert called["begin_calls"] == called["open_calls"] == 1, (name, called)
+        if name == "absent-esm":
+            fixture_sources(fixture_source)
         details = {key_: state[key_] for key_ in ("failure", "source_binding_failure", "work") if key_ in state}
         receipt = custody / title.RECEIPT
         attempt_sha256 = file_sha256(custody / title.ATTEMPT)
@@ -284,7 +281,8 @@ def run(directory):
             header = next(census._load_receipt(receipt))
             dataset = bound_dataset(report, file_sha256(receipt), header["reader_source_sha256"])
             if name in {"direct", "corpus", "upper"}:
-                details["fields"] = check_fields(name, dataset, expected_namespace=True, defining_only=True)
+                details["fields"] = check_fields(name, dataset, expected_namespace=True, defining_only=True,
+                                                native_only=True)
                 output = output_bytes(dataset)
                 (custody / "portable.json").write_bytes(output)
                 details.update(receipt_sha256=file_sha256(receipt), attempt_sha256=attempt_sha256,
@@ -299,9 +297,12 @@ def run(directory):
                                                                    services=services))
                     finally:
                         receipt.write_bytes(raw)
-            elif name in {"source-filtered", "vector-drift", "signed-roster-order"}:
+            elif name in {"source-filtered", "source-unreadable", "vector-drift", "relative-data", "absent-esm", "changed-esm"}:
                 assert dataset["acquisition"] == "QUALIFIED" and len(dataset["rows"]) == 4, (name, dataset)
                 assert all(len(row["slots"]) == 7 for row in dataset["rows"])
+                if name == "source-unreadable":
+                    assert dataset["native_source_attribution"]["agreement"] == "INCOMPLETE"
+                    assert dataset["native_source_attribution"]["refusals"] == ["unreadable_region"] * 2
             else:
                 assert dataset["acquisition"] != "QUALIFIED", (name, dataset)
             details["coverage"] = report["coverage_counts"]

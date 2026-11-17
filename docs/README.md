@@ -41,6 +41,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-016 whole-store allocation census and native-slot oracle](SRR-016-whole-store-census.md)
 - [SRR-017 retained allocation export and retail readiness](SRR-017-retail-allocation-export.md)
 - [SRR-017 retail readiness continuation](SRR-017-retail-readiness.md)
+- [SRR-017 native FormID identity correction](SRR-017-identity-correction.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence

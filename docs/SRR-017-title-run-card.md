@@ -11,13 +11,13 @@ SRR-013 approvals and disposable signatures confer no retail authority.
 From the reviewed checkout, set absolute local paths for the reviewed
 64-bit Python executable, the Steam root, and an existing restricted
 custody directory below the checkout's private work root. The two
-approval files and source profile have the fixed basenames shown here.
+approval files have the fixed basenames shown here.
 
 ```powershell
 & $approvedPython -E -B -m tools.srr017.retail_title execution-manifest
 & $approvedPython -E -B -m tools.srr017.retail_title observe-title `
     $steamRoot $custody "$custody/authorization.json" `
-    "$custody/authorization.json.sig" "$custody/source-files.json"
+    "$custody/authorization.json.sig"
 ```
 
 The first command is offline and prints the canonical execution manifest
@@ -56,7 +56,7 @@ and one final LF. The schema has these fields.
 | `operator_sid`, `steam_session` | Approved Windows user SID and interactive session number |
 | `steam_root`, `custody` | Canonical Steam and custody paths |
 | `source_sha256`, `work_sha256` | Canonical SHA-256 of the command manifest and its `work` member, without final LF |
-| `input_sha256` | Byte SHA-256 of canonical `source-files.json` |
+| `input_sha256` | Canonical SHA-256 of `IDENTITY_CONTRACT` in the reviewed command, binding native namespace and PNDT/BIOM/RSGD/IRES validation |
 | `trust_sha256`, `verifier_sha256` | Exact approved allowlist and OS SSH verifier byte SHA-256 |
 | `retail_sha256` | `7e9adb1414a8e1b325e5e1f097b9b17b78deb7eebeda37a333351a43a60f9d28` for Starfield.exe 1.16.244.0 |
 | `pre_environment_sha256`, `pre_protection_sha256` | Exact SHA-256 of the two preflight receipt byte files |
@@ -70,13 +70,13 @@ the original JSON bytes and detached signature to the agreed directory.
 & $approvedSshKeygen -Y sign -f $maintainerPrivateKey -n srr017-retail-title $approval
 ```
 
-The source profile uses schema `srr017-source-files-v1` and a `files`
-array of per-plugin objects with `plugin`, `path`, `bytes` and
-`sha256`. The files cover the intended effective roster, including the
-two principal ESMs and any applicable installed plugins. Native loaded
-paths and slot namespaces supply the independent epoch check. Use only
-paths and digests verified for the proposed invocation. The expected
-population and the reproducer do not enter the command.
+The native loaded-plugin namespace supplies defining plugin names and
+local record identities. The native FormID map independently validates
+each relevant record's stored ID and type, and each resource's vptr.
+Relative `DATA\` directories are admitted. ESM backing files, file hashes,
+provider selection and winning-content attribution are outside this
+identity contract. The expected population and reproducer remain later
+comparison inputs.
 
 The strict approval and preflight checks precede any Steam baseline or
 game process open. After verification, the tool creates and durably
@@ -130,15 +130,15 @@ cooperative cancellation without a duration deadline.
    & $approvedPython -E -B tools/srr008/watch_exit.py $epochToken $approvedImage $custody
    ```
 
-2. Hold the title scene through both collections and source closeout.
+2. Hold the title scene through both collections and epoch closeout.
    Collect from each fresh published root and registry, check consumed
    witnesses and the process epoch, wait at least 25 ms, and repeat.
    Keep exact counts, all seven words and present all-zero targets.
-   Native epoch-bound loaded paths and slot assignments resolve
-   defining identities against the prelaunch and post-pair file
-   snapshots. An override attribution remains a separate question.
+   Native epoch-bound slot assignments resolve defining identities.
+   Preserve observed runtime IDs, typed input metadata, all seven slots
+   and canonical plugin/local IDs. Winning content stays unresolved.
 3. Stop if there is cancellation, phase or identity drift, unsupported
-   loaded paths, malformed data, or work/evidence exhaustion. Ctrl+C
+   namespace conflicts, malformed data, or work/evidence exhaustion. Ctrl+C
    requests cooperative cancellation when the current operation returns.
    A failed attempt never triggers a replacement pair, larger limits,
    or fresh launch. Keep any sealed refusal or incomplete private prefix.

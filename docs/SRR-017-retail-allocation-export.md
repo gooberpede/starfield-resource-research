@@ -1,5 +1,8 @@
 # SRR-017 retained allocation export and retail readiness
 
+The [native FormID identity correction](SRR-017-identity-correction.md)
+governs the current identity contract and retail release disposition.
+
 This dossier records the original owned qualification. The
 [retail readiness continuation](SRR-017-retail-readiness.md) records the
 subsequent command, source-binding scope and current release decision.

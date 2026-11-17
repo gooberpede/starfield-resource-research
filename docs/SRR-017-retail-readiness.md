@@ -1,5 +1,11 @@
 # SRR-017 retail readiness continuation
 
+**Historical contract.** The maintainer subsequently withdrew physical
+ESM backing-file provenance as an extraction and authorization gate.
+The [identity correction](SRR-017-identity-correction.md) governs current
+requirements and release disposition. The physical-provenance blocker
+and associated requirements below are **SUPERSEDED**.
+
 **BLOCKED for a request to observe retail.** The continuation adds a
 signed, single-use retail-facing title command and applies its acquisition,
 source binding and replay to owned processes. The pinned executable has a

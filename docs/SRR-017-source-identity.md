@@ -1,5 +1,37 @@
 # SRR-017 FormID source identity
 
+## Corrected defining identity contract
+
+The maintainer withdrew physical ESM backing provenance as an extraction
+and retail-admission requirement. The current retail profile resolves
+each independently native-validated FormID through the paired loaded
+plugin namespace. Full records retain 24 local bits, medium records
+16 bits and small records 12 bits. The resulting identity is the loaded
+plugin basename plus local record ID, alongside the original runtime ID.
+The native FormID map supplies the record's stored ID and type witness.
+Every nonzero resource also retains its BGSResource vptr witness.
+
+`bind_native_namespace(namespace)` builds the native identity index
+without opening an ESM or requiring a source manifest. Invalid IDs,
+unassigned slots, conflicting assignments, ambiguous plugin names and
+conflicting native types refuse. The rooted reader retains all of its
+coverage, paired-value, typed-input and evidence-integrity checks.
+A relative `DATA\\` directory and an absent or retired file stream
+have no effect on defining identity.
+
+Winning content remains unresolved. Missing, filtered or contradictory
+source-history attribution is retained separately where available and
+does not override a verified defining namespace and record type.
+The earlier file-backed join and provider investigation below remain
+historical evidence. They supply no current acquisition gate.
+
+Run `python -E -B -m unittest -v tools.srr017.test_native_identity`
+for independent full/medium/small controls, relative-directory and
+retired-stream counterexamples, attribution independence, conflicting
+namespace assignments, invalid IDs and contradictory native types.
+The corrected scientific contract is documented in the
+[identity correction dossier](SRR-017-identity-correction.md).
+
 **PROVEN STATIC** on retail 1.16.244.0, SHA-256
 7e9adb1414a8e1b325e5e1f097b9b17b78deb7eebeda37a333351a43a60f9d28.
 The pinned native image exposes an independent loaded plugin namespace and
@@ -25,7 +57,12 @@ form. The writer can filter prior non-master contributors. Registration's
 deferred branch and the vector filter prevent treating either list as
 universal proof of winning bytes.
 
-## Effective file backing
+## Historical effective file backing investigation
+
+**SUPERSEDED as a retail-admission requirement.** The following records
+the earlier file-backing approach. Its native locators retain their
+static evidence status. The maintainer decision removes these physical
+path, provider, handle and file-hash conditions from extraction.
 
 The continuation qualifies an absolute packed-file directory and an
 independently typed retained open stream as pathname witnesses. Both
@@ -53,7 +90,8 @@ journal retains the raw witness and the portable dataset records the
 refusal code. The export includes path witness classes and digests
 without physical paths.
 
-**Retail readiness remains conditional on the effective backing.** The
+The earlier candidate made retail readiness conditional on effective
+backing. That requirement is now **SUPERSEDED**. The
 ordinary startup route can retain `DATA\\` and close the stream. The
 active provider list offers a positive alternate-root mechanism. A
 basename, the current Steam install directory and a file hash therefore
@@ -65,7 +103,12 @@ every earlier applicable provider and path in the authenticated epoch
 either misses or resolves to the same pinned file. An install directory
 listing or last-writer guess cannot supply either check.
 
-## Independent disk controls
+## Historical independent disk controls
+
+These disk checks and the file-backed tooling below describe the
+superseded acquisition contract. They remain available for offline
+comparison research and historical replay. The current retail command
+uses the native namespace index described above.
 
 | File | SHA-256 | PNDT / BIOM / RSGD / IRES |
 | --- | --- | ---: |
@@ -121,7 +164,7 @@ injected records, corrupt signatures, duplicate source words and deleted
 winners refuse. Supported filenames are ASCII plugin basenames.
 
 That ordered-winner mode serves the historical owned tests. The
-continuation's `bind_source_files(native_namespace, snapshot)` instead
+earlier continuation's `bind_source_files(native_namespace, snapshot)`
 resolves defining identity by native slot, file-local master domains,
 local ID and typed signature. It lists candidate contributor and
 tombstone filenames with winning-content attribution unresolved.
@@ -204,8 +247,8 @@ stream, omitted contributors and a contradictory contributor.
 | Base fields are a pointer or handle | **Excluded** for the SRR-013 sample scope. Native typed lookup and independent source headers agree. The active-file wrapper also forwards encoded FormIDs to that same lookup. |
 | Runtime prefix always equals the disk high byte | **Excluded.** Native scale arrays and independently authored disk examples demonstrate the need for a separate loaded prefix. Base prefix 00 agrees for the observed samples. |
 | CommonLibSF singleton locates the collection directly | **Excluded** on this image. Local Address Library 1.16.244.0 maps ID 825890 to 0x145912E10. The target is a service slot with registered vptr at 0x14395A8DB. Native lookup and the constructor independently identify the loader data-handler pointer. [Upstream ID](https://github.com/Starfield-Reverse-Engineering/CommonLibSF/blob/main/include/RE/IDs.h) |
-| Native plugin namespace can be joined independently | **PROVEN STATIC** for ordinary full, medium and small entries. The name registry and vector reads identify basenames. The checked constructor fields at +0x140..+0x150 initialize as qwords, and destruction calls a resource retirement helper on +0x140. This does not establish a retained path or usable handle at title. A retail epoch still requires a witnessed runtime roster, a complete relevant disk manifest and a binding from the actual loaded paths or open file identities to those digests. |
-| Registry order or the last source diagnostic always proves the winning record | **BLOCKED.** Native register deferral and source-history filtering are affirmative counterexamples to treating these mechanisms as complete winner evidence. Capture and replay both paired namespace and source vectors with the typed forms, then qualify the winner join against the effective loaded inputs. |
+| Native plugin namespace can be joined independently | **PROVEN STATIC** for ordinary full, medium and small entries. The paired native arrays and file-name registry supply defining plugin and local bits. The native FormID map supplies stored ID and type checks for encountered records. Physical file backing is outside the corrected acquisition contract. |
+| Registry order or the last source diagnostic always proves the winning record | **UNRESOLVED** for winning-content attribution. Native register deferral and source-history filtering prevent treating these mechanisms as complete winner evidence. The current index leaves the winner unresolved and retains optional history diagnostics separately. This does not block defining identity. |
 | Alternate plugin or CSV sources change comparison | **BLOCKED** for oracle applicability. The sources above establish identity layouts and candidate headers. A loaded-file witness and effective reconstruction are needed for an input attestation. [Existing effective-input gates](SRR-013-retail-effective-inputs.md) |
 
 No retail process or save was accessed.

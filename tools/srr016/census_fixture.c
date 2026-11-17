@@ -119,6 +119,10 @@ static void publish_identity(void)
     check(filename != NULL, "owned plugin path");
     *filename = '\0';
     memcpy(plugin_source + 0x268, directory, (size_t)(filename - directory) + 1);
+    if (mode("relative-data")) {
+        memset(plugin_source + 0x268, 0, 260);
+        memcpy(plugin_source + 0x268, "DATA\\", sizeof("DATA\\"));
+    }
     dword(plugin_source + 0x1b8, 1);
     address(handler + 0x1570, plugin_source);
     dword(handler + 0x1580, 1);
@@ -448,7 +452,7 @@ static void build(void)
     if (mode("empty")) targets = mixed = 0;
     if (mode("direct") || mode("all-seven") || mode("holes") || mode("bad-hole") || mode("wrapper") ||
         mode("reuse") || mode("wrong-type") || mode("blank-mixed") || mode("namespace-invalid") ||
-        mode("source-filtered") || mode("map-region-crossing")) {
+        mode("source-filtered") || mode("source-unreadable") || mode("map-region-crossing") || mode("relative-data")) {
         targets = 4;
         mixed = 2;
         block_width = 16;
@@ -476,6 +480,11 @@ static void build(void)
     }
     make_forms(targets);
     if (mode("source-filtered")) word(forms[0].data + 0x30, UINT16_MAX);
+    if (mode("source-unreadable")) {
+        Byte *unreadable = VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_NOACCESS);
+        check(unreadable != NULL, "reserve unavailable source history");
+        address(image + 0x5e881f0, unreadable);
+    }
     make_rows(targets, mixed);
     if (mode("all-seven")) {
         for (unsigned lane = 0; lane < 7; ++lane) rows[1].slots[lane] = RESOURCE + lane;

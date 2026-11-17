@@ -25,16 +25,15 @@ from structural_title import cancellation_signal, operator_response
 
 ROOT = Path(__file__).resolve().parents[2]
 COMMAND = ("python", "-E", "-B", "-m", "tools.srr017.retail_title", "observe-title",
-           "<steam-root>", "<custody>", "<authorization.json>", "<authorization.json.sig>",
-           "<source-files.json>")
+           "<steam-root>", "<custody>", "<authorization.json>", "<authorization.json.sig>")
 SIGNER = "srr017-maintainer"
 SIGN_NAMESPACE = "srr017-retail-title"
 TRUST_PATH = Path("C:/Program Files/SRR017/allowed_signers")
 SSH_PATH = Path("C:/Windows/System32/OpenSSH/ssh-keygen.exe")
 CLAIM = "retail-authorization.used"
 RECEIPT = "title.jsonl"
-SOURCE_BEFORE = "source-files-before.json"
-SOURCE_AFTER = "source-files-after.json"
+IDENTITY_CONTRACT = {"schema": "srr017-native-formid-identity-v1", "namespace": "native-loaded-plugins",
+                     "types": ["PNDT", "BIOM", "RSGD", "IRES"]}
 ATTEMPT = "retail-attempt.json"
 PROTECTION_SIZE = 2 * 1024 * 1024
 AUTH_SIZE = 8192
@@ -315,7 +314,7 @@ def available_space():
 
 def approval_files(custody):
     return tuple(existing_local(custody / name)
-                 for name in ("authorization.json", "authorization.json.sig", "source-files.json"))
+                 for name in ("authorization.json", "authorization.json.sig"))
 
 
 @dataclass(frozen=True)
@@ -339,18 +338,14 @@ REAL = Services("retail", real_operator, protect_trust_path, begin_retail, open_
 
 
 def _verify_approval(steam_root, directory, paths, services, *, replay_clock=None):
-    from .work import SOURCE_MANIFEST_BYTES
-
-    approval, signature, source_profile = approval_files(directory)
-    demand(tuple(Path(x) for x in paths) == (approval, signature, source_profile),
-           "retail_authorization_location", "all three evidence inputs must use the fixed private custody paths")
+    approval, signature = approval_files(directory)
+    demand(tuple(Path(x) for x in paths) == (approval, signature),
+           "retail_authorization_location", "approval evidence must use the fixed private custody paths")
     raw = file_bytes(approval, AUTH_SIZE)
     value = object_from(raw, canonical=True)
     trust, verifier = services.trust()
     verifier_sha256 = digest(file_bytes(verifier, 4 * 1024 * 1024))
     trust_sha256, signature_sha256 = verify_sshsig(trust, signature, raw, verifier)
-    profile_bytes = file_bytes(source_profile, SOURCE_MANIFEST_BYTES)
-    profile = object_from(profile_bytes, canonical=True)
     manifest = candidate_manifest()
     preflight, pins = preflight_receipts(directory, "pre")
     if replay_clock is None:
@@ -364,7 +359,7 @@ def _verify_approval(steam_root, directory, paths, services, *, replay_clock=Non
         "scope": services.scope, "operator_sid": operator_sid, "steam_session": session,
         "steam_root": str(steam_root), "custody": str(directory),
         "source_sha256": digest_manifest(manifest), "work_sha256": digest_manifest(manifest["work"]),
-        "input_sha256": digest(profile_bytes), "retail_sha256": RETAIL_APPLICABILITY["sha256"],
+        "input_sha256": digest_manifest(IDENTITY_CONTRACT), "retail_sha256": RETAIL_APPLICABILITY["sha256"],
         "trust_sha256": trust_sha256, "verifier_sha256": verifier_sha256, **pins,
     }
     clock = time_ns() if replay_clock is None else replay_clock
@@ -375,7 +370,7 @@ def _verify_approval(steam_root, directory, paths, services, *, replay_clock=Non
     check_protection(preflight["protection"])
     claim = {**expected, "approval_id": value["approval_id"], "authorization_sha256": digest(raw),
              "signature_sha256": signature_sha256, "claimed_utc_ns": clock}
-    return claim, value["expires_utc_ns"], profile
+    return claim, value["expires_utc_ns"]
 
 
 def check_exit_bound(directory, identity, image):
@@ -395,18 +390,18 @@ def raw_source_namespace(collection):
     return witness.get("namespace")
 
 
-def _bind_pair_sources(report, before, target_kind):
-    from .source import bind_source_files
+def _bind_pair_sources(report, target_kind):
+    from .source import bind_native_namespace
 
     collections = report["collections"]
     namespaces = [raw_source_namespace(item) for item in collections]
     demand(len(collections) == 2 and all(item["coverage_verified"] for item in collections)
            and all(isinstance(namespace, dict) and namespace.get("compiled") for namespace in namespaces),
-           "source_pair_unavailable", "source binding needs two complete native passes with loaded paths")
+           "source_pair_unavailable", "identity binding needs two complete native namespace passes")
     authority = "RETAIL_NATIVE_WITNESS" if target_kind == "retail" else "OWNED_DISPOSABLE"
-    bindings = [bind_source_files(namespace, before, authority=authority) for namespace in namespaces]
+    bindings = [bind_native_namespace(namespace, authority=authority) for namespace in namespaces]
     demand(bindings[0].provenance == bindings[1].provenance,
-           "source_pair_changed", "the loaded source file and namespace bindings differ")
+           "source_pair_changed", "the loaded native namespace bindings differ")
 
 
 def poll_no_cancel(cancelled):
@@ -427,13 +422,12 @@ def meter_process_census(api, initial, maximum):
 
 
 def acquire(
-    steam, custody, authorization, signature, source_profile, *,
+    steam, custody, authorization, signature, *,
     services=REAL, limits=None,
 ):
     """Run the exact integrated command. Only its private services are substituted in owned tests."""
-    from .source import snapshot_source_files
     from .source import SourceIdentityError
-    from .work import ImageDigestMeter, RETAIL_WORK, SOURCE_MANIFEST_BYTES, meter_backend
+    from .work import ImageDigestMeter, RETAIL_WORK, meter_backend
 
     demand(sys.flags.ignore_environment and sys.dont_write_bytecode and not sys.flags.optimize,
            "observer_flags", "use the reviewed -E -B invocation with optimizations disabled")
@@ -443,8 +437,8 @@ def acquire(
     limits = RETAIL_WORK["census"] if limits is None else limits
     demand(services.target_kind == "simulated" or limits == RETAIL_WORK["census"], "retail_limits",
            "the retail invocation fixes the exact reviewed census work limits")
-    authority, expires, profile = _verify_approval(
-        steam_root, directory, (authorization, signature, source_profile), services)
+    authority, expires = _verify_approval(
+        steam_root, directory, (authorization, signature), services)
     works = services.space()
     write_exclusive(directory / CLAIM, authority, AUTH_SIZE)
     path = directory / RECEIPT
@@ -453,8 +447,6 @@ def acquire(
     try:
         with cancellation_signal() as cancelled:
             hashes = ImageDigestMeter(cancelled)
-            before = snapshot_source_files(profile, cancelled=cancelled)
-            write_exclusive(directory / SOURCE_BEFORE, before, SOURCE_MANIFEST_BYTES)
             poll_no_cancel(cancelled)
             demand(time_ns() < expires, "retail_authorization_stale", "authorization expired before Steam admission")
             with services.begin(steam_root, digest_file=hashes) as baseline:
@@ -485,7 +477,7 @@ def acquire(
                     state["epoch"] = token
                     binding = {"target_kind": services.target_kind, "authority": authority, "attempt": attempt,
                                "marker": marker, "namespace_profile": census.RETAIL_NAMESPACE_PROFILE,
-                               "source_snapshot_sha256": digest_manifest(before),
+                               "identity_contract_sha256": digest_manifest(IDENTITY_CONTRACT),
                                "exit_witness_bound_sha256": digest(file_bytes(
                                    directory / "exit-witness-bound.json", AUTH_SIZE))}
                     report = census.capture(
@@ -494,10 +486,7 @@ def acquire(
                     )
                     if report["failure"] is None:
                         try:
-                            _bind_pair_sources(report, before, services.target_kind)
-                            after = snapshot_source_files(profile, cancelled=cancelled)
-                            write_exclusive(directory / SOURCE_AFTER, after, SOURCE_MANIFEST_BYTES)
-                            demand(before == after, "source_files_changed", "source file identity changed across the paired capture")
+                            _bind_pair_sources(report, services.target_kind)
                             close = reader.identity()
                             demand(close == bound, "epoch_mismatch", "authenticated epoch changed before source closeout")
                             state["source_close_identity"] = close
@@ -520,15 +509,13 @@ def acquire(
 
 
 def replay_retail(path, *, attempt_sha256, services=REAL):
-    from .work import SOURCE_MANIFEST_BYTES
-
     path = existing_local(path)
     directory = private_directory(path.parent)
     demand(path == directory / RECEIPT, "retail_receipt_location", "use the named receipt in original custody")
     claim = object_from(file_bytes(existing_local(directory / CLAIM), AUTH_SIZE), canonical=True)
     clock = claim.get("claimed_utc_ns")
     demand(type(clock) is int and clock > 0, "retail_approval_clock", "claim has an invalid authorization clock")
-    authority, expires, profile = _verify_approval(Path(claim["steam_root"]), directory,
+    authority, expires = _verify_approval(Path(claim["steam_root"]), directory,
                                                    approval_files(directory), services, replay_clock=clock)
     demand(authority == claim, "retail_replay_claim", "independent signed authorization claim disagrees")
     report = census.replay(path, retail_authority=authority)
@@ -541,21 +528,15 @@ def replay_retail(path, *, attempt_sha256, services=REAL):
            "retail_replay_attempt", "attempt closeout does not bind its signed approval")
     source_failure = state["source_binding_failure"]
     if report["failure"] is None and not state["failure"] and source_failure is None:
-        before = object_from(file_bytes(existing_local(directory / SOURCE_BEFORE), SOURCE_MANIFEST_BYTES), canonical=True)
-        after = object_from(file_bytes(existing_local(directory / SOURCE_AFTER), SOURCE_MANIFEST_BYTES), canonical=True)
         identity = report["identity_brackets"][0][0]
-        requested_files = profile["files"]
-        captured_files = [{key: value for key, value in row.items() if key != "stamp"} for row in before["files"]]
         phase = state["target_bound"]
         token = check_exit_bound(directory, identity, Path(phase["image"]))
         demand(digest(file_bytes(directory / "exit-witness-bound.json", AUTH_SIZE))
                == header["binding"]["exit_witness_bound_sha256"] and token == phase["epoch"]
-               and requested_files == captured_files and before["profile_sha256"] == digest_manifest(profile)
-               and digest_manifest(before) == header["binding"]["source_snapshot_sha256"]
-               and before == after and state["source_close_identity"] == identity,
-               "retail_replay_source_files", "source or epoch closeout evidence did not reconcile")
-        _bind_pair_sources(report, before, services.target_kind)
-        report["source_snapshot"] = before
+               and header["binding"]["identity_contract_sha256"] == digest_manifest(IDENTITY_CONTRACT)
+               and state["source_close_identity"] == identity,
+               "retail_replay_identity", "native identity contract or epoch closeout did not reconcile")
+        _bind_pair_sources(report, services.target_kind)
     else:
         report["source_binding_failure"] = source_failure or "retail_attempt_incomplete"
     return report
@@ -589,7 +570,7 @@ def exit_details(directory, state, target_kind):
 def verify_closeout(directory, *, attempt_sha256, services=REAL):
     directory = private_directory(directory)
     claim = object_from(file_bytes(existing_local(directory / CLAIM), AUTH_SIZE), canonical=True)
-    authority, _, _ = _verify_approval(Path(claim["steam_root"]), directory, approval_files(directory),
+    authority, _ = _verify_approval(Path(claim["steam_root"]), directory, approval_files(directory),
                                        services, replay_clock=claim["claimed_utc_ns"])
     demand(authority == claim, "retail_replay_claim", "independent signed authorization claim disagrees")
     state = checked_attempt(directory, attempt_sha256, authority)
@@ -623,7 +604,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("execution-manifest", help="show the exact source, work and invocation offline")
     observe = commands.add_parser("observe-title", help="use one separately signed maintainer approval")
-    for field in ("steam", "custody", "authorization", "signature", "source_profile"):
+    for field in ("steam", "custody", "authorization", "signature"):
         observe.add_argument(field, type=Path)
     replay = commands.add_parser("replay-retail")
     replay.add_argument("path", type=Path)
@@ -637,7 +618,7 @@ def main():
             manifest = candidate_manifest()
             result = {"manifest": manifest, "sha256": digest_manifest(manifest)}
         elif args.command == "observe-title":
-            result = acquire(args.steam, args.custody, args.authorization, args.signature, args.source_profile)
+            result = acquire(args.steam, args.custody, args.authorization, args.signature)
             attempt_hash = digest(file_bytes(args.custody / ATTEMPT, PROTECTION_SIZE))
             result = {"failure": result["failure"], "source_binding_failure": result["source_binding_failure"],
                       "attempt_sha256": attempt_hash, "receipt_sha256": result.get("receipt_sha256")}
