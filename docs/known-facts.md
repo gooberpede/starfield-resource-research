@@ -56,6 +56,15 @@ so a normal return to `0x14094EF5C` follows the visited writes, if any.
 See [SRR-014](SRR-014-startup-allocation-component-database-lifecycle.md)
 for predicates, synchronization, the queue timing limits and sample scope.
 
+**PROVEN STATIC:** The pinned retail DB constructor initializes the
+notification receiver at DB +0x38 with an empty collection pointer at
+receiver +0x80. The examined edge-insert notification passes the two
+key qwords to its dispatcher, which loads the subscriber callable and
+dispatches indirectly through its vtable +0x10. The receiver's own
+vtable +0x10 is a distinct operation. See the
+[SRR-015 bounded follow-up](SRR-015-lead-register.md#b8-bounded-follow-up)
+for the direct-reference search and the open same-key result-transfer join.
+
 ## Input Resolution and Biome Order
 
 ```text

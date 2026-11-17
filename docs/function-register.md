@@ -45,6 +45,7 @@ extends the pinned retail graph.
 | `FUN_141893ee0`, `FUN_141896280`, `FUN_140951c80` | **PROVEN STATIC** initial-loader continuation and signed-mode reset/replay path. Teardown can clear the module guard. `PerformGameReset` is diagnostic-derived terminology. |
 | `FUN_141840e60`, `FUN_14183df10`, `FUN_141896020` | **PROVEN STATIC** load-order callback bodies and mode dispatch. Their mode-0x84 path can dispatch reset via state 1. |
 | `FUN_14076ec00`, `FUN_140773180`, `FUN_14077bce0`, `FUN_1407766b0`, `FUN_142322520` | **PROVEN STATIC** PNDT definition reader and queued component creation, collector of existing CTPerBiomeData edges, typed edge insertion and separate typed component insertion/replacement. |
+| `FUN_142412830`, `FUN_142406B70`, `FUN_14240F5F0` | **PROVEN STATIC** DB +0x38 notification subobject initialization, edge-key notification and indirect callback dispatch. A same-key computed-result transfer to +0x268 remains unresolved. [SRR-015 bounded follow-up](SRR-015-lead-register.md#b8-bounded-follow-up) |
 | `FUN_140771f30`, `FUN_14076e720`, `FUN_14076e810` | **PROVEN STATIC** keyed component lookup with output assignment on hit, typed copy and typed assignment. The seven generated IDs are copied. |
 | `FUN_1407ba9b0`, `FUN_1407bd270`, `FUN_14086a6d0` | **PROVEN STATIC** consumers of the looked-up generated slots on accepted branches. |
 | `FUN_140774970`, `FUN_142409490`, `FUN_1424063b0` | **PROVEN STATIC** scoped edge-range removal and broader context index clear. |

@@ -37,6 +37,7 @@ superseded interpretations, but are not substitutes for the baseline.
 - [SRR-013 structural allocation-state observation](SRR-013-structural-state-observation.md)
 - [SRR-013 live observation budget recovery](SRR-013-live-observation-budget-recovery.md)
 - [SRR-014 startup allocation and component database lifecycle](SRR-014-startup-allocation-component-database-lifecycle.md)
+- [SRR-015 retained allocation census and oracle feasibility](SRR-015-retained-allocation-extraction-feasibility.md)
 - [Research workflow](research-workflow.md)
 
 ## Experiments and Evidence
