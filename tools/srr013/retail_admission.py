@@ -301,7 +301,7 @@ def registered_steam_root():
 
 
 @contextmanager
-def begin_retail(steam_root):
+def begin_retail(steam_root, *, digest_file=file_digest):
     """Retain the ordinary-account Steam client and pre-launch provenance.
 
     For a future authorized reader. The caller controls Steam and the game.
@@ -328,7 +328,7 @@ def begin_retail(steam_root):
         try:
             steam_file = opened.enter_context(steam.open("rb"))
             stamp = pinned_stat(os.fstat(steam_file.fileno()))
-            steam_hash = file_digest(steam_file)
+            steam_hash = digest_file(steam_file)
         except OSError as error:
             raise ReadFailure("steam_install_unverified", "cannot pin the Steam client backing file") from error
         steam_epoch = epoch(api, steam_handle)[1]
@@ -340,7 +340,7 @@ def begin_retail(steam_root):
             try:
                 paths_match = (api.process_path(steam_handle) == steam
                                and pinned_stat(steam.stat()) == pinned_stat(os.fstat(steam_file.fileno())) == stamp
-                               and file_digest(steam_file) == steam_hash)
+                               and digest_file(steam_file) == steam_hash)
             except OSError as error:
                 raise ReadFailure("steam_install_unverified", "cannot recheck Steam client backing identity") from error
             require(paths_match, "steam_install_unverified", "Steam client backing identity changed")
@@ -353,7 +353,7 @@ def begin_retail(steam_root):
 
 
 @contextmanager
-def _open_selected(baseline, expected_epoch, expected_session, *, query_only):
+def _open_selected(baseline, expected_epoch, expected_session, *, query_only, digest_file=file_digest):
     api = baseline.api
     pid, (log, tail, append) = baseline.select(with_source=True)
     append_sha256 = bytes_sha(append)
@@ -363,7 +363,7 @@ def _open_selected(baseline, expected_epoch, expected_session, *, query_only):
         try:
             stream = opened.enter_context(baseline.image.open("rb"))
             before = pinned_stat(os.fstat(stream.fileno()))
-            require(file_digest(stream) == baseline.image_hash, "image_hash_mismatch", "selected disk executable disagrees")
+            require(digest_file(stream) == baseline.image_hash, "image_hash_mismatch", "selected disk executable disagrees")
             disk = disk_profile(stream, retail=baseline.profile_name == RETAIL_PROFILE)
             require(pinned_stat(os.fstat(stream.fileno())) == pinned_stat(baseline.image.stat()) == before,
                     "mapping_unverified", "selected executable changed during disk qualification")
@@ -385,13 +385,14 @@ def _open_selected(baseline, expected_epoch, expected_session, *, query_only):
                     "admission_append_sha256": append_sha256, **evidence}
 
         reader = ImageReader(api, handle, selected, baseline.image, stream, baseline.image_hash, disk, query_only,
-                             profile_name=baseline.profile_name, attribution=attribution)
+                             profile_name=baseline.profile_name, attribution=attribution, digest_file=digest_file)
         reader.admission_log = {"baseline_tail": tail, "append": append}
         yield reader
 
 
 @contextmanager
-def open_simulated(baseline, process, *, query_only=False, expected_creation=None, expected_session=None):
+def open_simulated(baseline, process, *, query_only=False, expected_creation=None, expected_session=None,
+                   digest_file=file_digest):
     require(baseline.profile_name == SIMULATED_PROFILE and isinstance(process, subprocess.Popen)
             and isinstance(process.args, (tuple, list)) and process.args,
             "ownership_unverified", "retail-like qualification requires an owned fixture launch")
@@ -401,14 +402,14 @@ def open_simulated(baseline, process, *, query_only=False, expected_creation=Non
     require(pid == process.pid, "epoch_mismatch", "owned launch handle PID disagrees")
     expected_epoch = pid, creation if expected_creation is None else expected_creation
     session = baseline.session if expected_session is None else expected_session
-    with _open_selected(baseline, expected_epoch, session, query_only=query_only) as reader:
+    with _open_selected(baseline, expected_epoch, session, query_only=query_only, digest_file=digest_file) as reader:
         yield reader
 
 
 @contextmanager
-def open_retail(baseline):
+def open_retail(baseline, *, digest_file=file_digest):
     require(baseline.profile_name == RETAIL_PROFILE and baseline.image.name == RETAIL_NAME
             and baseline.image_hash == RETAIL_APPLICABILITY["sha256"],
             "retail_profile_unverified", "the separately designated retail baseline is required")
-    with _open_selected(baseline, None, baseline.session, query_only=False) as reader:
+    with _open_selected(baseline, None, baseline.session, query_only=False, digest_file=digest_file) as reader:
         yield reader

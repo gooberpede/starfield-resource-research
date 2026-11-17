@@ -232,13 +232,14 @@ def verify_relocation_free(stream, optional, sections):
 
 class ImageReader:
     def __init__(self, api, handle, expected_epoch, path, stream, expected_sha256, profile, query_only,
-                 *, profile_name="srr013-owned-amd64", attribution=None):
+                 *, profile_name="srr013-owned-amd64", attribution=None, digest_file=file_digest):
         self.api, self.handle, self.expected_epoch = api, handle, expected_epoch
         self.path, self.stream = path, stream
         self.sha256, self.profile = expected_sha256, profile
         self.query_only = query_only
         self.profile_name = profile_name
         self.attribution = attribution
+        self.digest_file = digest_file
         self.stat = pinned_stat(os.fstat(stream.fileno()))
         self.native_path = native_disk_path(api, stream)
         self.base = None
@@ -296,7 +297,7 @@ class ImageReader:
             image_path = Path(executable.value).resolve(strict=True)
             metadata = image_path.stat()
             pinned_metadata = os.fstat(self.stream.fileno())
-            digest = file_digest(self.stream)
+            digest = self.digest_file(self.stream)
         except OSError as error:
             raise ReadFailure("mapping_unverified", "cannot identify process image path") from error
         require(

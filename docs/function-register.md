@@ -60,6 +60,15 @@ and traversal anchors.
 | `FUN_1405f7a80`, `FUN_1403832a0`, `FUN_1403833e0`, `FUN_1403a4250` | **PROVEN STATIC** planet/type range construction, directory and record lookup, and successor iteration on the +0x300 index. |
 | `FUN_1405de3b0` | **PROVEN STATIC** FormID lookup sourced from an image-relative locator for the form map. The map contents and per-form addresses require fresh resolution in a later observation. |
 
+[SRR-017 FormID map capacity evidence](SRR-017-title-admission.md)
+qualifies the allocation and growth path on the same pinned image.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_1405DD4C0`, `FUN_1405DEA80` | **PROVEN STATIC** atomic first-owner construction gate, initial authoritative map allocation with capacity floor `0x40000` and publication. |
+| `FUN_1405E2B30`, `FUN_1405E2C30`, `FUN_1405E3020` | **PROVEN STATIC** insertion through the helper and large-table doubling when the free count is exhausted. |
+| `FUN_1405DEDC0` | **PROVEN STATIC** teardown of the authoritative map. |
+
 [SRR-013 structural observation](SRR-013-structural-state-observation.md#native-resource-identity)
 qualifies the independent resource type check on the same retail image.
 
@@ -79,6 +88,19 @@ qualifies the startup and DB execution roles on the same retail image.
 | `FUN_142404230`, `FUN_142404A80` | **PROVEN STATIC** shared-mode participant entry around the planet adapter and representative copy readers, and distinct ticket admission for inspected insert, removal and clear paths. |
 | `FUN_1424069F0`, `FUN_142413190` | **PROVEN STATIC** reverse-key command preparation and guarded application to the +0x358 index. The inspected path carries the key. |
 | `FUN_140773910`, `FUN_142346A60`, `FUN_1405DF5C0` | **PROVEN STATIC** PNDT proxy submission and the primary PNDT vtable +0x1A0 flag setter. Their join to the final CSV hook requires a hit on that PNDT proxy. |
+
+[SRR-017](SRR-017-source-identity.md) distinguishes the loaded plugin namespace,
+typed FormID lookup and per-form source history in the pinned retail image.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_140598430`, `FUN_14200A5A0`, `FUN_1405B78C0` | **PROVEN STATIC** name-registry lookup, registered GetFormFromFile wrapper and full/medium/small local-ID formatting. The wrapper calls the separate native FormID map. |
+| `FUN_1405994A0`, `FUN_14059FCF0` | **PROVEN STATIC** guarded initial namespace assignment, including a deferred-file branch, and three compiled slot assignments. |
+| `FUN_14058E350` | **PROVEN STATIC** diagnostic lookup of source-file vectors for found FormIDs and full/small/medium compiled slots on its missed-form branch. |
+| `FUN_1405E0D50`, `FUN_1405E3980`, `FUN_1405DC730` | **PROVEN STATIC** guarded source-vector update, index interning and ordered append of a previously unlisted source. The caller can filter prior contributors before appending. |
+| `FUN_1405972B0`, `FUN_140597A70`, `FUN_1405B9750` | **PROVEN STATIC** initial scan and packed-source construction. One startup branch supplies the relative `DATA\\` directory to the packed-file constructor. |
+| `FUN_1405B5BE0`, `FUN_1405B9950`, `FUN_1428E4230` | **PROVEN STATIC** packed-file open wrapper, pathname composition and distinct direct or virtual provider route, followed by the typed file constructor. |
+| `FUN_1427D8950`, `FUN_1427D7FA0`, `FUN_1405BA840` | **PROVEN STATIC** relative-path virtual provider delegation, ordered provider search stopping on success, and packed-file close that clears the open stream pointer. |
 
 The CK entries below retain their original build and evidence scope.
 

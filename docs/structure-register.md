@@ -51,6 +51,19 @@ the supported root, node and record decoding and acquisition limits.
 | CTPerBiomeData biome and resource fields | +0x40 BIOM key read and +0x4C optional RSGD key read, both four bytes. +0x50 through +0x68 hold seven four-byte result IDs. | **PROVEN STATIC** key match `0x140771FB6`, RSGD lookup in `FUN_140777870`, result clear/writes in `FUN_140779760` and `FUN_140777870`, seven-slot copy `0x14076E86A–0x14076E886`. | Formal field names and byte-level save-stream mapping. |
 | Resolved `BGSResource` identity | Object +0x00, eight-byte primary vptr at image RVA `0x4B6F0B0`. Object +0x28, four-byte FormID. Object +0x2E, one-byte enum `0x9F`. | **PROVEN STATIC** constructor vptr/type stores `0x1409E74E6` and `0x1409E75D9`, independent output-ID lookup and consumer type check `0x14079BC52` and `0x14079BC63`. [Resource identity](SRR-013-structural-state-observation.md#native-resource-identity) | Actual object residence and identity at the selected checkpoint. |
 
+## Retail FormID source namespace
+
+Same [retail pin](PROVENANCE.md#current-retail-identity). See the
+[SRR-017 instruction evidence](SRR-017-source-identity.md).
+
+| Owning context and field or relationship | Offset, width and operation | Evidence and confidence | Open detail |
+| --- | --- | --- | --- |
+| Data-handler publication and file-name registry | Image +0x5FD9B28 qword pointer. Handler +0x1570 inline node, file pointer +0 and successor +8. TESFile name begins at +0x38. | **PROVEN STATIC** constructor/publication at `0x140573788` and `0x14057378D`, registry lookup at `0x140598449..0x140598487`. | Actual admitted files and loaded-source digests. |
+| Compiled plugin namespace | Handler +0x1580 full, +0x1590 small, +0x15A0 medium. Array header u32 count, u32 capacity and qword pointer. TESFile +0x1B8 flags and index fields +0x218 u8, +0x219 u8 and +0x21A u16. | **PROVEN STATIC** assignment at `FUN_14059FCF0` and ordinal read at `0x14058E59E..0x14058E64C`. | Title-card contents and admissibility of update aliases. |
+| Packed source backing | `TESPackedFile` vtable at image +0x4B29B80. Directory at +0x268 and basename at +0x38, each 260 bytes. The optional open-stream qword at +0x378 points to a `BSFile` (image +0x4DA7FB8 vtable) with open predicate at +0x4C and pathname at +0x6C. | **PROVEN STATIC** at `0x1405B5BE4..0x1405B5BEF`, `0x1405B99D8..0x1405B9A0B`, `0x1405BA126..0x1405BA1EE`, and `0x1428E4340..0x1428E4360`. [Source identity](SRR-017-source-identity.md#effective-file-backing) | A closed source can retain a relative directory and no effective-file stream at title. |
+| Relative-source provider list | The relative packed-file open uses the `GlobalLocations` pointer at image +0x61FAB68, with list head at +0x28. Nodes carry the next pointer at +0 and provider at +8; provider vtable slot +0x30 resolves the request. | **PROVEN STATIC** at `0x1405B9FB2..0x1405B9FD3`, `FUN_1427D8950` and `0x1427D7FD6..0x1427D8005`. | Effective per-file route after stream retirement. |
+| Per-form source vector | TESForm +0x30 holds u16 index, with FFFF sentinel. Image +0x5E881E8 u32 count, +0x5E881F0 qword index pointer. Bucket +0 qword TESFile-pointer array, +8 u32 length. | **PROVEN STATIC** diagnostic at `0x14058E453..0x14058E508`, writer and append at `FUN_1405E0D50` and `FUN_1405DC730`. | Complete winning-record provenance across loader variants. |
+
 ## Creation Kit reference
 
 Use the separately [fingerprinted CK static evidence](PROVENANCE.md#creation-kit-static-evidence)

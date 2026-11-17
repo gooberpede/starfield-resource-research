@@ -11,8 +11,12 @@
 static volatile unsigned char image_tail[0x82f0000];
 #pragma bss_seg(pop, fixture_image)
 
+#ifndef SRR_FIXTURE_MAP_CAPACITY
+#define SRR_FIXTURE_MAP_CAPACITY 16384
+#endif
+
 enum {
-    BLOCK_END = 0xfe0, MAP_CAP = 16384, DISC = 37, BIOM = 0x200000,
+    BLOCK_END = 0xfe0, MAP_CAP = SRR_FIXTURE_MAP_CAPACITY, DISC = 37, BIOM = 0x200000,
     OWNER = 0x100000, EXCEPTIONAL_OWNER = 0x1fffe0, RSGD = 0x300000, RESOURCE = 0x400000,
 };
 
@@ -35,6 +39,7 @@ typedef struct {
 typedef struct { uint32_t id; Byte *data; } Form;
 
 static Byte *image, *index_header, *map_table;
+static Byte *plugin_source;
 static Form forms[2048];
 static size_t form_count;
 static uint32_t map_indices[2048];
@@ -100,6 +105,35 @@ static Byte *new_form(uint32_t id, Byte type, size_t size)
     return form;
 }
 
+static void publish_identity(void)
+{
+    Byte *handler = heap(0x15b0), *slot = heap(8);
+    Byte *source_index = heap(8), *vector = heap(16), *source_entry = heap(8);
+    plugin_source = heap(0x370);
+    address(plugin_source, image + 0x4b29b80);
+    memcpy(plugin_source + 0x38, "fixture.esm", sizeof("fixture.esm"));
+    char directory[MAX_PATH];
+    DWORD length = GetModuleFileNameA(NULL, directory, MAX_PATH);
+    check(length > 0 && length < MAX_PATH, "owned plugin directory");
+    char *filename = strrchr(directory, '\\');
+    check(filename != NULL, "owned plugin path");
+    *filename = '\0';
+    memcpy(plugin_source + 0x268, directory, (size_t)(filename - directory) + 1);
+    dword(plugin_source + 0x1b8, 1);
+    address(handler + 0x1570, plugin_source);
+    dword(handler + 0x1580, 1);
+    dword(handler + 0x1584, 1);
+    address(handler + 0x1588, slot);
+    address(slot, plugin_source);
+    address(image + 0x5fd9b28, handler);
+    dword(image + 0x5e881e8, 1);
+    address(image + 0x5e881f0, source_index);
+    address(source_index, vector);
+    address(vector, source_entry);
+    dword(vector + 8, 1);
+    address(source_entry, plugin_source);
+}
+
 static uint32_t home(uint32_t id)
 {
     uint64_t hash = 0xcbf29ce484222325;
@@ -126,7 +160,7 @@ static void make_forms(size_t target_count)
         dword(form + 0x54, id);
     }
     Byte *rsgds[5];
-    for (unsigned i = 0; i < _countof(rsgds); ++i) rsgds[i] = new_form(RSGD + i, 0xab, 0x30);
+    for (unsigned i = 0; i < _countof(rsgds); ++i) rsgds[i] = new_form(RSGD + i, 0xab, 0x32);
     for (unsigned i = 0; i < 13; ++i) {
         Byte *form = new_form(BIOM + i, 0xa0, 0x318);
         Byte *list = heap(16);
@@ -146,7 +180,7 @@ static void make_forms(size_t target_count)
     address(map + 0x10, map_table);
     qword(map + 0x18, MAP_CAP);
     address(image + 0x5e60ea0, map);
-    uint8_t reserved[MAP_CAP] = {0};
+    Byte *reserved = heap(MAP_CAP);
     for (size_t i = 0; i < form_count; ++i) reserved[home(forms[i].id)] = 1;
     for (uint32_t i = 0; i < MAP_CAP; ++i) dword(bucket(i) + 0x10, UINT32_MAX);
     uint32_t free_index = MAP_CAP;
@@ -166,6 +200,7 @@ static void make_forms(size_t target_count)
         address(bucket(index) + 8, forms[i].data);
         dword(bucket(index) + 0x10, MAP_CAP);
     }
+    free(reserved);
 
     if (mode("map-alias")) {
         address(bucket(map_indices[1]) + 8, forms[0].data);
@@ -204,6 +239,17 @@ static void make_forms(size_t target_count)
     }
     if (mode("map-sentinel")) {
         dword(bucket(map_indices[1]) + 0x10, MAP_CAP + 2);
+    }
+    if (mode("map-region-crossing")) {
+        Byte *reservation = VirtualAlloc(NULL, (size_t)MAP_CAP * 0x18 + 8192, MEM_RESERVE, PAGE_NOACCESS);
+        check(reservation != NULL, "reserve map extent");
+        size_t entry = (size_t)home(OWNER) * 0x18;
+        size_t alignment = ((4096 - 8) + 4096 - entry % 4096) % 4096;
+        Byte *pages = reservation + alignment + entry - (4096 - 8);
+        check(VirtualAlloc(pages, 8192, MEM_COMMIT, PAGE_READWRITE) == pages, "commit map boundary");
+        DWORD previous;
+        check(VirtualProtect(pages + 4096, 4096, PAGE_READONLY, &previous) != 0, "split map boundary");
+        address(map + 0x10, reservation + alignment);
     }
     if (mode("map-duplicate") || mode("decoy-invalid") || mode("decoy-valid") || mode("long-chain")) {
         unsigned length = mode("long-chain") ? 255 : 1;
@@ -395,12 +441,14 @@ static void build(void)
     dword(image + 0x82eec20, 64);
     address(image + 0x82eec28, registry);
     address(registry + 0x18 * DISC, receiver + 0x100);
+    publish_identity();
 
     size_t targets = 36, mixed = 12;
     unsigned block_width = 7, leaf_width = 2, min_depth = 2;
     if (mode("empty")) targets = mixed = 0;
-    if (mode("direct") || mode("holes") || mode("bad-hole") || mode("wrapper") ||
-        mode("reuse") || mode("wrong-type") || mode("blank-mixed")) {
+    if (mode("direct") || mode("all-seven") || mode("holes") || mode("bad-hole") || mode("wrapper") ||
+        mode("reuse") || mode("wrong-type") || mode("blank-mixed") || mode("namespace-invalid") ||
+        mode("source-filtered") || mode("map-region-crossing")) {
         targets = 4;
         mixed = 2;
         block_width = 16;
@@ -427,7 +475,11 @@ static void build(void)
         min_depth = 1;
     }
     make_forms(targets);
+    if (mode("source-filtered")) word(forms[0].data + 0x30, UINT16_MAX);
     make_rows(targets, mixed);
+    if (mode("all-seven")) {
+        for (unsigned lane = 0; lane < 7; ++lane) rows[1].slots[lane] = RESOURCE + lane;
+    }
     if (mode("duplicate")) rows[1] = rows[0];
     build_tree(&primary, targets + mixed, block_width, leaf_width, min_depth);
     publish(&primary);
@@ -445,6 +497,7 @@ static void build(void)
     if (mode("bad-count")) qword(index_header + 0x48, primary.count + 1);
     if (mode("bad-span")) word(primary.first_block + 0x12, 0x11);
     if (mode("bad-biom")) dword(primary.edges[0] + 0x60, BIOM + 1);
+    if (mode("namespace-invalid")) plugin_source[0x218] = 0xff;
     if (mode("optional-absent")) dword(primary.edges[0] + 0x6c, 0x750000);
     if (mode("bad-fence")) set_key(primary.first_branch + 8, (Key){1, 1});
     if (mode("bad-minimum")) set_key(primary.first_leaf + 0x18, (Key){1, 1});
@@ -479,6 +532,14 @@ static void build(void)
         DWORD previous;
         check(VirtualProtect(primary.first_block, 4096, PAGE_NOACCESS, &previous) != 0, "protect block");
     }
+    if (mode("region-crossing")) {
+        Byte *pair = VirtualAlloc(NULL, 8192, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        DWORD previous;
+        check(pair != NULL, "reserve two pages");
+        memcpy(pair + 2048, primary.first_block, BLOCK_END);
+        check(VirtualProtect(pair + 4096, 4096, PAGE_READONLY, &previous) != 0, "split readable regions");
+        address(index_header, pair + 2048);
+    }
 }
 
 int main(int argc, char **argv)
@@ -494,6 +555,9 @@ int main(int argc, char **argv)
         if (!strcmp(command, "quit")) return 0;
         if (!strcmp(command, "truth")) truth();
         else if (!strcmp(command, "clear")) slots(&primary, 0);
+        else if (!strcmp(command, "namespace-drift"))
+            memcpy(plugin_source + 0x38, "drifted.esm", sizeof("drifted.esm"));
+        else if (!strcmp(command, "vector-drift")) word(forms[0].data + 0x30, UINT16_MAX);
         else if (!strcmp(command, "input-drift-clear")) {
             dword(forms[0].data + 0x50, 13);
             slots(&primary, 0);

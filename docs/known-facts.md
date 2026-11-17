@@ -65,6 +65,19 @@ vtable +0x10 is a distinct operation. See the
 [SRR-015 bounded follow-up](SRR-015-lead-register.md#b8-bounded-follow-up)
 for the direct-reference search and the open same-key result-transfer join.
 
+**PROVEN STATIC:** The pinned retail authoritative FormID map initializer
+uses an initial capacity floor of `0x40000`. The insertion path doubles
+large tables when their free count reaches zero. Capacity is a backing
+extent, with per-ID reads following a bounded chain independently.
+[SRR-017 capacity evidence](SRR-017-title-admission.md)
+
+**PROVEN STATIC:** In the pinned retail image, the diagnostic in
+`FUN_14058E350` uses separate compiled plugin arrays for full, small and
+medium FormID prefixes. Its successful-lookup branch reads a distinct
+ordered source-file vector from TESForm +0x30. The append path in
+`FUN_1405DC730` preserves the prefix of an existing vector. Its upstream
+caller can filter prior contributors. [SRR-017 source identity](SRR-017-source-identity.md)
+
 ## Input Resolution and Biome Order
 
 ```text

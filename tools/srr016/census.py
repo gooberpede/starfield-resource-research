@@ -1,4 +1,4 @@
-"""Whole-tree +0x300 census and checked replay for an owned fixture."""
+"""Whole-tree +0x300 census and checked replay for bound title observations."""
 
 from bisect import bisect_left
 from contextlib import ExitStack
@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "srr013"))
 from checkpoint import claim, validate_capture_marker, validate_identity, validate_marker
 from contract import RETAIL_APPLICABILITY, STRUCTURAL_MODE
 from memory import ReadFailure
+from retail_admission import RETAIL_NAME
 from native import (
     BLOCK, EDGE_VPTR, MAX_BIOM_RSGDS, MAX_CHAIN, MAX_KEYS, NODE_END,
     RESOURCE_TYPE, Collection, NativeFailure, Node, pointer, require, unpack,
@@ -23,9 +24,12 @@ from observe import (
     GAP_NS, GAP_SEC, AcquisitionStop, JournalFailure, RecordingReader, ReplayReader,
     add_timing, encode, pending_journal,
 )
+from tools.srr017.namespace import FormSourceVectors, collect_namespace
+from tools.srr017.source import SourceIdentityError
 
 
 RECEIPT_SCHEMA = "srr016-disposable-census-v1"
+RETAIL_RECEIPT_SCHEMA = "srr017-title-census-v1"
 OBSERVATION_SCHEMA = "srr016-observation-v1"
 RETAIL_SHA256 = RETAIL_APPLICABILITY["sha256"]
 CANONICAL = re.compile(r"[^:/\\\x00-\x1f]{1,255}\.(?:esm|esl|esp):[0-9A-F]{6}")
@@ -49,6 +53,25 @@ LIMITS = {
     "requested_bytes": 16 * 1024 * 1024,
     "journal_bytes": 64 * 1024 * 1024,
 }
+# SRR-017 can exercise a native-scale table extent on owned fixtures. This
+# bounds address claims independent of the much smaller set of read entries.
+OWNED_EXTENDED_LIMITS = {**LIMITS, "form_capacity": 0x800000}
+LEGACY_SOURCE_SHA256 = "c813eb4bff937c475b07debb907aa45a22ecd55c78f6fc0931476f8975b803bd"
+OWNED_NAMESPACE_PROFILE = "srr017-owned-native-namespace-v1"
+RETAIL_NAMESPACE_PROFILE = "srr017-retail-native-namespace-v1"
+RETAIL_SCOPE = "srr017-retail-title"
+RETAIL_FIXTURE_SCOPE = "srr017-retail-flow-fixture"
+PRIOR_OWNED_SOURCE_SHA256 = "e5d549ea8cb56b365706b2f336447224624ac1501ea5777cb35347cc428c5a5e"
+RETAIL_LIMITS = {
+    **OWNED_EXTENDED_LIMITS,
+    "entries": 8192,
+    "tree_windows": 1024,
+    "tree_depth": 5,
+    "map_entries": 8192,
+    "events": 80_000,
+    "requested_bytes": 32 * 1024 * 1024,
+    "journal_bytes": 128 * 1024 * 1024,
+}
 
 
 def validate_remap(remap):
@@ -68,7 +91,7 @@ def validate_remap(remap):
 class WholeCollection(Collection):
     """Reuse the SRR-013 structural witnesses within a full-root census."""
 
-    def __init__(self, reader, base, remap, limits):
+    def __init__(self, reader, base, remap, limits, namespace_profile=None):
         super().__init__(reader, base, structural=True)
         self.remap = remap
         self.limits = limits
@@ -90,6 +113,11 @@ class WholeCollection(Collection):
         self.coverage_verified = False
         self.remap_missing = set()
         self.reading_inputs = False
+        self.namespace_profile = namespace_profile
+        self.typed_form_ids = set()
+        self.source_witness = {}
+        self.source_failure = None
+        self.provenance_windows = set()
 
     def exact(self, address, size, alignment):
         self.read_count += 1
@@ -146,6 +174,8 @@ class WholeCollection(Collection):
                 actual_id, actual_type = unpack("I2xB", self.read(form + 0x28, 7, 4))
                 require(actual_id == key, "form_id_mismatch", f"mapped form ID disagrees for {key:08X}")
                 size = {0xBA: 0x58, 0xA0: 0x318, RESOURCE_TYPE: 0x118}.get(actual_type, 0x2F)
+                if self.namespace_profile and actual_type == 0xAB:
+                    size = 0x32
                 self.claim(form, size, f"form {key:08X}")
                 self.map_keys[key] = index
                 result = (key, form, actual_type, next_)
@@ -180,6 +210,8 @@ class WholeCollection(Collection):
             self.forms[form_id] = matched
         address, actual_type = self.forms[form_id]
         require(actual_type == expected_type, "form_type_mismatch", f"wrong record type for {form_id:08X}")
+        if self.namespace_profile:
+            self.typed_form_ids.add(form_id)
         return address
 
     def normalize_id(self, runtime):
@@ -335,6 +367,8 @@ class WholeCollection(Collection):
                 "index_shape", "mixed descriptor count does not reconcile")
 
         self.normalize()
+        if self.namespace_profile:
+            self.collect_sources()
         self.witness_sha256 = self.revalidate(opening_reads)
         structure_digest = sha256()
         for bounds, prior in self.structure.items():
@@ -365,7 +399,69 @@ class WholeCollection(Collection):
         self.typed_input_sha256 = input_digest.hexdigest()
         self.coverage_verified = True
 
+    def collect_sources(self):
+        source_digest = sha256()
+        retail_flow = self.namespace_profile == RETAIL_NAMESPACE_PROFILE
+
+        def source_read(address, width, label):
+            alignment = 2 if width == 2 else 8
+            data = self.read(address, width, alignment)
+            if retail_flow and label == "form_source_vector":
+                self.provenance_windows.add((address, width, alignment))
+            source_digest.update(struct.pack("<QI", address, width))
+            source_digest.update(data)
+            return data
+
+        try:
+            options = {"include_paths": True} if retail_flow else {}
+            namespace = collect_namespace(source_read, self.base, claim=self.claim, **options)
+            rows = {}
+            private_namespace = {**namespace, "file_pointers": {
+                f"{address:016X}": fields for address, fields in namespace["file_pointers"].items()}}
+            self.source_witness = {"namespace": private_namespace, "vectors": rows}
+            if retail_flow:
+                self.source_identity_sha256 = source_digest.hexdigest()
+            if self.typed_form_ids:
+                vectors = FormSourceVectors(source_read, self.base, namespace, claim=self.claim)
+                for form_id in sorted(self.typed_form_ids):
+                    self.reader.pulse()
+                    names = vectors.lookup(self.forms[form_id][0])
+                    rows[f"{form_id:08X}"] = list(names) if names is not None else None
+                self.source_witness["vector_reads"] = vectors.reads
+                self.source_witness["vector_requested_bytes"] = vectors.requested_bytes
+            if retail_flow:
+                self.source_witness["provenance_sha256"] = source_digest.hexdigest()
+            else:
+                self.source_identity_sha256 = source_digest.hexdigest()
+        except (SourceIdentityError, NativeFailure) as error:
+            if retail_flow and hasattr(self, "source_identity_sha256"):
+                self.source_witness["provenance_failure"] = error.code
+            else:
+                self.source_failure = [error.code, error.detail]
+
+    def revalidate(self, anchors):
+        if self.namespace_profile != RETAIL_NAMESPACE_PROFILE:
+            return super().revalidate(anchors)
+        digest = sha256()
+        for bounds, prior in self.structure.items():
+            self.reader.pulse()
+            current = self.exact(*bounds)
+            if bounds in self.provenance_windows:
+                if current != prior:
+                    self.source_witness["provenance_failure"] = "source_vector_changed_during_collection"
+                continue
+            require(current == prior, "structural_change", f"structural witness changed at {bounds[0]:#x}")
+            digest.update(struct.pack("<QII", *bounds))
+            digest.update(prior)
+        for bounds in anchors:
+            self.reader.pulse()
+            require(self.exact(*bounds) == self.structure[bounds],
+                    "structural_change", f"closing anchor changed at {bounds[0]:#x}")
+        return digest.hexdigest()
+
     def normalize(self):
+        if self.namespace_profile == RETAIL_NAMESPACE_PROFILE:
+            return
         rows = []
         for row in self.raw_rows:
             self.reader.pulse()
@@ -382,7 +478,7 @@ class WholeCollection(Collection):
                 "duplicate_identity", "raw-to-canonical target key sets do not reconcile")
 
     def report(self):
-        return {
+        result = {
             "publication": getattr(self, "publication", None),
             "form_map": getattr(self, "map", None),
             "coverage_verified": self.coverage_verified,
@@ -402,6 +498,10 @@ class WholeCollection(Collection):
             "raw_rows": self.raw_rows,
             "rows": self.rows,
         }
+        if self.namespace_profile:
+            result.update(source_witness=self.source_witness, source_failure=self.source_failure,
+                          source_identity_sha256=getattr(self, "source_identity_sha256", None))
+        return result
 
 
 class BoundedJournal:
@@ -476,9 +576,16 @@ def pair(reader, binding, remap, limits, gap):
             try:
                 start = reader.identity(STRUCTURAL_MODE)
                 brackets[-1].append(start)
-                validate_identity(binding, start)
+                check_binding = binding
+                if binding["target_kind"] == "retail":
+                    # The independently verified SRR-017 claim is checked at both entry points.
+                    # Reuse SRR-013's executable, profile, epoch and Steam transcript predicates.
+                    check_binding = {**binding, "authority": {**binding["authority"],
+                                                              "scope": "srr013-structural-title"}}
+                validate_identity(check_binding, start)
                 require(start == brackets[0][0], "process_identity_changed", "epoch or mapped image changed")
-                collection = WholeCollection(reader, start["image_base"], remap, limits)
+                collection = WholeCollection(reader, start["image_base"], remap, limits,
+                                             binding.get("namespace_profile"))
                 collection.collect()
                 end = reader.identity(STRUCTURAL_MODE)
                 brackets[-1].append(end)
@@ -497,20 +604,28 @@ def pair(reader, binding, remap, limits, gap):
                 "pair_identity_mismatch", "the observations cover different typed input witnesses")
         require(first["raw_rows"] == second["raw_rows"],
                 "pair_value_mismatch", "seven raw slot words disagree between observations")
+        if binding.get("namespace_profile"):
+            require(not first["source_failure"] and not second["source_failure"], "namespace_witness_refused",
+                    "native namespace or per-form source witness refused")
+            require(first["source_identity_sha256"] == second["source_identity_sha256"],
+                    "pair_namespace_mismatch", "native namespace or ordered per-form source witness changed")
         require(first["witness_sha256"] == second["witness_sha256"],
                 "pair_identity_mismatch", "the observations cover different complete form or map witnesses")
     except ERRORS as error:
         failure = [error.code, error.detail]
-    return make_report(passes, brackets, failure, reader.calls, reader.bytes, remap)
+    return make_report(passes, brackets, failure, reader.calls, reader.bytes, remap, binding=binding)
 
 
-def make_report(passes, brackets, failure, calls, byte_count, remap, *, admission_refused=False):
-    structural = failure is None or failure[0] == "pair_value_mismatch"
-    normalized = failure is None and not passes[0]["remap_missing"]
+def make_report(passes, brackets, failure, calls, byte_count, remap, *, admission_refused=False, binding=None):
+    structural = failure is None or failure[0] in {
+        "pair_value_mismatch", "pair_namespace_mismatch", "namespace_witness_refused",
+    }
+    needs_source_join = (binding or {}).get("namespace_profile") == RETAIL_NAMESPACE_PROFILE
+    normalized = failure is None and not needs_source_join and not passes[0]["remap_missing"]
     status = "QUALIFIED" if structural else "ACQUISITION_INDETERMINATE"
     counts = {"mixed": passes[0]["mixed_visited"],
               "typed": len(passes[0]["raw_rows"])} if structural else None
-    return {
+    report = {
         "collections": passes,
         "identity_brackets": brackets,
         "failure": failure,
@@ -525,7 +640,7 @@ def make_report(passes, brackets, failure, calls, byte_count, remap, *, admissio
             "schema": OBSERVATION_SCHEMA,
             "retail_sha256": RETAIL_SHA256,
             "input_sha256": None,
-            "source": "OWNED_DISPOSABLE",
+            "source": "RETAIL_ATTESTED" if (binding or {}).get("target_kind") == "retail" else "OWNED_DISPOSABLE",
             "structure": status,
             "remap_sha256": sha256(encode(remap)).hexdigest(),
             "target_image_sha256": brackets[0][0]["image_sha256"] if brackets and brackets[0] else None,
@@ -534,44 +649,68 @@ def make_report(passes, brackets, failure, calls, byte_count, remap, *, admissio
             "rows": passes[0]["rows"] if normalized else [],
         },
     }
+    if needs_source_join:
+        report["title_flow"] = RETAIL_NAMESPACE_PROFILE
+    return report
 
 
-def _checked_limits(limits):
+def _checked_limits(limits, *, legacy=False, retail_flow=False):
     if limits is None:
-        return dict(LIMITS)
-    if not isinstance(limits, dict) or limits.keys() != LIMITS.keys() or any(
-            type(value) is not int or not 0 < value <= LIMITS[key] for key, value in limits.items()):
+        return dict(RETAIL_LIMITS if retail_flow else LIMITS)
+    ceilings = RETAIL_LIMITS if retail_flow else LIMITS if legacy else OWNED_EXTENDED_LIMITS
+    if not isinstance(limits, dict) or limits.keys() != ceilings.keys() or any(
+            type(value) is not int or not 0 < value <= ceilings[key] for key, value in limits.items()):
         raise ValueError("receipt limits exceed the disposable qualification envelope")
     return limits
+
+
+def validate_title_binding(binding, retail_authority):
+    kind, profile = binding.get("target_kind"), binding.get("namespace_profile")
+    if binding.get("marker", {}).get("label") != "title":
+        raise ValueError("unsupported title marker")
+    if profile == RETAIL_NAMESPACE_PROFILE:
+        expected = {"retail": RETAIL_SCOPE, "simulated": RETAIL_FIXTURE_SCOPE}.get(kind)
+        if (not isinstance(retail_authority, dict) or expected is None
+                or binding.get("authority") != retail_authority or retail_authority.get("scope") != expected
+                or any(not isinstance(retail_authority.get(key), str)
+                       or not re.fullmatch(r"[0-9a-f]{64}", retail_authority[key])
+                       for key in ("source_sha256", "authorization_sha256"))):
+            raise ValueError("the independently verified SRR-017 title authority is required")
+        return True
+    if retail_authority is not None or kind != "simulated" or profile not in (None, OWNED_NAMESPACE_PROFILE):
+        raise ValueError("unsupported native namespace or title admission profile")
+    return False
 
 
 def source_identity():
     paths = ("srr016/census.py", "srr013/checkpoint.py", "srr013/contract.py",
              "srr013/memory.py", "srr013/native.py", "srr013/observe.py",
-             "srr013/retail_admission.py")
+             "srr013/retail_admission.py", "srr017/namespace.py", "srr017/source.py")
     root = Path(__file__).resolve().parents[1]
     return sha256(encode({name: sha256((root / name).read_bytes()).hexdigest() for name in paths})).hexdigest()
 
 
 def capture(path, attempt_directory, admission, binding, remap, *, limits=None,
-            cancelled=None, between=None, after_read=None):
-    """Capture exactly one bound pair. The admission context must be disposable."""
-    if binding.get("target_kind") != "simulated" or binding.get("marker", {}).get("label") != "title":
-        raise ValueError("only simulated title bindings are admitted by this implementation")
+            cancelled=None, between=None, after_read=None, retail_authority=None):
+    """Capture exactly one pair after its controller separately verifies admission authority."""
+    retail_flow = validate_title_binding(binding, retail_authority)
     custody = Path(attempt_directory).resolve(strict=True)
     private_root = (Path(__file__).resolve().parents[2] / ".local-work").resolve(strict=True)
     path = Path(path)
     if path.parent.resolve(strict=True) != custody or not custody.is_relative_to(private_root):
         raise ValueError("address-bearing capture must stay in private attempt custody")
     validate_remap(remap)
-    limits = _checked_limits(limits)
+    limits = _checked_limits(limits, retail_flow=retail_flow)
+    if retail_flow and remap:
+        raise ValueError("the retail flow derives identities only from paired native and source evidence")
     if len(remap) > limits["remap_entries"]:
         raise ValueError("remap exceeds the declared independent row ceiling")
     with pending_journal(path) as raw_journal, ExitStack() as stack:
         journal = BoundedJournal(raw_journal, limits["journal_bytes"])
         start = monotonic_ns()
         start_utc = time_ns()
-        header = {"kind": "start", "schema": RECEIPT_SCHEMA, "limits": limits, "remap": remap,
+        header = {"kind": "start", "schema": RETAIL_RECEIPT_SCHEMA if retail_flow else RECEIPT_SCHEMA,
+                  "limits": limits, "remap": remap,
                   "reader_source_sha256": source_identity(), "remap_sha256": sha256(encode(remap)).hexdigest(),
                   "start_ns": start, "start_utc_ns": start_utc,
                   "utc": datetime.now(timezone.utc).isoformat()}
@@ -581,14 +720,15 @@ def capture(path, attempt_directory, admission, binding, remap, *, limits=None,
             validate_marker(binding, "title", intake["mono_ns"], intake["utc_ns"], STRUCTURAL_MODE)
             binding = {**binding, "marker_intake": intake}
             source = stack.enter_context(admission)
-            if source.path.name.casefold() != FIXTURE_NAME:
-                raise ReadFailure("ownership_unverified", "only the designated SRR-016 fixture is admitted")
+            expected_name = RETAIL_NAME.casefold() if binding["target_kind"] == "retail" else FIXTURE_NAME
+            if source.path.name.casefold() != expected_name:
+                raise ReadFailure("ownership_unverified", "acquisition target differs from its title profile")
             binding = {**binding, "steam_log": {name: raw.hex() for name, raw in source.admission_log.items()}}
         except ReadFailure as error:
             journal.write({**header, "binding": binding})
             failure = [error.code, error.detail]
             journal.write({"kind": "admission_refused", "failure": failure})
-            report = make_report([], [], failure, 0, 0, remap, admission_refused=True)
+            report = make_report([], [], failure, 0, 0, remap, admission_refused=True, binding=binding)
             timing = []
         else:
             # Use the intake marker as the freshness boundary, before admission and acquisition.
@@ -615,11 +755,12 @@ def capture(path, attempt_directory, admission, binding, remap, *, limits=None,
 def _load_receipt(path):
     if path.suffix == ".partial":
         raise ValueError("pending receipt was not durably published")
-    if path.stat().st_size > LIMITS["journal_bytes"]:
-        raise ValueError("receipt exceeds the disposable journal ceiling")
+    ceiling = RETAIL_LIMITS["journal_bytes"]
+    if path.stat().st_size > ceiling:
+        raise ValueError("receipt exceeds the journal ceiling")
     digest = sha256()
     with path.open("rb") as stream:
-        line = stream.readline(LIMITS["journal_bytes"])
+        line = stream.readline(ceiling)
         while line:
             if not line.endswith(b"\n"):
                 raise ValueError("receipt line is unfinished")
@@ -632,30 +773,36 @@ def _load_receipt(path):
                 return
             digest.update(line)
             yield event
-            line = stream.readline(LIMITS["journal_bytes"])
+            line = stream.readline(ceiling)
     raise ValueError("receipt has no seal")
 
 
-def replay(path):
+def replay(path, *, retail_authority=None):
     """Reperform every declared acquisition operation and verify the sealed result."""
     path = Path(path)
     events = _load_receipt(path)
     header = next(events, None)
-    if header is None or header.get("kind") != "start" or header.get("schema") != RECEIPT_SCHEMA:
+    if header is None or header.get("kind") != "start" or header.get("schema") not in (
+            RECEIPT_SCHEMA, RETAIL_RECEIPT_SCHEMA):
         raise ValueError("unsupported receipt schema")
     if set(header) != {"kind", "schema", "limits", "remap", "reader_source_sha256", "remap_sha256",
                        "start_ns", "start_utc_ns", "utc", "binding"}:
         raise ValueError("invalid receipt header")
     if not all(type(header[field]) is int and header[field] > 0 for field in ("start_ns", "start_utc_ns")):
         raise ValueError("invalid receipt opening clocks")
-    if header.get("reader_source_sha256") != source_identity():
+    legacy = header.get("reader_source_sha256") == LEGACY_SOURCE_SHA256
+    prior_owned = header.get("reader_source_sha256") == PRIOR_OWNED_SOURCE_SHA256
+    if not (legacy or prior_owned) and header.get("reader_source_sha256") != source_identity():
         raise ValueError("receipt reader source differs from the replay source")
-    limits = _checked_limits(header["limits"])
+    binding, remap = header["binding"], header["remap"]
+    retail_flow = validate_title_binding(binding, retail_authority)
+    if (retail_flow != (header["schema"] == RETAIL_RECEIPT_SCHEMA)
+            or retail_flow and (legacy or prior_owned or remap)
+            or legacy and binding.get("namespace_profile") is not None):
+        raise ValueError("receipt source or remap disagrees with the title profile")
+    limits = _checked_limits(header["limits"], legacy=legacy, retail_flow=retail_flow)
     if path.stat().st_size > limits["journal_bytes"]:
         raise ValueError("receipt exceeds the declared journal ceiling")
-    binding, remap = header["binding"], header["remap"]
-    if binding.get("target_kind") != "simulated" or binding.get("marker", {}).get("label") != "title":
-        raise ValueError("unsupported target binding")
     validate_remap(remap)
     if len(remap) > limits["remap_entries"]:
         raise ValueError("remap exceeds the declared independent row ceiling")
@@ -669,7 +816,7 @@ def replay(path):
         if set(first) != {"kind", "failure"} or not isinstance(failure, list) or len(failure) != 2 or not all(
                 isinstance(field, str) and field for field in failure):
             raise ValueError("malformed admission refusal")
-        report = make_report([], [], failure, 0, 0, remap, admission_refused=True)
+        report = make_report([], [], failure, 0, 0, remap, admission_refused=True, binding=binding)
         timing = []
     else:
         validate_capture_marker(binding, "title", header["start_ns"], header["start_utc_ns"], STRUCTURAL_MODE)

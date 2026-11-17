@@ -30,6 +30,7 @@ WAIT = 30
 TREE_CASES = {
     "empty": (0, 0, 0, 0, 0),
     "direct": (6, 1, 1, 0, 0),
+    "all-seven": (6, 1, 1, 0, 0),
     "holes": (6, 1, 1, 0, 0),
     "ordinary": (48, 13, 7, 4, 2),
     "corpus": (3600, 181, 150, 22, 3),
@@ -55,7 +56,8 @@ NEGATIVES = {
     "map-alias": "form_id_mismatch", "map-table-edge": "pointer_alias",
     "map-cycle": "form_map_unverified", "map-sentinel": "form_map_unverified",
     "map-duplicate": "form_duplicate", "decoy-invalid": "form_id_mismatch",
-    "unreadable": "unreadable_region", "short-read": "read_incomplete",
+    "unreadable": "unreadable_region", "region-crossing": "unreadable_region",
+    "short-read": "read_incomplete",
     "mid-clear": "structural_change", "mid-insert": "structural_change",
     "mid-remove": "structural_change", "mid-repack": "structural_change",
     "mid-reuse": "structural_change", "pair-clear": "pair_value_mismatch",
@@ -65,13 +67,14 @@ NEGATIVES = {
     "entry-limit": "traversal_budget", "chain-limit": "traversal_budget",
     "rsgd-list-limit": "rsgd_list_budget",
     "cancel": "operator_cancelled", "compute-cancel": "operator_cancelled",
+    "cancel-second": "operator_cancelled",
     "missing-steam-witness": "steam_log_unverified",
 }
 SCENARIO = {
     "stable-clear": "direct", "mid-clear": "direct", "pair-clear": "direct",
     "aba": "switch", "mid-repack": "switch", "pair-repack": "switch",
     "mid-insert": "insert", "mid-remove": "remove", "mid-reuse": "reuse",
-    "short-read": "direct", "compute-cancel": "direct",
+    "short-read": "direct", "compute-cancel": "direct", "cancel-second": "direct",
     "chain-limit": "long-chain",
 }
 MID = {
@@ -82,15 +85,16 @@ BETWEEN = {"pair-clear": "clear", "pair-repack": "repack", "aba": "aba",
            "pair-input-drift-clear": "input-drift-clear"}
 
 
-def build_fixture(directory):
+def build_fixture(directory, *, map_capacity=None):
     environment = compiler_environment(find_vcvars())
     compiler = Path(shutil.which("cl.exe", path=environment["PATH"]))
     linker = Path(shutil.which("link.exe", path=environment["PATH"]))
     target = directory / FIXTURE_NAME
     source_digest = file_digest(SOURCE)
     flags = ("/Brepro", f"/out:{FIXTURE_NAME}")
+    compile_flags = COMPILE if map_capacity is None else (*COMPILE, f"/DSRR_FIXTURE_MAP_CAPACITY={map_capacity}")
     with (directory / "build.log").open("xb") as log:
-        subprocess.run([compiler, *COMPILE, SOURCE, "/link", *flags], cwd=directory,
+        subprocess.run([compiler, *compile_flags, SOURCE, "/link", *flags], cwd=directory,
                        env=environment, stdout=log, stderr=subprocess.STDOUT, check=True)
     if source_digest != file_digest(SOURCE):
         raise RuntimeError("fixture source changed during build")
@@ -99,7 +103,7 @@ def build_fixture(directory):
         "linker_sha256": file_digest(linker), "msvc_toolset": environment["VCTOOLSVERSION"],
         "windows_sdk": environment["WINDOWSSDKVERSION"].rstrip("\\"),
         "fixture_sha256": file_digest(target), "image_size": inspect_fixture(target),
-        "compile": COMPILE, "link": flags, "python": sys.version.split()[0],
+        "compile": compile_flags, "link": flags, "python": sys.version.split()[0],
     }
 
 
@@ -218,7 +222,7 @@ def independent_truth(case):
     # arithmetic and sort composite identities once without parsing native memory.
     if case == "empty":
         return []
-    count, mixed = {"direct": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
+    count, mixed = {"direct": (4, 2), "all-seven": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
                     "corpus": (3210, 390), "upper": (4096, 1024)}.get(case, (36, 12))
     targets = []
     for ordinal in range(count):
@@ -229,6 +233,8 @@ def independent_truth(case):
         if ordinal % 17:
             for offset, lane in enumerate((0, 2, 6)):
                 slots[lane] = 0x400000 + ((ordinal + offset) % 64)
+        if case == "all-seven" and ordinal == 1:
+            slots = list(range(0x400000, 0x400007))
         targets.append((first, 0x200000 + biome, 0x90, *slots))
     excluded = [(0x100000 * (1 << 32) + (ordinal % ((count + 11) // 12)) * (1 << 32) + 0x10026,
                  0xFEED0000 + ordinal, 0x20 if ordinal % 2 else 0x38, *([0] * 7))
@@ -308,6 +314,7 @@ def run_case(directory, target, image_hash, case):
     backend_actual, backend_caps = measure_backend(baseline.api, limits)
     affected = False
     polls_until_cancel = None
+    between_collections = False
     with fixture(target, SCENARIO.get(case, case)) as (process, command):
         if case != "missing-steam-witness":
             simulated_append(log, process.pid, target)
@@ -330,7 +337,7 @@ def run_case(directory, target, image_hash, case):
 
         def cancelled():
             nonlocal polls_until_cancel
-            if case == "cancel":
+            if case == "cancel" or case == "cancel-second" and between_collections:
                 return True
             if polls_until_cancel is None:
                 return False
@@ -339,6 +346,8 @@ def run_case(directory, target, image_hash, case):
             return result
 
         def between():
+            nonlocal between_collections
+            between_collections = True
             if case in BETWEEN:
                 command(BETWEEN[case])
 
@@ -374,6 +383,9 @@ def run_case(directory, target, image_hash, case):
         (directory / f"{case}-observation.json").write_bytes(encode(state) + b"\n")
     if case == "compute-cancel" and b'"kind":"compute_cancelled"' not in path.read_bytes():
         raise AssertionError("compute-only cancellation was not exercised")
+    if case == "cancel-second" and (
+            len(report["collections"]) != 1 or not report["collections"][0]["coverage_verified"]):
+        raise AssertionError("cancellation failed to preserve the completed first pass")
     if case == "missing-steam-witness" and report["admission_refusal_source"] != "ATTESTED_AT_ACQUISITION":
         raise AssertionError("admission refusal did not preserve its evidence class")
     return stats
