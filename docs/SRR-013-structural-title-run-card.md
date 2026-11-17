@@ -1,8 +1,12 @@
 # Proposed SRR-013 structural title-card observation
 
-**NOT AUTHORIZED.** This is a proposal for one responsive retail title-card
-observation. Before any live use obtain separate written approval naming the
-reviewed inspector, operator, build, private custody and single checkpoint.
+**NOT AUTHORIZED.** This is a proposal for one further responsive retail
+title-card observation with the separately reviewed
+[budget-recovery candidate](SRR-013-live-observation-budget-recovery.md).
+Offline qualification does not authorize a launch, a process handle,
+observation, another phase, save loading or travel. Before any live use
+obtain new written approval naming the frozen inspector, operator, build,
+private custody and single checkpoint.
 The authorization record used by the program binds that external approval to
 the local source and run scope. A file or a successful preflight alone confers
 no approval.
@@ -24,14 +28,19 @@ no approval.
    title card, then follows the inspector prompt. The selector binds the
    unique game epoch to Steam and checks the mapped image using query/read
    access. The operator confirms `title` for that selected epoch and holds
-   the phase for the one bounded pair. If the phase changed, declare that in
-   the private operational record and discard the checkpoint conclusion.
-4. Close the read handle after the attempt, independently replay the sealed
+   the phase for the one work-bounded pair. The console operator may request
+   cancellation with Ctrl+C after confirming `title`. Cancellation takes
+   effect at a returning acquisition boundary. A synchronous Windows call
+   can delay that boundary. If the phase changed, cancel when possible,
+   record the change privately and discard the checkpoint conclusion.
+4. Close the read handle after the attempt, retain any incomplete journal
+   under private custody, independently replay completed sealed
    evidence and reconcile the operator marker and outcome. Report context
    publication, component presence, and per-sample structural status with
    explicit refusal reasons where applicable. Zero refers to selected fields
    during the observed window. Equal reads can miss ABA or an intervening
-   writer cycle. A new observation requires separate approval.
+   writer cycle. Record the actual durations of the two collections and
+   pair. A new observation requires separate approval.
 5. The operator Quits normally. Reconcile the exact process and exit outcome,
    check the protective settings and inventory, and keep identifying records,
    logs and raw reads in private custody. Share only the cleared conclusions.

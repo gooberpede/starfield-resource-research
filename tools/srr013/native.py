@@ -4,7 +4,6 @@ from bisect import bisect_left
 from dataclasses import dataclass
 import hashlib
 import struct
-import time
 
 from memory import ReadFailure
 
@@ -30,10 +29,15 @@ MAX_ENTRIES = 512
 MAX_CHAIN = 256
 MAX_READS = 12_000
 MAX_BYTES = 1024 * 1024
-MAX_SECONDS = 8
 NODE_END = 0xFE0
 MAX_KEYS = 0xA8
 BLOCK = 0xFFFFFFFF
+
+
+def work_limits():
+    return {"tree_depth": MAX_LEVEL, "nodes": MAX_NODES, "entries": MAX_ENTRIES,
+            "form_chain": MAX_CHAIN, "biom_rsgds": MAX_BIOM_RSGDS,
+            "reads": MAX_READS, "requested_bytes": MAX_BYTES}
 
 
 class NativeFailure(Exception):
@@ -83,7 +87,6 @@ class Collection:
         self.reader = reader
         self.base = pointer(base)
         self.structural = structural
-        self.deadline = time.monotonic() + MAX_SECONDS
         self.read_count = self.byte_count = self.entries = 0
         self.structure = {}
         self.nodes = {}
@@ -108,10 +111,10 @@ class Collection:
         self.read_count += 1
         self.byte_count += size
         require(
-            self.read_count <= MAX_READS and self.byte_count <= MAX_BYTES
-            and time.monotonic() <= self.deadline,
+            self.read_count <= MAX_READS and self.byte_count <= MAX_BYTES,
             "traversal_budget",
-            "collection read, byte or time safety limit exceeded",
+            ("collection read, byte or time safety limit exceeded" if getattr(self.reader, "historical", False)
+             else "collection read or byte safety limit exceeded"),
         )
         data = self.reader.read(address, size, alignment)
         require(len(data) == size, "read_incomplete", f"short read at {address:#x}")

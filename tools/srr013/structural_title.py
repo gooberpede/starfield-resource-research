@@ -1,15 +1,18 @@
 """Proposed single-use title-only entry point for a separately authorized run."""
 
 import argparse
+from contextlib import contextmanager
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import signal
+import sys
 
 from checkpoint import issue, mark
 from contract import STRUCTURAL_MODE
 from memory import ReadFailure
-from observe import capture_refusal, encode
+from observe import JournalFailure, capture_refusal, encode
 from retail_admission import begin_retail, open_retail
 from retail_controller import _observe
 
@@ -58,6 +61,22 @@ def operator_response(prompt):
         raise ReadFailure("operator_declined", "operator confirmation was interrupted") from error
 
 
+@contextmanager
+def cancellation_signal():
+    """Request cancellation at the next returning acquisition boundary."""
+    requested = False
+
+    def cancel(_signum, _frame):
+        nonlocal requested
+        requested = True
+
+    previous = signal.signal(signal.SIGINT, cancel)
+    try:
+        yield lambda: requested
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+
 def run(steam_root, custody, authorization):
     custody = Path(custody).resolve(strict=True)
     approved = reserve_authorization(authorization, custody)
@@ -74,8 +93,15 @@ def run(steam_root, custody, authorization):
                     raise ReadFailure("operator_declined", "operator did not confirm the title-card checkpoint")
                 marker = mark(attempt, identity, "title")
                 binding.update(attempt=attempt, marker=marker)
-                report = _observe(receipt, custody, lambda: reader, binding, None, STRUCTURAL_MODE)
+                with cancellation_signal() as cancelled:
+                    report = _observe(receipt, custody, lambda: reader, binding, None, STRUCTURAL_MODE,
+                                      cancelled=cancelled)
     except ReadFailure as error:
+        report = capture_refusal(receipt, "title", error, mode=STRUCTURAL_MODE, binding=binding)
+    except KeyboardInterrupt:
+        if receipt.exists() or receipt.with_name(receipt.name + ".partial").exists():
+            raise
+        error = ReadFailure("operator_cancelled", "operator cancelled before acquisition")
         report = capture_refusal(receipt, "title", error, mode=STRUCTURAL_MODE, binding=binding)
     return report
 
@@ -92,9 +118,14 @@ def main():
     if args.action == "source-identity":
         print(source_identity())
     else:
-        report = run(args.steam_root, args.custody, args.authorization)
+        try:
+            report = run(args.steam_root, args.custody, args.authorization)
+        except JournalFailure as error:
+            print(error, file=sys.stderr)
+            return 1
         print(json.dumps({"outcomes": report["counts"], "failure": report["failure"]}, indent=2))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

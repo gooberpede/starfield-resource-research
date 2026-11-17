@@ -48,14 +48,21 @@ replay summary. Resource addresses and acquisition bytes remain private.
 | Kreet Volcanic (`002C9985`) | Present, 2 nonzero resource IDs | `STATE_INDETERMINATE` |
 | Decaran VII-b Cratered (`000C5717`) | Present, 4 nonzero resource IDs | `STATE_INDETERMINATE` |
 
-The attempt recorded 1,092 acquisition calls and 20,032 requested bytes.
-Both counts were below their limits. The report interval was approximately
-5.001 seconds. The second collection did not complete its structural checks
-or closing identity bracket. Consequently the pair and each comparison
-control remained unqualified. The first collection's nonzero fields are
-retained as partial evidence. They supply neither a paired structural
-population verdict nor a claim about exact tuples, allocator execution
-timing, persistence or the galaxy-wide state.
+All four complete first-collection vectors descriptively matched the
+predeclared [SRR-012 sample predictions](SRR-012-sample-plan.md#fixed-samples-and-controls),
+including the zero positions. The comparison uses the retained private
+`replay-summary.json` indexed by evidence manifest SHA-256
+`081614a5994a908db03d4af9dc3f7e53ceb9456459c722a7de7f8c6a2c7adcae`.
+The first collection remains partial evidence for the paired observation.
+Exact-tuple qualification still requires verified effective inputs.
+
+The time budget interrupted the second collection at a report interval of
+5.000920400 seconds, with 1,092 acquisition calls and 20,032 requested bytes.
+Both work counts were below their limits. The second collection did not
+complete its structural checks or closing identity bracket. The pair and
+each comparison control remained unqualified, and all four verdicts remain
+`STATE_INDETERMINATE`. The retained fields establish no execution timing,
+persistence or galaxy-wide state.
 
 ## Exit, preservation and evidence
 

@@ -50,6 +50,12 @@ measurement. Historical Stage B run cards are spent.
 
 ## Bounded collection
 
+The [SRR-013 budget recovery](SRR-013-live-observation-budget-recovery.md)
+proposes a later execution policy for the same two-collection scientific
+contract. It retains finite work and operator cancellation and records elapsed
+time as evidence. The original limits below describe the SRR-012 design and
+historically reviewed implementation.
+
 Use the authenticated module base and resolve the owner root afresh for each
 collection. Check the context anchors and registered type word, then walk the
 native +0x300 range for each sampled planet up to its native upper bound or

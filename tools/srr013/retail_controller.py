@@ -11,7 +11,7 @@ from retail_inputs import verify_inputs
 
 
 def observe_window(path, attempt_directory, admission, binding, evidence,
-                   *, between=None, after_read=None, mode=None):
+                   *, between=None, after_read=None, mode=None, cancelled=None):
     """Acquire one owned disposable window through the selected contract."""
     label = binding["marker"]["label"]
     if binding["target_kind"] != "simulated":
@@ -24,18 +24,23 @@ def observe_window(path, attempt_directory, admission, binding, evidence,
         def authenticate():
             return stack.enter_context(admission)
 
-        return _observe(path, attempt_directory, authenticate, binding, evidence, mode, between, after_read)
+        return _observe(path, attempt_directory, authenticate, binding, evidence, mode, between, after_read,
+                        cancelled=cancelled)
 
 
-def _observe(path, attempt_directory, authenticate, binding, evidence, mode, between=None, after_read=None):
+def _observe(path, attempt_directory, authenticate, binding, evidence, mode, between=None, after_read=None,
+             *, cancelled=None):
     if mode is not None and mode not in MODES:
         raise ValueError("unknown observation mode")
     label = binding["marker"]["label"]
     try:
         claim(attempt_directory, binding["attempt"])
-        validate_marker(binding, label, monotonic_ns(), time_ns(), mode)
+        intake = {"mono_ns": monotonic_ns(), "utc_ns": time_ns()}
+        validate_marker(binding, label, intake["mono_ns"], intake["utc_ns"], mode)
+        binding = {**binding, "marker_intake": intake}
         reader = authenticate()
     except ReadFailure as error:
         return capture_refusal(path, label, error, binding=binding, inputs=evidence, mode=mode)
     binding = {**binding, "steam_log": {name: raw.hex() for name, raw in reader.admission_log.items()}}
-    return capture(path, reader, label, evidence, binding=binding, between=between, after_read=after_read, mode=mode)
+    return capture(path, reader, label, evidence, binding=binding, between=between, after_read=after_read,
+                   mode=mode, cancelled=cancelled)

@@ -70,7 +70,7 @@ EXPECTATIONS = {
     "mid-read-insert": ("structural_change",) * 4,
     "aba": (NONZERO_REASON,) * 4,
     "stable-clear": (ZERO_REASON,) * 4,
-    "budget-expired": ("observation_budget",) * 4,
+    "budget-expired": (NONZERO_REASON,) * 4,
     "marker-mode": ("marker_mode",) * 4,
     **{case: (reason,) * 4 for case, reason in ADMISSION_REFUSALS.items()},
 }
@@ -211,6 +211,7 @@ def run(directory):
     ]
     strict = run_case(directory, fixture, "explicit-strict", mode="strict")
     matrix.append(check_result(directory / "explicit-strict.jsonl", strict, "strict", ("tuple_match",) * 4))
+    time_control = None
     for case, reasons in EXPECTATIONS.items():
         scenario = case if case.startswith("structural-") or case in {
             "context-absent", "context-decoy", "wrong-context-vptr", "unregistered", "wrong-biom", "excessive",
@@ -221,11 +222,26 @@ def run(directory):
             row = result["samples"][1]
             if row["observed_words"][0] != 0xE100:
                 raise AssertionError("divergent validated FormID was lost or replaced by a prediction")
+        if case == "budget-expired":
+            timing = result["timing"]
+            collections = timing["collections"]
+            if (len(result["collections"]) != 2 or len(collections) != 2
+                    or collections[0]["elapsed_ns"] <= 8_000_000_000
+                    or timing["pair_elapsed_ns"] <= 8_000_000_000):
+                raise AssertionError("slow paired control did not cross both former duration cutoffs")
+            time_control = {
+                "case": case,
+                "previous_expected_reasons": ["observation_budget"] * 4,
+                "previous_fixture_pause_ns": 5_050_000_000,
+                "revised_expected_reasons": list(reasons),
+                "revised_timing": timing,
+            }
         matrix.append(check_result(directory / f"{case}.jsonl", result, "structural", reasons))
     invalid = check_replay_boundaries(directory)
     summary = {"build": baseline["build"], "original_cases": baseline["baseline_cases"],
                "prior_retail_like_cases": len(baseline["cases"]), "new_observations": matrix,
-               "invalid_receipts": invalid, "authorization_checks": check_authorization(directory)}
+               "invalid_receipts": invalid, "authorization_checks": check_authorization(directory),
+               "changed_duration_control": time_control}
     (directory / "summary-structural.json").write_bytes(encode(summary) + b"\n")
     print(f"Passed {len(matrix)} new external observations and {len(invalid)} replay challenges.")
     return summary

@@ -96,6 +96,19 @@ def validate_marker(binding, label, start_ns, start_utc_ns, mode=None):
             "marker_clock", "wall and monotonic intervals disagree")
 
 
+def validate_capture_marker(binding, label, start_ns, start_utc_ns, mode=None, *, historical=False):
+    """Keep the freshness check at operator intake before acquisition begins."""
+    if historical:
+        validate_marker(binding, label, start_ns, start_utc_ns, mode)
+        return
+    intake = binding.get("marker_intake")
+    require(isinstance(intake, dict) and type(intake.get("mono_ns")) is int
+            and type(intake.get("utc_ns")) is int and type(start_utc_ns) is int
+            and 0 < intake["mono_ns"] <= start_ns and start_utc_ns > 0,
+            "marker_order", "approved operator intake must precede acquisition")
+    validate_marker(binding, label, intake["mono_ns"], intake["utc_ns"], mode)
+
+
 def validate_identity(binding, identity):
     marker = binding["marker"]
     require(identity.get("profile") == TARGET_PROFILES.get(binding.get("target_kind"))

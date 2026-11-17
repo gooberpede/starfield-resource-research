@@ -7,7 +7,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 from shutil import copyfile
-from time import sleep
+from threading import Event, Timer
 
 from checkpoint import FILETIME_UNIX_EPOCH, MARKER_MAX_AGE_NS, _issued_bytes, issue, mark
 from contract import CHECKPOINTS, INDETERMINATE, POPULATED, UNPOPULATED
@@ -19,6 +19,7 @@ from retail_controller import observe_window
 from retail_inputs import MASTER_SHA256, OFFLINE_SCHEMA, PACK_BLOBS, PACK_COMMIT, SIMULATED_INPUT_EVIDENCE
 
 WORK = ROOT / ".local-work" / "codex" / "SRR-013-retail"
+SLOW_FIXTURE_WATCHDOG_SECONDS = 45
 
 POSITIVE = {"title": "populated", "menu": "zero", "settled-gameplay": "mixed", "aba": "aba",
             "stable-clear": "stable-clear", "ineligible-zero": "ineligible-zero", "wrong-map": "wrong-map",
@@ -120,19 +121,40 @@ def run_case(directory, fixture, case, *, mode=None, scenario=None):
             options["expected_session"] = 0xFFFFFFFF
         if case == "stable-clear":
             command("clear")
-        between = (lambda: command(case)) if case in ("clear", "aba", "drift-resource") else None
+        cancellation = Event()
+
+        def exit_owned():
+            command("quit")
+            proc.wait(timeout=5)
+
+        between = {
+            "clear": lambda: command("clear"),
+            "aba": lambda: command("aba"),
+            "drift-resource": lambda: command("drift-resource"),
+            "cancel-between": cancellation.set,
+            "process-exited": exit_owned,
+        }.get(case)
         injected = False
+        pauses = 0
 
         def disturb(_address, size, _alignment):
-            nonlocal injected
-            if not injected and size == 7 * 4:
-                if case == "budget-expired":
-                    sleep(5.05)
-                else:
-                    command("insert" if case == "mid-read-insert" else "drift-image")
+            nonlocal injected, pauses
+            if injected or size != 7 * 4:
+                return
+            if case == "budget-expired":
+                # Keep the original case name in receipts. The amended control
+                # progresses through three fixture pauses during collection 1.
+                command("pause-read")
+                pauses += 1
+                injected = pauses == 3
+            elif case == "cancel-during":
+                cancellation.set()
+                injected = True
+            else:
+                command("insert" if case == "mid-read-insert" else "drift-image")
                 injected = True
 
-        after_read = disturb if case in ("mid-read-insert", "identity-drift", "budget-expired") else None
+        after_read = disturb if case in ("mid-read-insert", "identity-drift", "budget-expired", "cancel-during") else None
         if case == "marker-duplicate":
             initial = directory / "marker-duplicate-first.jsonl"
             first = observe_window(initial, directory, open_simulated(baseline, proc), binding, inputs, **mode_options)
@@ -142,8 +164,22 @@ def run_case(directory, fixture, case, *, mode=None, scenario=None):
         admission = open_simulated(baseline, proc, **options)
         if case == "short-read":
             admission = shorten_read(admission)
-        report = observe_window(path, directory, admission, binding, inputs,
-                                between=between, after_read=after_read, **mode_options)
+        elif case == "slow-admission":
+            admission = pause_after_admission(admission, command)
+        watchdog = None
+        if case == "budget-expired":
+            watchdog = Timer(SLOW_FIXTURE_WATCHDOG_SECONDS, cancellation.set)
+            watchdog.start()
+        try:
+            report = observe_window(path, directory, admission, binding, inputs,
+                                    between=between, after_read=after_read, cancelled=cancellation.is_set,
+                                    **mode_options)
+        finally:
+            if watchdog is not None:
+                watchdog.cancel()
+                watchdog.join()
+        if case == "budget-expired" and (pauses != 3 or cancellation.is_set()):
+            raise AssertionError("slow fixture control did not complete within its supervisor limit")
     assert_replay(path, report)
     rights = PROCESS_QUERY_INFORMATION | (0 if case == "query-only" else PROCESS_VM_READ)
     if any(access != rights or inherit or selected != pid for access, inherit, selected in access_requests):
@@ -151,6 +187,13 @@ def run_case(directory, fixture, case, *, mode=None, scenario=None):
     if case in ("title", "no-read-rights", "query-only") and access_requests != [(rights, False, pid)]:
         raise AssertionError(f"{case}: acquisition must make exactly one process-open request")
     return report
+
+
+@contextmanager
+def pause_after_admission(admission, command):
+    with admission as reader:
+        command("pause-read")
+        yield reader
 
 
 @contextmanager

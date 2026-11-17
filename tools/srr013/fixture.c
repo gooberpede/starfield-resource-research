@@ -168,24 +168,27 @@ static void make_forms(void)
     make_resources();
 
     /* Reserve every home slot before placing overflow entries in the same table. */
-    enum { CAPACITY = 64, STRIDE = 0x18 };
-    uint32_t homes[CAPACITY] = {0};
-    unsigned char *table = make_page();
-    for (uint32_t i = 0; i < CAPACITY; ++i) put32(table + i * STRIDE + 0x10, UINT32_MAX);
-    for (size_t i = 0; i < form_count; ++i) homes[hash_slot(forms[i].id, CAPACITY)] = 1;
+    enum { STRIDE = 0x18, LONG_CHAIN_CAPACITY = 512 };
+    const uint32_t capacity = is_mode("chain-budget") ? LONG_CHAIN_CAPACITY : 64u;
+    uint32_t homes[LONG_CHAIN_CAPACITY] = {0};
+    unsigned char *table = capacity == LONG_CHAIN_CAPACITY
+        ? VirtualAlloc(NULL, capacity * STRIDE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) : make_page();
+    require(table != NULL, "form map allocation failed");
+    for (uint32_t i = 0; i < capacity; ++i) put32(table + i * STRIDE + 0x10, UINT32_MAX);
+    for (size_t i = 0; i < form_count; ++i) homes[hash_slot(forms[i].id, capacity)] = 1;
     unsigned collisions = 0;
     unsigned char *mountains_entry = NULL;
     unsigned char *divergent_entry = NULL;
     for (size_t i = 0; i < form_count; ++i) {
         const uint32_t id = forms[i].id;
-        uint32_t slot = hash_slot(id, CAPACITY);
+        uint32_t slot = hash_slot(id, capacity);
         unsigned char *entry = table + slot * STRIDE;
         if (get32(entry + 0x10) != UINT32_MAX) {
-            while (get32(entry + 0x10) != CAPACITY)
+            while (get32(entry + 0x10) != capacity)
                 entry = table + get32(entry + 0x10) * STRIDE;
-            for (slot = 0; slot < CAPACITY; ++slot)
+            for (slot = 0; slot < capacity; ++slot)
                 if (!homes[slot] && get32(table + slot * STRIDE + 0x10) == UINT32_MAX) break;
-            require(slot < CAPACITY, "form map has no overflow slot");
+            require(slot < capacity, "form map has no overflow slot");
             put32(entry + 0x10, slot);
             entry = table + slot * STRIDE;
             ++collisions;
@@ -198,12 +201,12 @@ static void make_forms(void)
         if (id == samples[1].biome) mountains_entry = entry;
         if (id == DIVERGENT_RESOURCE) divergent_entry = entry;
         putptr(entry + 8, form);
-        put32(entry + 0x10, CAPACITY);
+        put32(entry + 0x10, capacity);
     }
-    require(collisions != 0, "form map collision coverage missing");
+    require(collisions != 0 || is_mode("chain-budget"), "form map collision coverage missing");
     if (is_mode("structural-table-resource") || is_mode("structural-zero-table-biom")) {
         /* A plausible object whose header overlaps two unused map entries. */
-        unsigned char *alias = table + (CAPACITY - 2) * STRIDE;
+        unsigned char *alias = table + (capacity - 2) * STRIDE;
         require(get32(alias + 0x10) == UINT32_MAX && get32(alias + STRIDE + 0x10) == UINT32_MAX,
                 "expected unused map tail entries");
         if (is_mode("structural-table-resource")) {
@@ -219,8 +222,8 @@ static void make_forms(void)
     if (is_mode("structural-duplicate-resource")) {
         require(divergent_entry != NULL, "resource form entry missing");
         uint32_t slot = 0;
-        while (slot < CAPACITY && get32(table + slot * STRIDE + 0x10) != UINT32_MAX) ++slot;
-        require(slot < CAPACITY, "form map has no duplicate slot");
+        while (slot < capacity && get32(table + slot * STRIDE + 0x10) != UINT32_MAX) ++slot;
+        require(slot < capacity, "form map has no duplicate slot");
         unsigned char *duplicate = table + slot * STRIDE;
         unsigned char *form = make_page();
         putptr(form, image + resource_vptr_rva);
@@ -236,9 +239,23 @@ static void make_forms(void)
         put32(mountains_entry, 0xeeeeeeee);
         put32(mountains_entry + 0x10, (uint32_t)((mountains_entry - table) / STRIDE));
     }
+    if (is_mode("chain-budget")) {
+        require(mountains_entry != NULL, "Mountains form entry missing");
+        unsigned char *tail = mountains_entry;
+        while (get32(tail + 0x10) != capacity) tail = table + get32(tail + 0x10) * STRIDE;
+        uint32_t slot = 0;
+        for (uint32_t i = 0; i < 256u; ++i) {
+            while (slot < capacity && get32(table + slot * STRIDE + 0x10) != UINT32_MAX) ++slot;
+            require(slot < capacity, "form map has no long-chain slot");
+            put32(tail + 0x10, slot);
+            tail = table + slot * STRIDE;
+            put32(tail, 0xfe000000u + i);
+            put32(tail + 0x10, capacity);
+        }
+    }
     unsigned char *map = make_page();
     putptr(map + 0x10, table);
-    put64(map + 0x18, CAPACITY);
+    put64(map + 0x18, capacity);
     putptr(image + 0x5e60ea0, map);
 }
 
@@ -449,6 +466,7 @@ static void make_tree(Tree *tree, int depth, int variant, int faults)
         tree->root = internal(leaves, leaf_count, 1);
     }
     if (faults && is_mode("predecessor")) putkey(tree->root.address + 8, (Key){kreet - 1, 4});
+    if (faults && is_mode("depth-budget")) put32(tree->root.address, 9u);
     if (faults && is_mode("loop")) putptr(leaves[1].address + 8, leaves[1].address);
     if (faults && is_mode("bad-count")) put32(tree->root.address + 4, 0xa9);
     if (faults && is_mode("bad-minimum")) putkey(leaves[1].address + 0x18, (Key){kreet, 0});
@@ -598,6 +616,7 @@ int main(int argc, char **argv)
         "structural-zero-wrong-type", "structural-zero-wrong-map", "structural-zero-absent", "structural-resource-vptr",
         "structural-duplicate-resource", "structural-zero-wrong-pndt",
         "structural-table-resource", "structural-zero-table-biom",
+        "chain-budget", "depth-budget",
     };
     require(argc == 2, "provide one fixture scenario");
     mode = argv[1];
@@ -622,6 +641,7 @@ int main(int argc, char **argv)
             else if (!strcmp(command, "restore-tree")) publish_tree(&primary);
             else if (!strcmp(command, "drift-image")) drift_image();
             else if (!strcmp(command, "drift-resource")) record(samples[1].slots[0], resource_type)[0x2e] = 0xab;
+            else if (!strcmp(command, "pause-read")) Sleep(2900);
             else if (!strcmp(command, "aba")) {
                 slots(&primary, 0);
                 publish_tree(&inserted);

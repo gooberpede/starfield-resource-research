@@ -33,3 +33,13 @@
 | Changed seed or RSGD path | Resolved for mode separation | Structural measurement checks observed typed PNDT/BIOM and RSGD joins. It neither verifies nor depends on effective prediction inputs. Strict exact-tuple applicability remains blocked on the previously identified runtime evidence. |
 | Mode relabelling or duplicate authority | Resolved for disposable/custody controls | Bind the selected mode to issuance, marker, ordered identity requests and report. Bind the future external written approval reference to the reviewed source identity and approved canonical custody. Reserve that custody's single attempt before opening process handles. |
 | Actual title-card state and retail process predicates | Conditional runtime | A separately authorized operator run must verify the Steam/session and mapped-image evidence, access, responsive phase, published context and typed records. Failures refuse. No save or travel is part of the title proposal. |
+
+## Observation budget recovery
+
+| Lead | Disposition | Evidence or next gate |
+| --- | --- | --- |
+| Healthy retail progress interrupted before pair completion | Resolved in the candidate | The historical refusal reached the five-second deadline below both work limits. Remove both elapsed acquisition deadlines and keep the same scientific predicates. [Budget recovery](SRR-013-live-observation-budget-recovery.md) |
+| Marker expiry during a progressing collection | Resolved by moving freshness to intake | Capture revalidates intake chronology and process epoch. Elapsed time during the pair is diagnostic. |
+| Infinite traversal or unexpected lifecycle change | Existing finite safety gates retained | Cursor, pointer and visited-state guards and finite counts terminate malformed traversal. Reads and paired identity checks refuse on failure or drift. |
+| Cancellation during a synchronous OS call | Limited to returning boundaries | The Ctrl+C signal records intent. The call can defer observation of cancellation. No remote or thread control is involved. |
+| Historical timeout and first collection | Preserved | Replay retains the original refusal and all four indeterminate outcomes. The complete first vectors have a descriptive match to the conditional reference. |

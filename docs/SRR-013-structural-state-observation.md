@@ -7,6 +7,10 @@ window. The [retail title run card](SRR-013-structural-title-run-card.md) is
 **NOT AUTHORIZED**. This investigation used owned Windows fixtures and the
 pinned retail executable as an offline data file.
 
+The [budget recovery](SRR-013-live-observation-budget-recovery.md) qualifies
+a later acquisition policy. The original tests and review below describe
+the candidate frozen for the first title-card attempt.
+
 The existing [strict continuation](SRR-013-retail-readiness-continuation.md)
 and its effective-input blocker remain in force for strict measurements.
 The [SRR-012 acquisition](SRR-012-acquisition-evidence.md), [strict measurement
