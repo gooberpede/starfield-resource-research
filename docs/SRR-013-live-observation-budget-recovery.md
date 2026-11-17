@@ -97,8 +97,6 @@ Reviewed source manifest SHA-256
 The manifest hashes delivered files in sorted path order and excludes
 only this marked block. The execution-source identity is
 `69d8623f734c19fabed2674d2ea97ff4779505fe1ee22ff8fb4a1b2f66500cd6`.
-Independent review and receipts remain under
-`.local-work/independent-review/SRR-013-budget/`. This disposition applies
-to offline readiness. Any later live observation requires new written
+This disposition applies to offline readiness. Any later live observation requires new written
 authorization and remains subject to its actual runtime predicates.
 <!-- review-status:end -->

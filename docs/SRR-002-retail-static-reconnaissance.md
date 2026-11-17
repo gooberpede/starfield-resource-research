@@ -245,7 +245,7 @@ require separate authorization.
 
 ## Local verification and handoff
 
-Receipts and selected native evidence are in .local-work/codex/SRR-002/.
+Historical receipts and native exports have private custody.
 start.json and verification-final.json record Git state, external input
 hashes and project inventory. identity.tsv, core/manifest.json, the core
 exports, context.tsv, code-checks.txt and flow1.txt through flow3.txt support
@@ -255,9 +255,9 @@ identity. No scratch output was made a protected repository dependency.
 
 The caller-available space floor was 40,000,000,000 bytes on C: and D:.
 Checks preceded write stages with growth reserves, including 1 GiB per drive
-for each headless run. space.log and space-during.json record preflight and in-run readings. The task patch is .local-work/diffs/SRR-002.diff.
-The replay applies it to bytes retrieved from the starting Git objects in
-isolation and checks the result against all delivered file bytes. The brief,
+for each headless run. The preflight and in-run readings were recorded.
+The task patch was replayed against the starting Git objects in isolation
+and checked against all delivered file bytes. The brief,
 original Git index, CK evidence and unrelated tracked paths are preserved.
 
 ### SRR-004 editorial revision
@@ -281,7 +281,5 @@ Reviewed manifest SHA-256
 The manifest sorts the six task paths and records each file's SHA-256,
 two spaces, its repository-relative path and LF. The dossier digest
 excludes this entire review-status block, including the marker lines.
-Detailed challenge rounds and the manifest are retained in
-.local-work/independent-review/SRR-002/.
 
 <!-- review-status:end -->

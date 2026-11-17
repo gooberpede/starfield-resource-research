@@ -1,14 +1,16 @@
 # SRR-009 — Read-only dependency, publication and Stage A readiness audit
 
-**Assignment to Codex.** This is an audit of the *frozen Phase 1 round-3 candidate*, not a continuation of implementation, a new SRR number, or an authorization to run Stage A. Deliver a factual assessment for maintainer review. **Do not modify any tracked or existing local project files, commit, stage, push, invoke the retail observer, launch Starfield, attach a debugger, or change game/Steam/Windows settings.** Audit work products may be written only to a new, isolated, ignored `.local-work/independent-review/SRR-009/publication-audit/` directory; do not overwrite previous evidence. Read repository source, local evidence and documentation, and use non-invasive inspection commands. Do not run native executables or fixture suites unless separately approved; they have already been qualified. No external network is needed.
+**Historical assignment.** The [tracked Stage A dossier](../SRR-009-retail-debugger-admission-and-stage-a.md) and [publication dependency inventory](../SRR-009-publication-verification.md) record the findings. The identities below describe the original audit inputs.
+
+This is an audit of the *frozen Phase 1 round-3 candidate*, not a continuation of implementation, a new SRR number, or an authorization to run Stage A. Deliver a factual assessment for maintainer review. **Do not modify any tracked or existing local project files, commit, stage, push, invoke the retail observer, launch Starfield, attach a debugger, or change game/Steam/Windows settings.** Audit work products may be written only to a new, isolated, ignored `.local-work/independent-review/SRR-009/publication-audit/` directory; do not overwrite previous evidence. Read repository source, local evidence and documentation, and use non-invasive inspection commands. Do not run native executables or fixture suites unless separately approved; they have already been qualified. No external network is needed.
 
 ## Frozen reference and scope
 
 - Git HEAD: `1fd0b0d33c1212721a483ac0078a89fbc9f9a3c7` plus the nine-file uncommitted SRR-009 Phase 1 patch. Confirm that the observed tree matches the frozen handoff before analysis; a mismatch is a finding, not permission to fix it.
-- Closing manifest v3: `.local-work/codex/SRR-009/closing/manifest-v3.json`, SHA-256 `51e9609458c40a01208f24cc8a2d395519276de2fceba190c2ee5af0f8257faa`.
-- Task-only patch: `.local-work/diffs/codex-srr009-phase1-r3-final.diff`, SHA-256 `2d8f72f1977368ff609fa4a6db1748b36d895be13cb4f4954cad3252e9839319`.
-- Reviewed Stage A binary: `.local-work/codex/SRR-009/freeze-2/observer.exe`, SHA-256 `8962a74a230086c179f807c54de40aed5708f6e7cfaf5a75e8d103237eda6144`.
-- Challenger review: `.local-work/independent-review/SRR-009/review-round3.md`, SHA-256 `da26307915ba44fac72f61efddfa3ad605df76d4a3ec507b170d942fda146140`.
+- Closing manifest v3 SHA-256 `51e9609458c40a01208f24cc8a2d395519276de2fceba190c2ee5af0f8257faa`.
+- Task-only patch SHA-256 `2d8f72f1977368ff609fa4a6db1748b36d895be13cb4f4954cad3252e9839319`.
+- Reviewed Stage A binary SHA-256 `8962a74a230086c179f807c54de40aed5708f6e7cfaf5a75e8d103237eda6144`.
+- Challenger review SHA-256 `da26307915ba44fac72f61efddfa3ad605df76d4a3ec507b170d942fda146140`.
 - Primary dossier: `docs/SRR-009-retail-debugger-admission-and-stage-a.md`. Read the SRR-009 brief and `AGENTS.md`, `docs/research-workflow.md`, SRR-006–008 dossiers as controlling context. Preserve the current frozen candidate and previous review rounds.
 
 ## Questions to answer

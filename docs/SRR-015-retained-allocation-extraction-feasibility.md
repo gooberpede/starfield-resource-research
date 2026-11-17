@@ -134,9 +134,7 @@ The installed offline retail PE reported file and product versions
 `7e9adb1414a8e1b325e5e1f097b9b17b78deb7eebeda37a333351a43a60f9d28`.
 Use Python 3.14.3 and Capstone 5.0.7 for the [native decoder](../tools/srr011/inspect_pe.py).
 See the [lead register](SRR-015-lead-register.md) for the bounded
-native cross-checks. The independent challenge and replay findings are
-retained in local custody at
-`.local-work/independent-reviews/SRR-015-independent-challenge.md`.
+native cross-checks.
 
 ```powershell
 python -B tools/srr012/check_contract.py
@@ -157,8 +155,7 @@ design and await the population adapter.
 <!-- srr-015-review:start -->
 **COMPLETE for the offline draft.** The independent internal challenger
 reproduced the pinned native and model checks and exercised completeness
-counterexamples. The report is retained at
-`.local-work/independent-reviews/SRR-015-independent-challenge.md`.
+counterexamples.
 This review leaves the population adapter, census of expected keys and
 full-owner oracle qualification as preconditions for a retail comparison.
 
@@ -166,10 +163,9 @@ Final manifest SHA-256
 `4b023ed75169a98853fc05a9bd6d8acac79eacc4681101f4f0d0336ea7605516`.
 The manifest records the SHA-256, two spaces and repository-relative path
 for each of nine task paths in sorted order with LF endings. Only this
-review block is excluded from the dossier digest. The final task-only patch
-is `.local-work/diffs/SRR-015-custody-correction.diff`. It supersedes the
-retained ten-path patch at `.local-work/diffs/SRR-015.diff`. Forward and
-reverse replay matched all nine paths byte-for-byte. Ending HEAD and index
+review block was excluded from that historical dossier digest. The final
+nine-path patch superseded the earlier ten-path patch. Forward and reverse
+replay matched all nine paths byte-for-byte. Ending HEAD and index
 matched their starting identities. The supplied brief remains unchanged
 and untracked.
 <!-- srr-015-review:end -->

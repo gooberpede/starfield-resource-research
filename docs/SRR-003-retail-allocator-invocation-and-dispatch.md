@@ -296,7 +296,7 @@ starting path and is excluded from the task patch. No runtime work was
 performed. The project was opened with `-process Starfield.exe -readOnly
 -noanalysis`.
 
-Receipts are under `.local-work/codex/SRR-003/`. The Ghidra reports are
+Historical receipts remain private. The Ghidra reports included
 `leads.tsv`, `dispatch.tsv`, `controls.tsv` and `core/`. The PE
 checks include `rtti.txt`, `control-rtti.txt`, `initial-native.txt`,
 `dispatch-native.txt`, `upstream-native.txt`, `caller-controls.txt`,
@@ -305,10 +305,8 @@ checks record hashes of the executable inputs, analysis project,
 dependencies, brief and original index. The caller-available floor was
 40,000,000,000 bytes on both drives after growth reserve. Checks are in
 `start.json`, `space.log` and `verification-final.json`. The ending
-HEAD and index match the starting state. The Git-native task patch is
-`.local-work/diffs/SRR-003.diff`. The final verification receipt records
-the isolated apply check, replay and byte comparison against every
-deliverable.
+HEAD and index matched the starting state. The Git-native patch passed
+isolated apply, replay and byte comparison against every deliverable.
 
 ### SRR-004 editorial revision
 
@@ -334,7 +332,6 @@ Reviewed substantive manifest SHA-256
 It sorts the seven deliverable paths and records each file's SHA-256,
 two spaces, its repository-relative path, and LF. Only this marked
 review-status block, including the marker lines, is excluded from the
-dossier digest. The detailed challenge and manifest are retained under
-`.local-work/independent-review/SRR-003/`.
+dossier digest.
 
 <!-- review-status:end -->

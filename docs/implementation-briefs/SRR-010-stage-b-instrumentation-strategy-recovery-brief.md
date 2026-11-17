@@ -20,9 +20,14 @@ Do not claim the third standard from the first two. No obligation to explain the
 
 ## 2. Starting evidence, constraints and prior art
 
-Review the current uncommitted SRR-010 task stack, including the Phase 1 observer, both independently reviewed live attempts, the offline recovery continuation and their separate manifests/reviews. The second live attempt's dossier-only patch is applied **after** the original Stage B patch and recovery patch; preserve that cumulative order and its 12 task-file identities. Confirm HEAD, index and pre-existing worktree state before changing anything. Do not rewrite or reinterpret earlier evidence.
+The original assignment started from the uncommitted Phase 1 observer,
+both independently reviewed live attempts and the offline recovery
+continuation. The second live attempt's dossier patch followed the
+original Stage B and recovery patches, with 12 task-file identities in
+the accumulated handoff. The [Stage B dossier](../SRR-010-stage-b-save-load-observation.md)
+records the historical evidence identities and verification limits.
 
-Use the retained *primary* evidence, not merely summary statements. At minimum compare:
+The original comparison called for the following primary evidence:
 
 - **SRR-010, attempts 1 and 2:** the native event/prefix records, readbacks, thread birth/exit service, exception dispositions, load marker-to-exit window, and exact target exit (`0x80000004`). Both have qualified pre-load negatives but incomplete save-load evidence; the second has eight deferred idle checks and one event-held check during load. The load-marker-to-exit interval includes operator time and is **not** a measured save-load execution duration. Neither has a corresponding delivered single-step exception or faulting instruction.
 - **`starfield-reference-handles`:** the successful native Win32 startup hardware smoke and any separately retained game-transition attempt. A startup smoke is not proof of save-load stability. Compare exact source, event ownership, RF/TF/DR6 rules, thread population and survival.

@@ -124,10 +124,7 @@ dependencies. The tool SHA-256 is
 and the schema 1 fixture receipt SHA-256 is
 `9cbb91c6a51a1fc041c3804773249ada9cfe78dc6b0f28e61f1a0eeffbf83924`.
 The local replay uses the starting Git blob and verifies both delivered
-files byte-for-byte. Evidence and tool receipts are under
-`.local-work/codex/SRR-008/`, independent review under
-`.local-work/independent-review/SRR-008/` and the Git-native patch at
-`.local-work/diffs/SRR-008.diff`.
+files byte-for-byte.
 
 The installed-file identity is eligible as a scoped claim. From the public
 repository, follow [SRR-001 and provenance](PROVENANCE.md#current-retail-identity)
@@ -155,8 +152,7 @@ Reviewed substantive manifest SHA-256
 `236acd4780ed59c8c0a364ac339abf8cde72185789879cd26c3e0b9abddafaba`.
 The two sorted entries contain each file's SHA-256, two spaces, its
 repository-relative path and LF. Only this marked review block is excluded
-from the dossier digest. The internal challenge and final replay receipt
-remain under `.local-work/independent-review/SRR-008/`.
+from the dossier digest.
 <!-- review-status:end -->
 
 ## Amended preflight and Steam dispatch — 14 November 2026
@@ -249,12 +245,9 @@ also agreed. The postflight observed no additions, removals or changes in
 those checks. This was a post-attempt comparison because no game exit was
 observed. Both drives remained above the reserved floor.
 
-The amended run, tool source, fixture journals, access receipt, process/log
-diagnostics and preservation assessment are in
-`.local-work/codex/SRR-008/amended/`. The controller source SHA-256 is
+The amended run's controller source SHA-256 is
 `b34162ac780ae79a653002c800ce1fad83b43446b95cb7f6dc8374bc632a96d3`.
-The historic patch and substantive manifest are archived there. The revised
-task-only patch includes the index link and this dossier against the same
+The revised task-only patch included the index link and this dossier against the same
 starting Git objects. HEAD and the actual index retained their original
 identities. The maintainer-supplied brief was excluded from the patch.
 
@@ -280,9 +273,7 @@ evidence unmet. AC5 and AC6 pass for the partial handoff.
 Reviewed substantive manifest SHA-256
 `f760d44d0a4b0a3887765f568219c26bd3911450195442f2dc59ef921394d637`.
 Only this amended review block is excluded from the dossier digest. The
-original review block is included as historical evidence. Amended review
-and final replay receipts are under
-`.local-work/independent-review/SRR-008/amended/`.
+original review block is included as historical evidence.
 <!-- amended-review-status:end -->
 
 ## Current protection and environment checks
@@ -397,14 +388,10 @@ The installed-file and bounded run summary are eligible for scoped
 publication. A public reproduction starts with the SRR-001 file checks
 on a lawfully obtained copy. A new authorized run can reproduce the
 observational method using a Steam PID/path record, Windows process identity
-and Tool Help snapshots. Independent byte verification of this historical
-run requires the retained local receipts and source.
-Raw paths, full inventories, account details, save comparisons and
-operator records remain local under
-`.local-work/codex/SRR-008/interactive/`. The manifest, byte-replay and
-independent review receipts accompany the task-only patch. The earlier
-amended patch is retained separately and the user-supplied brief remains
-outside the patch.
+and Tool Help snapshots. The original run is a custody-backed historical
+observation. Exact raw records, full inventories, account details, save
+comparisons and operator records remain private. The task-only patch
+excluded the user-supplied brief.
 
 <!-- interactive-review-status:start -->
 ### Interactive-account independent review
@@ -420,7 +407,5 @@ retrospective responsiveness confirmation and the public verification limit.
 Reviewed substantive manifest SHA-256
 `b96c6026d712b1288741c47c732739f20d30a4aa6c473e9595557fb8cea756ec`.
 Only this review block is excluded from the dossier digest. Both prior
-review blocks remain included as historical evidence. The detailed review
-and final replay are under
-`.local-work/independent-review/SRR-008/interactive/`.
+review blocks remain included as historical evidence.
 <!-- interactive-review-status:end -->

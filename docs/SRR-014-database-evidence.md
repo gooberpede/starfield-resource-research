@@ -320,8 +320,6 @@ unwind ranges. The first scan produced six decoded direct references.
 Computed references, arbitrary dynamic receiver registrations and runtime
 producer timing fall outside that census. [Existing broader native lead controls](SRR-011-lifecycle-lead-register.md)
 
-Local receipt directory `.local-work/codex/SRR-014/database/` retains
-derived disassembly only. It is ignored and supports parent and
-challenger verification. The tracked route requires neither these text
-captures nor a Ghidra project. This investigation read the offline
-image as data and left the local Ghidra database untouched.
+The tracked decoder generates the relevant disassembly from the pinned
+offline image. This investigation read the image as data and left the
+local Ghidra database untouched.

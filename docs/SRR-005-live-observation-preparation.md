@@ -284,14 +284,11 @@ volume decides whether the engine invoked the path.
   after those tests. The fixture and schema qualify prerequisites for
   development. They provide no game-qualified observer binary.
 
-The exact historical checks are custody-only and used the ignored
-`check-sites.py <installed-PE> <SRR-002 identity.tsv>` and
-`test-correlation.py` with Python `-B`, and `build-fixture.cmd` under
-`.local-work/codex/SRR-005/`. The first reads disk PE and retained
-metadata. The second uses synthetic records. The build writes its EXE/OBJ
-beside its sources and executes that disposable program alone. Redirect
-outputs in the same ignored task directory. These checks do not open or
-write the Ghidra project. A public verification route is the
+The historical checks used Python `-B` for a disk PE and
+SRR-002 identity-metadata check and a synthetic correlation test. A local
+build compiled and executed a disposable fixture, with outputs kept
+alongside its sources. These checks left Ghidra untouched. The public
+verification route is the
 [SRR-003 procedure](SRR-003-retail-allocator-invocation-and-dispatch.md#reproduction-publication-and-next-experiment)
 with a lawfully obtained matching PE. Current synthetic controls use
 the [tracked SRR-006 fixture tooling](SRR-006-four-site-hardware-observer.md#reproduce-the-fixture-controls).
@@ -425,10 +422,8 @@ The protected-input receipt rechecks 56 exact file hashes, including
 both executables, Save2, the retained Ghidra project and sibling
 dependencies. The selective SFSE live-precedent receipt is separate.
 
-Local work and verification are under `.local-work/codex/SRR-005/`.
-The patch is `.local-work/diffs/SRR-005.diff`. The patch includes this
-dossier and its index link. Check the end-state and replay receipt
-for Git state, protected-input comparisons, UTF-8/link checks,
+The historical task patch covered this dossier and its index link.
+The handoff checked Git state, protected-input identities, UTF-8, links,
 disk-space projections and isolated byte-for-byte patch replay.
 The original brief is retained locally. Earlier review identities
 remain in their original documents.
@@ -449,8 +444,6 @@ Reviewed substantive manifest SHA-256
 `887010ae04a1f407a588f9215269db798a5e973b4d340eebd5b8a457fdfe1513`.
 The manifest lists each file's SHA-256, two spaces, its
 repository-relative path and LF, sorted by path. Only this marked review
-block is excluded from the dossier digest. The local independent challenge
-and final patch verification are under
-`.local-work/independent-review/SRR-005/`.
+block is excluded from the dossier digest.
 
 <!-- review-status:end -->

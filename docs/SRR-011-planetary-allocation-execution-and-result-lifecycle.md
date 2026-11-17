@@ -559,13 +559,10 @@ local custody. The evidence grades for actual retail allocation
 timing and persistence remain open. These claims stay on publication
 hold as actual invocation or serialization findings.
 
-Task receipts are under `.local-work/codex/SRR-011/`. The upstream and
-downstream handoffs index their focused listings, failed candidates and
-prior-source pins. `start.json` and `verification-final.json` record
-identity, stage boundaries, Git state and the byte-exact patch replay.
-Independent review receipts are under `.local-work/independent-review/SRR-011/`.
-The task-only patch is `.local-work/diffs/SRR-011.diff`. It excludes
-the pre-existing brief and prior evidence. No Git staging, commit,
+The upstream and downstream handoffs recorded focused listings, failed
+candidates and prior-source pins. The verification covered input identity,
+stage boundaries, Git state and byte-exact patch replay. The task patch
+excluded the pre-existing brief and prior evidence. No Git staging, commit,
 push or publication occurred.
 
 ## Lead audit
@@ -630,8 +627,7 @@ Reviewed manifest SHA-256
 `59a2bd41d632b0eeb87559cd7036c441ddc765d813cfd07ed4501ca0127c86b9`.
 Each line records the file SHA-256, two spaces and the repository-relative
 path, followed by LF in sorted path order. The dossier hash excludes
-only this marked review-status block. The detailed internal review
-and replay receipts are under `.local-work/independent-review/SRR-011/`.
+only this marked review-status block.
 <!-- review-status:end -->
 
 <!-- documentation-review:start -->
@@ -647,9 +643,6 @@ Continuation manifest SHA-256
 `0c6165c7a8102c44eed1c770ba8a8bd26750328ce07d04ddd6082066b14ae7c1`.
 The manifest hashes the dossier with only this marked continuation block
 excluded. The original review block is part of the hashed content.
-The incremental patch is `.local-work/diffs/SRR-011-documentation-continuation.diff`.
-Review and replay receipts are in
-`.local-work/independent-review/SRR-011-documentation-continuation/`.
 <!-- documentation-review:end -->
 
 [startup]: https://github.com/gooberpede/starfield-reference-handles/blob/7be6624893ef8a1abfdbbef7b50ed35e90b8f970/docs/experiments/pack-in-storage-reference-startup-construction.md

@@ -70,8 +70,9 @@ untouched. A receipt contains disposable epoch and address-bearing evidence.
 Keep receipts and compiled outputs local.
 
 ```powershell
-python -B tools/srr013/qualify.py run qualification
-python -B tools/srr013/qualify.py replay .local-work/codex/SRR-013/qualification/populated.jsonl
+$srrRun = "qualification-$([guid]::NewGuid().ToString('N'))"
+python -B tools/srr013/qualify.py run $srrRun
+python -B tools/srr013/qualify.py replay ".local-work/codex/SRR-013/$srrRun/populated.jsonl"
 ```
 
 Replay checks the completion seal, then runs the same decoder and classifier
@@ -100,11 +101,10 @@ call and reproduced the refusal with a controlled clock after rework.
 The exact fixture PE SHA-256 is
 `edac25b21ad832b69015bf3d73e6f19f8c6e148d77d58b27a6200204c6c1c105`.
 The reader is Python source. The run used AMD64 CPython 3.14.3, MSVC
-14.51.36231 and Windows SDK 10.0.26100.0. The source manifest, build identities,
-per-case receipts and SHA-256 values are under `.local-work/codex/SRR-013/`.
-Earlier diagnostic receipts and independent challenge evidence are retained
-in the ignored local investigation and review directories. The patch excludes
-these receipts, proprietary images, real game memory and save files.
+14.51.36231 and Windows SDK 10.0.26100.0. The qualifier generates a
+build manifest, per-case receipts and hash summary for the new run.
+The patch excluded diagnostic evidence, proprietary images, real game
+memory and save files.
 
 ## Review and authorization
 
@@ -130,6 +130,5 @@ card and an exact 11-file patch replay against `4dcb5e0`.
 Reviewed source manifest SHA-256
 `d7bd83899be4a8c44b76058d83f16b26f0e3032d5dec67cf4db5fcab3f4e078d`.
 The manifest hashes each delivered file in sorted path order with only this
-marked review block excluded. Review records are retained locally under
-`.local-work/independent-review/SRR-013/`.
+marked review block excluded.
 <!-- review-status:end -->

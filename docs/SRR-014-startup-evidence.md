@@ -106,7 +106,6 @@ machine and PE base on each invocation, reads only the supplied file and
 prints to stdout. These commands were checked with CPython 3.14.3 and
 Capstone 5.0.7. Set `$srrPython` to the interpreter and `$srrExe` to a
 lawful matching image. No runtime process or Ghidra program was opened.
-Listings and checks remain in ignored `.local-work/codex/SRR-014/startup/`.
 
 ```powershell
 & $srrPython -B tools/srr011/inspect_pe.py $srrExe functions 141898870 141881660 1424059f0 14231d000 14189a970

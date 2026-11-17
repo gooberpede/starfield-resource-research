@@ -149,8 +149,7 @@ high-water 3,038. The burst STOP continued another 3,850 hardware
 events from at least nine generations. The overflow run flushed 32 of
 32 accepted rows out of 4,204 attempts. The interrupted write confirmed
 6 durable rows out of 303 accepted, with an incomplete row in the tail.
-No fixture watchdog fired. Exact receipts and earlier failures are under
-`.local-work/codex/SRR-006/`.
+No fixture watchdog fired. Exact run records have private custody.
 
 Run18 reran all 17 original controls and passed seven additional
 scenarios on fixture SHA-256
@@ -306,7 +305,6 @@ AC1–AC7 on substantive manifest SHA-256
 `4af4b36f3989c22f2c1d077837bcda5aa1fffde240b6e8ae966bc9e9e9e779c3`.
 The independent rebuild passed all 25 fixtures and three compiled controls,
 and the challenger verified the protected inputs and task-only byte replay.
-Detailed rounds remain under `.local-work/independent-review/SRR-006/`.
 This disposition supports requesting the separately approved no-save
 Stage A run card with a pinned launch and module profile, operator-bound
 checkpoints, and explicit emergency and debugger-exit authority. Retail

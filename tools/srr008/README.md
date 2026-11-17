@@ -49,12 +49,14 @@ may be empty. The keys are save basenames.
 Each designation supplies `bytes`, `sha256` and an `evidence` string.
 Each explicit classification supplies an `evidence` string and `kind`
 from `MANUAL`, `AUTO`, `EXIT` and `QUICK`. Keep the original private policy
-pin when reusing it.
+pin when reusing it. Set `$srrConfig` to a configuration you create
+using the schema above and the tracked synthetic example. Create the ignored
+output parent before running these commands.
 
 ```powershell
 $local = '.local-work/codex/example'
-python -E -B tools/srr008/preflight.py protection --config "$local/local-settings.json" --output "$local/pre-protection"
-python -E -B tools/srr008/preflight.py environment --config "$local/local-settings.json" --output "$local/pre-environment"
+python -E -B tools/srr008/preflight.py protection --config $srrConfig --output "$local/pre-protection"
+python -E -B tools/srr008/preflight.py environment --config $srrConfig --output "$local/pre-environment"
 ```
 
 Protection hashes each protected original and independent backup, rejects
@@ -84,6 +86,8 @@ historical live process and account observations. Exact historical
 interactive commands and reports remain in private custody.
 
 ## Disposable module inventory
+
+Create the ignored output parent first. The receipt path is a new output.
 
 ```powershell
 python -E -B tools/srr008/inventory.py .local-work/codex/example/module-fixture.json

@@ -20,6 +20,12 @@ baseline before retail native research begins.
 
 ## Local work and content verification
 
+Tracked documentation must be self-contained. Cite tracked methods,
+declared lawful inputs and durable evidence identities. Describe the
+substantive findings, review disposition and limits in the dossier.
+Treat prior review manifests as identities of their historical snapshots.
+Private scratch areas can hold new outputs and custody records.
+
 - Use `.local-work/codex/<investigation>/` for task inputs and check receipts,
   `.local-work/independent-review/<investigation>/` for review rounds, and
   `.local-work/diffs/` for the review patch. Confirm all are ignored and
@@ -166,9 +172,8 @@ the workflow digest. The historical SRR-002 and SRR-003 review blocks remain
 part of their dossier bytes in this new manifest.
 
 Both Mermaid diagrams passed parsing and visual inspection after rendering
-locally with VS Code's bundled Mermaid engine in headless Chrome. Detailed
-receipts and the manifest are under `.local-work/independent-review/SRR-004/`
-and `.local-work/codex/SRR-004/`. Retail gameplay association, actual
+locally with VS Code's bundled Mermaid engine in headless Chrome. Retail
+gameplay association, actual
 invocation, cache lifecycle, descendant multiplicity and full runtime
 equivalence remain open under the existing publication holds.
 <!-- srr-004-review:end -->

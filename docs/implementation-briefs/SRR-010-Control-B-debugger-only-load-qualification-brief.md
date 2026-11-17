@@ -2,7 +2,8 @@
 
 **Implementation and independent-review brief for Codex**  
 **Status:** Offline preparation only — **no retail launch, attach, or save load authorized**  
-**Repository:** `D:\Projects\starfield-resource-research`  
+**Repository** `starfield-resource-research`
+
 **Investigation:** Continue SRR-010; do not create SRR-011 merely for this operational control.
 
 ## 1. Purpose and decision to be tested
@@ -19,7 +20,13 @@ Control B is a **discriminating operational control**; it has **zero resource-al
 
 ## 2. Sources and boundaries
 
-Read the committed `AGENTS.md`, `docs/research-workflow.md`, results-first `docs/SRR-009-retail-debugger-admission-and-stage-a.md`, SRR-005/006/007/008 research and fixture contracts, the **actual uncommitted SRR-010 source and dossier**, and the three live-attempt reviews, manifests and journal evidence already retained locally. Treat the previous SRR-010 patch chain and uncommitted worktree as the starting state; do not replace it with a clean checkout or assume Git HEAD includes SRR-010.
+The original assignment started from the then-uncommitted SRR-010 source
+and the private records of the three live attempts. The tracked
+[Stage B dossier](../SRR-010-stage-b-save-load-observation.md) now records
+their evidence identities, findings, reviews and limitations. Background
+includes `AGENTS.md`, the [research workflow](../research-workflow.md),
+[SRR-009](../SRR-009-retail-debugger-admission-and-stage-a.md) and the
+SRR-005/006/007/008 research and fixture contracts.
 
 Specifically inspect the existing `tools/srr006/observer.cpp`, relevant headers and fixture harnesses; `tools/srr006/stage_b_marker.py`; and `tools/srr008/watch_exit.py` and read-only protection tools. Consult sibling reference-handle/outpost source only if useful for the debugger-without-DR precedent, and keep earlier live results differentiated from disposable results.
 

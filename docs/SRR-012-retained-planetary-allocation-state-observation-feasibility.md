@@ -157,10 +157,6 @@ Reviewed manifest SHA-256
 `4d46e17c199600824b55d1346157e7028ace811dd3ad6a9442925c0c4b4e584c`.
 It records file SHA-256, two spaces and the repository-relative path
 with LF in sorted path order. Only this marked review block is excluded
-from the dossier digest. The exact task patch is
-`.local-work/diffs/SRR-012.diff`. Manifest, hash and endpoint replay
-receipts are under `.local-work/codex/SRR-012/`. The independent
-review and replay receipts are under
-`.local-work/independent-review/SRR-012/`. The pre-existing brief
-is unchanged and excluded from the patch.
+from the dossier digest. The pre-existing brief is unchanged and was
+excluded from the patch.
 <!-- review-status:end -->

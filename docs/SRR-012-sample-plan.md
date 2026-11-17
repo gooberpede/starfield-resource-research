@@ -193,9 +193,8 @@ From the research checkout, re-decode the focal functions using the
 [hash-enforcing PE reader](../tools/srr011/inspect_pe.py), the matching
 file as offline data and an interpreter with Capstone installed.
 The command reads the image and prints bounded disassembly to stdout.
-It requires no game process or Ghidra project. The optional local
-native listing is `.local-work/codex/SRR-012/sample-native.txt`,
-SHA-256 `0a9ce69f88c51a8776b7b1a6fa79dcf8c6c5e3bb29b1f3d2d55d4ab4fc257b71`.
+It requires no game process or Ghidra project. The historical listing
+had SHA-256 `0a9ce69f88c51a8776b7b1a6fa79dcf8c6c5e3bb29b1f3d2d55d4ab4fc257b71`.
 
 ```powershell
 & $srrPython -B tools/srr011/inspect_pe.py $srrExe functions 140777870 140777e30 140777ff0 1407780b0 140779760 14076ec00 142340AB0

@@ -145,6 +145,4 @@ Reviewed source manifest SHA-256
 The manifest hashes delivered files in sorted path order and excludes this
 marked block. The executable inspector source identity for the run card is
 `f03a3ee256d19e6e56227a0abdaa5568e067a23befbbc65cb8751c14bf0b214d`.
-Detailed review and independent receipts remain under
-`.local-work/independent-review/SRR-013-structural/`.
 <!-- review-status:end -->

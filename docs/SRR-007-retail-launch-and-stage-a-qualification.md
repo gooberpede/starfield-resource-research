@@ -96,11 +96,11 @@ It does not establish generic Steam successor discovery.
 Use the x64 SDK `10.0.26100.0` and MSVC `19.51.36256.0` with the
 [SRR-006 build and creation tests](SRR-006-four-site-hardware-observer.md#reproduce-the-fixture-controls).
 From the repository root, use Python `3.14.3` and a fresh ignored directory
-for the attach harness. For example, with the freshly compiled controller
-in the task build directory:
+for the attach harness. Set `$srrObserver` to the freshly compiled
+`observer.exe` and `$srrAttachOutput` to a new run directory.
 
 ```powershell
-python -B tools/srr006/qualify_attach.py .local-work/codex/SRR-007/observer.exe .local-work/codex/SRR-007/attach-reproduction
+python -B tools/srr006/qualify_attach.py $srrObserver $srrAttachOutput
 ```
 
 This executes the real fixture attach entry point, authenticates its output

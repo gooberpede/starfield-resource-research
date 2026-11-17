@@ -103,8 +103,9 @@ The build used AMD64 CPython 3.14.3, MSVC 14.51.36231 and Windows SDK
 identities are in the ignored continuation handoff.
 
 ```powershell
-python -B tools/srr013/qualify_retail.py continuation-qualification
-python -B tools/srr013/qualify.py replay .local-work/codex/SRR-013-retail/continuation-qualification/title.jsonl
+$srrRun = "continuation-$([guid]::NewGuid().ToString('N'))"
+python -B tools/srr013/qualify_retail.py $srrRun
+python -B tools/srr013/qualify.py replay ".local-work/codex/SRR-013-retail/$srrRun/title.jsonl"
 ```
 
 Retain build products, checksums, private receipts, simulated log files and
@@ -131,6 +132,5 @@ the exact 13-file patch forward and in reverse against `ecaf2d6`.
 Reviewed source manifest SHA-256
 `f398dc73ce5b44d1dc43fe834d4e3494ac17947e7104d03ce3622a2303c9d118`.
 The manifest hashes delivered files in sorted path order and excludes this
-marked block. Review records remain under
-`.local-work/independent-review/SRR-013-retail/`.
+marked block.
 <!-- review-status:end -->

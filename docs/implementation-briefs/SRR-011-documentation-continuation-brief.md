@@ -2,7 +2,8 @@
 
 **Task type:** Documentation-only continuation of the independently reviewed SRR-011 static investigation.  
 **Disposition sought:** `READY FOR SRR-011 DOCUMENTATION ACCEPTANCE`, subject to independent review.  
-**Starting state:** The current unstaged, uncommitted SRR-011 nine-file patch stack and its retained native evidence; do **not** revert, rewrite, or treat the current scientific findings as provisional merely because this task changes their presentation.  
+**Historical starting state.** An unstaged, uncommitted nine-file SRR-011 patch stack and retained native evidence. The [SRR-011 dossier](../SRR-011-planetary-allocation-execution-and-result-lifecycle.md) records the resulting science and review disposition.
+
 **Authority:** Offline document editing and read-only verification only. No live Starfield launch or attachment, no changes to the observer, no new debugger, no alteration of the Ghidra program/database, and no Git staging, commit, or push. Up to two concurrent sub-agents remain permitted; the parent owns the integrated result and final lead/evidence audit.
 
 ## 1. Purpose
@@ -19,7 +20,8 @@ User direction: SRR-010 is **closed, inconclusive and resumable**. This continua
 
 ## 2. Baseline facts and exact source anchors
 
-Work from the **actual current** SRR-011 dossier and lead register, plus relevant committed prior documents and primary native evidence. Reconfirm source anchors before drafting explanatory reconstructions. The key findings to preserve and communicate are:
+The continuation used the SRR-011 dossier and lead register, prior tracked
+documentation and primary native evidence. Its focal anchors were:
 
 - **Prior SRR-003:** conditional `StarField::ModuleState` construction and PNDT iterator/callback/orchestrator path; its reachability is *not* newly discovered by SRR-011.
 - **SRR-011 extension:** upstream startup loader and signed reset/replay pathways, load-order callback predicates, and a possible reopening of the module construction guard; entry into the allocator, productive work, and observed runtime execution are separate propositions.

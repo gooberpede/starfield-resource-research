@@ -66,12 +66,12 @@ A plain site hit or a quiet interrupted load is insufficient.
 loads reached confirmed player control, post-load observation or the
 optional Lodge crossing.
 
-| Attempt | Method and result | Private run directory and manifest filename |
-| --- | --- | --- |
-| [First](#live-result--15-november-2026) | Initial four-site observer. Full load-entry sweep. Exit after 16.184 s | `stage-b-live-20261115T091730Z/phase2-evidence.sha256` |
-| [Second](#second-live-attempt-with-the-recovery-observer--15-november-2026) | [Deferred load-period timer sweeps](#offline-observer-recovery). Full load-entry checkpoint retained. Exit after 16.067 s | `stage-b-recovery-live-02/attempt2-evidence.sha256` |
-| [Third](#third-live-attempt-with-census-only-load_begin--15-november-2026) | [Census-only load entry](#instrumentation-strategy-after-the-two-save2-attempts) replaced the extra suspension and slot sweep. Exit after 15.349 s | `stage-b-strategy-live-03/attempt3-evidence.sha256` |
-| [Fourth](#fourth-stage-b-attempt-with-the-d5b-recovery--16-november-2026) | [D5B-informed recovery](#scientific-status-and-d5b-recovery) used event-held periodic sampling, full operator checkpoints and expanded held-thread checks. Exit after 15.686 s | `stage-b-d5b-live-04/attempt4-evidence.sha256` |
+| Attempt | Method and result |
+| --- | --- |
+| [First](#live-result--15-november-2026) | Initial four-site observer. Full load-entry sweep. Exit after 16.184 s |
+| [Second](#second-live-attempt-with-the-recovery-observer--15-november-2026) | [Deferred load-period timer sweeps](#offline-observer-recovery). Full load-entry checkpoint retained. Exit after 16.067 s |
+| [Third](#third-live-attempt-with-census-only-load_begin--15-november-2026) | [Census-only load entry](#instrumentation-strategy-after-the-two-save2-attempts) replaced the extra suspension and slot sweep. Exit after 15.349 s |
+| [Fourth](#fourth-stage-b-attempt-with-the-d5b-recovery--16-november-2026) | [D5B-informed recovery](#scientific-status-and-d5b-recovery) used event-held periodic sampling, full operator checkpoints and expanded held-thread checks. Exit after 15.686 s |
 
 Times are marker to native exit, including operator selection time.
 Each linked record identifies its own challenger review, prefix digests,
@@ -95,10 +95,10 @@ The [observer](../tools/srr006/observer.cpp), [correlation](../tools/srr006/corr
 [window checks](../tools/srr006/window_evidence.h), [journal](../tools/srr006/journal.h),
 [native fixture](../tools/srr006/fixture.cpp), and [assembly](../tools/srr006/fixture.asm)
 are project source. See also the [phase marker publisher](../tools/srr006/stage_b_marker.py)
-and [independent exit witness](../tools/srr008/watch_exit.py). The Stage B additions are in the reviewed patch stack
-and some are absent from the starting Git HEAD. Replay the ordered stack
-on the recorded baseline for a clean reproduction. The latest frozen
-source and exact candidate are pinned by the
+and [independent exit witness](../tools/srr008/watch_exit.py). Use the
+tracked source for clean-checkout reproduction. The historical starting Git
+snapshot predated parts of the subsequently reviewed Stage B implementation.
+The latest historical source and exact candidate are pinned by the
 [D5B qualification](#offline-qualification-and-proposed-run-card).
 The first, second and third observer identities are in the
 [original qualification](#implementation-and-qualification),
@@ -111,9 +111,7 @@ For a future **disposable** qualification, use the SRR-006 x64 native
 recipe from an MSVC 14.51.36231 shell with Windows SDK 10.0.26100.0.
 Assemble `fixture.asm` with `ml64`, then build `observer.cpp` and
 `fixture.cpp` with the fixture object, `advapi32.lib`, `/O2 /EHsc
-/std:c++20` and linker flags `/OPT:NOICF /Brepro`. The ignored
-`d5b-recovery/final-build/build.cmd` under the SRR-010 custody root
-records the exact qualified recipe. Use fresh output subdirectories
+/std:c++20` and linker flags `/OPT:NOICF /Brepro`. Use fresh output subdirectories
 under an existing output root. The project scripts
 [`qualify_stage_b.py`](../tools/srr006/qualify_stage_b.py),
 [`qualify_stage_a.py`](../tools/srr006/qualify_stage_a.py),
@@ -127,11 +125,9 @@ used Python 3.14.3 x64 with `-E -B`, matching native `ntdll.dll`, and
 candidate Stage B result directories. Matching retail executable data
 is required for the separate retail profile check.
 
-All live directories in the table are relative to the ignored
-`.local-work/codex/SRR-010/` custody root. The Control B capture is
-`control-b-live-01/`, indexed by `control-b-live-evidence.sha256`
-and `steam-attribution-supplement.sha256`. The Stage B attempt sections
-identify their individual digests and challenger reviews. The fourth
+The Stage B attempt sections record their individual digests and
+challenger findings. Control B's evidence includes a separate Steam
+attribution supplement. The fourth
 manifest SHA-256 is
 `7e4a18c7c1d2c25c84f05e4092d6e92338aea5a82b5ff2da4b91f54e32614317`.
 The Control B primary manifest SHA-256 is
@@ -142,24 +138,22 @@ The [D5B comparator](#prior-art-and-scope) pins `pilot-evidence01.zip`
 and its journal from the sibling project. Its Save52 and Build Mode
 workload supplies prior art for event handling.
 
-With authorized access, verify each evidence manifest's SHA-256
-against the linked dossier, then rehash its listed files. Paths starting
-with `.local-work/` in the newer manifests are repository-relative.
-The earlier per-attempt manifests use paths relative to the manifest.
+Historical manifest digests identify the preserved evidence. The
+per-attempt reviews record the scope of verification.
 The [STOP verifier](../tools/srr006/verify_stage_b_stop.py) accepts a
 capture directory, run token and STOP sequence for a run that actually
 published a scientific seal. Retained terminal and phase prefixes for
 the four aborted loads support replay of the evidence through their
 watermarks. Those prefixes do not qualify as STOP seals. Private saves,
 raw captures, proprietary images and retained observer binaries are
-local artifacts. A clean applied source tree can reproduce the method
-with lawful inputs. Historical live verification requires access to
-the preserved records.
+private artifacts. A clean checkout can reproduce the disposable method
+with lawful inputs. The live results are custody-backed historical
+observations.
 
 ### Resumption gate
 
 To reopen SRR-010, identify the new scientific question and the
-observation window needed to answer it. Consult the preserved evidence
+observation window needed to answer it. Use the recorded results above
 and the [scientific contract](#scientific-contract). Document any changes
 to instrumentation and the coverage limitations of the proposed window.
 Independently qualify and pin the candidate, then obtain fresh written
@@ -178,8 +172,7 @@ resumption links, qualification commands and task-only replay.
 Reviewed substantive manifest SHA-256
 `cb46fddb130920d333d6b4ec1758b28aa0a963437c44ecc6eada2f6b4d596906`.
 Independent review SHA-256
-`f09ddfa531c234e2e32e3c983490d893587c74621a0baea976bb424a5e584c08`
-at `.local-work/independent-review/SRR-010/closure/review.md`.
+`f09ddfa531c234e2e32e3c983490d893587c74621a0baea976bb424a5e584c08`.
 Only this marked block and its following blank line are excluded from
 the substantive dossier digest.
 <!-- srr-010-closure-review:end -->
@@ -255,10 +248,8 @@ the caller-available floor plus reserve.
 
 The raw journal, separate exit witness, operator records, exact Steam
 attribution bytes, protected-save receipts and verified prefixes remain
-in the access-controlled fourth-attempt evidence directory
-`.local-work/codex/SRR-010/stage-b-d5b-live-04/private/`. The
-`attempt4-evidence.sha256` manifest and `handoff/scientific-result.json`
-record their hashes and conclusions. The three earlier Stage B
+in access-controlled custody. The fourth-attempt manifest records their
+hashes. Its scientific result is summarized above. The three earlier Stage B
 dispositions and both Control A and Control B remain as recorded below.
 
 
@@ -275,8 +266,7 @@ qualified negative evidence. The cause of the exit remains unresolved.
 Reviewed substantive manifest SHA-256
 `ec7c964ac0a619aadb1698bcc9ae798ddffdd616740df84d3987ab13bf4a4ebd`.
 Independent review SHA-256
-`1c3d1874e961ab236288ae57519b52c8fcf4838003b4ae6f84acd24650207e90`
-at `.local-work/independent-review/SRR-010/stage-b-d5b-live-04/review.md`.
+`1c3d1874e961ab236288ae57519b52c8fcf4838003b4ae6f84acd24650207e90`.
 Only this marked block and its following blank line are excluded from
 the dossier digest in the fourth-attempt substantive manifest.
 <!-- srr-010-stage-b-d5b-live-04-review:end -->
@@ -316,9 +306,8 @@ native continuation. Stage A and Control B retain their existing routes.
 
 ### Prior art and scope
 
-The D5B build15 archive is
-`starfield-outpost-research/.local-work/resource-combined-acquisition/pilot-evidence01.zip`
-with SHA-256
+The private D5B build15 archive from the sibling outpost research
+project, `pilot-evidence01.zip`, had SHA-256
 `e3836d1e27c4cdc7e84c59ec8076b3fbeb52fae1c7025dea3acbd57110a618a4`.
 The exact controller is the tracked
 `research/resource-combined-acquisition/controller.cpp` blob
@@ -379,8 +368,8 @@ correlation, window, retail-image data and admission diagnostics also
 passed. A fresh MSVC 14.51.36231 x64, SDK 10.0.26100.0 `/Brepro` build
 reproduced the final observer byte for byte.
 
-The final build and raw qualification evidence are retained under
-`.local-work/codex/SRR-010/d5b-recovery/`. Early overlapping fixture
+The final build and raw qualification evidence have private custody.
+Early overlapping fixture
 runs recorded a marker-sharing error, a missing retirement row and a
 busy supervisor timeout. Fresh representative repeats passed on the
 same first binary. The failed runs and the first candidate are retained
@@ -428,8 +417,7 @@ survival and the cause of the earlier exits remain unresolved.
 Reviewed substantive manifest SHA-256
 `6ad81e9cba0065a858c34d39096b55b3a8b814869a9987db540ab688320e212e`.
 Independent review SHA-256
-`b74649f3a653597fbbc7bd172af9c0fff2583d76e2ce17e4e10f9a8c8b71c3af`
-at `.local-work/independent-review/SRR-010/d5b-recovery/review.md`.
+`b74649f3a653597fbbc7bd172af9c0fff2583d76e2ce17e4e10f9a8c8b71c3af`.
 Only this marked block and its following blank line are excluded from
 the dossier digest in the substantive manifest.
 <!-- srr-010-d5b-review:end -->
@@ -510,10 +498,8 @@ and an identity-only replacement of `Plugins.txt`. Both C: and D:
 remained above 40,134,217,728 caller-available bytes.
 
 The original journal, sealed and terminal prefixes, operator records,
-independent exit witness and postflight are retained under the
-access-controlled `.local-work/codex/SRR-010/control-b-live-01/private/`.
-The evidence manifest and sanitized result receipt are in the enclosing
-run directory and its `handoff/` child.
+independent exit witness and postflight have access-controlled custody.
+The evidence manifest and sanitized result receipt summarize that run.
 
 
 <!-- srr-010-control-b-live-review:start -->
@@ -530,8 +516,7 @@ normal observer retirement unverified.
 Reviewed substantive manifest SHA-256
 `a15b73b7cfa797f1928b89a10881d1a329dc933ac7f0f7226909538e752be320`.
 Independent review SHA-256
-`9747a396f6f623f9530ff2db9518ba420bf4c87c0b21ca1e079a5766c9f0345e`
-at `.local-work/independent-review/SRR-010/control-b-live-01/review.md`.
+`9747a396f6f623f9530ff2db9518ba420bf4c87c0b21ca1e079a5766c9f0345e`.
 Only this marked block and its following blank line are excluded from
 the dossier digest in the live substantive manifest.
 <!-- srr-010-control-b-live-review:end -->
@@ -735,13 +720,11 @@ condition caused the earlier exits.
 ### Evidence custody
 
 The offline evidence, exact binary, build logs, test receipts, patch
-ancestry and substantive manifest are retained under
-`.local-work/codex/SRR-010/control-b/`. That evidence includes the
+ancestry and substantive manifest have private custody. The records include the
 earlier verifier failure, where an expected continuation field was
 absent from the native event row. The final schema records actual
 continuation in that row and passed independent replay and adverse
-testing. Independent review and its primary challenge evidence are
-retained under `.local-work/independent-review/SRR-010/control-b/`.
+testing.
 No raw journal, save, account record or proprietary binary is included
 in the tracked patch.
 
@@ -759,8 +742,7 @@ remains untested and requires separate authorization.
 
 The reviewed substantive manifest SHA-256 is
 `fd325ea518947f7981e7a77ed1c77f73f55807c716f319c9c62912f107fabc5c`.
-The independent review at
-`.local-work/independent-review/SRR-010/control-b/review.md` has SHA-256
+The independent review has SHA-256
 `456521d800ffe5cb02d3a7bd5e06a299ec1e5fe088d62e052bad30093b0907d9`.
 Only this marked block and its following blank line are excluded
 from the dossier digest in the substantive manifest.
@@ -856,9 +838,8 @@ an identical digest. The monitored Steam executable and DLL hashes and
 critical pins matched preflight. Both drives exceeded the space floor
 with reserve.
 
-The third capture is in
-`.local-work/codex/SRR-010/stage-b-strategy-live-03/private/`.
-Its parent contains the 36-entry `attempt3-evidence.sha256`, SHA-256
+The third capture has private custody. Its 36-entry evidence manifest
+had SHA-256
 `5b7b5438841f4ac892113924e1aaeee71cbea07f8197004ccfb54d2f75e30c9e`.
 It pins the complete journal, both verified prefixes, console and
 operator records, Steam attribution inputs, independent witness,
@@ -875,13 +856,9 @@ stack.
 The reviewed handoff manifest SHA-256 is
 `e8a689e600e21af68656b5c62e73eb3dc44d637bfd16aca75724760a12bedf7b`.
 Only this third-attempt review block is excluded from the dossier
-entry. The independent report is
-`.local-work/independent-review/SRR-010/strategy-live-03/review.md`,
-SHA-256
+entry. The independent review has SHA-256
 `67b0c7487fdfbdce47a54623f6202bece11032acb6e53ba750e9031b18ec0996`.
-The incremental task patch is
-`.local-work/diffs/SRR-010-stage-b-strategy-live-03.diff` and applies
-after the four reviewed historical patches.
+The incremental patch was reviewed against its four predecessors.
 <!-- srr010-attempt3-review:end -->
 
 ## Instrumentation strategy after the two Save2 attempts
@@ -910,8 +887,6 @@ The exact external source, commits, live streams and build identities
 are described in [the recovery comparison](#evidence-for-the-change).
 The strategy comparison reverified those primary pins, both archived
 SRR-010 journals and exact-exit receipts, and the SRR-009 verifier.
-The pre-implementation choice and rechecks are retained in
-`.local-work/codex/SRR-010/strategy/`.
 
 SRR-010 already uses native Win32 event delivery, arms later threads,
 attributes owned execution breakpoints by thread and DR state, and
@@ -1022,17 +997,14 @@ survival remains untested for this strategy.
 The reviewed strategy manifest SHA-256 is
 `4bf2ac306634aa638844349f71a75ff79068c36b989ba81401c60510c9c99682`.
 Only this strategy review block is excluded from the dossier entry.
-The proposed binary is
-`.local-work/codex/SRR-010/strategy/build/observer.exe`, SHA-256
+The proposed observer binary had SHA-256
 `a1b70b8ddb773aa488e15216cd763eda5503b5398f5131fc3d8e9841ec68d87e`.
 The proposed retail image is Starfield 1.16.244.0, SHA-256
 `7e9adb1414a8e1b325e5e1f097b9b17b78deb7eebeda37a333351a43a60f9d28`.
-The independent report is
-`.local-work/independent-review/SRR-010/strategy/review.md`, SHA-256
+The independent review has SHA-256
 `5ae6b9126c08f8ec74b0b28b3e40c1b7515afd783a221d23d58bdb672cc976e4`.
-The incremental patch `.local-work/diffs/SRR-010-instrumentation-strategy.diff`
-applies after the original Stage B, observer-recovery and second-attempt
-patches. A live attempt requires separate written authorization.
+The strategy patch was reviewed after the original Stage B,
+observer-recovery and second-attempt patches. A live attempt requires separate written authorization.
 <!-- srr010-strategy-review:end -->
 
 ## Second live attempt with the recovery observer — 15 November 2026
@@ -1121,10 +1093,8 @@ preflight digests. Both drives remained above the free-space floor plus
 reserve. The first attempt's evidence and accepted conclusions remain
 as recorded below.
 
-The capture is retained under
-`.local-work/codex/SRR-010/stage-b-recovery-live-02/private/`.
-Its parent contains `attempt2-evidence.sha256` with 36 entries and
-SHA-256
+The second capture has private custody. Its 36-entry evidence manifest
+had SHA-256
 `ac8eb2cd84458f02af24a09a6902e2832ef52f1fd7dc60ec9ae67743255f0487`.
 It pins the raw journal, both retained prefixes, console and operator
 records, Steam attribution inputs, independent exit witness, preflight
@@ -1140,12 +1110,10 @@ this dossier relative to the approved recovery stack.
 The reviewed handoff manifest SHA-256 is
 `46055ce61ebd9e31f121f03d90e0c3ea79e438cb710a6c53af59e134a10edd4a`.
 Only this second-attempt review block is excluded from the dossier
-entry. The independent report is
-`.local-work/independent-review/SRR-010/recovery-live-02/review.md`,
-SHA-256
+entry. The independent review has SHA-256
 `6d68e574bc98f20b1cfbf770719243b20d39be35e2cd78e6f6616520a6075e76`.
-The task patch `.local-work/diffs/SRR-010-stage-b-recovery-live-02.diff`
-applies after the original Stage B and observer-recovery patches.
+The second-attempt patch was reviewed after the original Stage B and
+observer-recovery patches.
 <!-- srr010-attempt2-review:end -->
 
 ## Live result — 15 November 2026
@@ -1247,10 +1215,7 @@ The UI description identifies the operator's choice. The observation
 does not establish the bytes consumed by the game. The authorization for
 one Stage B session is consumed.
 
-The capture is under private custody in
-`.local-work/codex/SRR-010/stage-b-live-20261115T091730Z/private/`.
-Its evidence manifest `phase2-evidence.sha256` is in the parent directory,
-with SHA-256
+The first capture has private custody. Its evidence manifest had SHA-256
 `c9aeb6f9ff54de4e7ecd2033ecf8ac286574151b603d5ca37222bfbd08869f89`.
 It pins the entire terminal journal, both retained prefixes, console
 transcripts, marker and operator records, Steam attribution bytes,
@@ -1266,11 +1231,8 @@ relative to the Phase 1 handoff.
 
 Reviewed handoff manifest SHA-256
 `bd9174a072cf65937c94d0d8cac2f0f12fadbcac5a7d0e9ea0a9ca0025829bfb`.
-Only this Phase 2 review block is excluded from the dossier entry. The
-independent report is
-`.local-work/independent-review/SRR-010/phase-2/review.md`, SHA-256
+Only this Phase 2 review block is excluded from the dossier entry. The independent review has SHA-256
 `470effbfc17234b49d64a87225fb6b32a7be6713bc4773a106600404bbac2f20`.
-The cumulative task patch is `.local-work/diffs/SRR-010-stage-b-live.diff`.
 <!-- srr010-phase2-review:end -->
 
 ## Offline observer recovery
@@ -1303,8 +1265,8 @@ no violated exception-handling contract or faulting instruction.
 | **Live controls and failures** · outpost EXP0002A 0.1.2 and 0.1.3 | Native post-title attach, separate Save action trials | S1 ran with no DR sites and survived. All-thread 0.1.2 and single-owner S2 0.1.3 had DR0 armed | RF servicing qualified separately on a disposable hit. Neither live armed trial recorded a request hit | Retained native logs and two matching dump contexts at the save-request site | Ordinary **New Save** click, distinct from loading a save | Native journals, reviewed dump evidence and cleanup records | Both armed trials exited. The dump contexts do not assign a cause to SRR-010's exit |
 | **Live success through load** · outpost D5B build15 | Ordinary Steam, native post-title attach to the same retail build | 95 initial readbacks, four DR sites per phase, two remaps, no timer-driven running thread suspension | Owned RF continuation and context readback, 15,119 verified resumes | Context work in held events, continued module and thread events, no EXCEPTION or LOSS rows | One operator-selected Save52 load, travel and Build Mode | Archived 45,645-row journal, framed captures and acknowledgements | Reached Build Mode while attached. Later deliberate disposal used different authority, site coverage and cleanup |
 
-The exact source and primary records are pinned in ignored local custody
-under `.local-work/codex/SRR-010/recovery/`. The reference-handles source
+The recovery compared pinned source and historical records.
+The reference-handles source
 is from `6a77579a184c64e0c080c8f3b7883c34bd17e24b`. Its live smoke
 journal SHA-256 is `fe9e2af5c8129e785a04eff4751e45ab94c59b3840dcfe1f853ed8857ba9e188`.
 The outpost source is pinned at `d116bc63ff394b0156539161c8d1addfc902665a`,
@@ -1417,14 +1379,11 @@ with the recovery candidate remains untested.
 The reviewed recovery manifest SHA-256 is
 `43d5c830a1ab87fd6776bd223b3846402a59da954a71793c2305ba168108b2c6`.
 Only this recovery review block is excluded from the dossier entry.
-The observer under `.local-work/codex/SRR-010/recovery/build/observer.exe`
-has SHA-256
+The recovery observer had SHA-256
 `43223b9c693fe38fd8d7d30f8e0b0a7b2bc78bcf5eb5d508ddfb7e3dd5d0725c`.
-The report is `.local-work/independent-review/SRR-010/recovery/review.md`,
-SHA-256
+The independent review has SHA-256
 `c79dee9a733510b8b5d0d8ff97ed089d244406d3b33e4f5c4fdb6780dc1402fc`.
-The incremental patch `.local-work/diffs/SRR-010-observer-recovery.diff`
-applies after the preserved `.local-work/diffs/SRR-010-stage-b-live.diff`.
+The recovery patch was reviewed after the first live-attempt patch.
 The proposed second attempt requires new written authorization.
 <!-- srr010-recovery-review:end -->
 
@@ -1553,8 +1512,7 @@ witness opens a read-only handle, verifies image and process epoch, and
 writes independent bound and exit receipts. These tools leave Ghidra
 untouched.
 
-Representative raw receipts are held locally under
-`.local-work/codex/SRR-010/regression/stage-b/`. The quiet STOP SHA-256
+The representative fixture receipts have private custody. The quiet STOP SHA-256
 is `e603b1c8c12ca1bdb29e3feef0831f7417f961626728dcd7830a9b7d60e1f479`
 (40,939 bytes). The cross-phase STOP SHA-256 is
 `aede59595782410570c2a7ceaf1a850e594a5efde1eca2353cb06d346e81cd10`
@@ -1738,9 +1696,7 @@ replayed source rebuilt the exact candidate binary.
 
 Reviewed manifest SHA-256
 `8dd59033805f5d2a75c5460703bc8c6f0ae6361738945fd89599d630abcefce7`.
-Only this marked block is excluded from the dossier entry. The independent
-report is `.local-work/independent-review/SRR-010/review.md`, SHA-256
+Only this marked block is excluded from the dossier entry. The independent review has SHA-256
 `9cd9a4d8ac41c0e86d7e209133638a3f979c3b1e719336ca39fe5e37e07bf54b`.
-The final task-only patch is `.local-work/diffs/SRR-010.diff`. Retail
-Stage B authority remains withheld pending written approval.
+Retail Stage B authority remains withheld pending written approval.
 <!-- srr010-review:end -->

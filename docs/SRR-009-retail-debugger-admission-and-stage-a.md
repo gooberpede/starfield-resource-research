@@ -59,8 +59,7 @@ through all three retail attempts.
 The starting Git HEAD was `1fd0b0d33c1212721a483ac0078a89fbc9f9a3c7`.
 The index-entry hash was `9727b8da3557d1719027fc1b6c07cf889db04346`.
 The supplied SRR-009 brief was the only initial untracked path. The task patch
-excludes it. Build and capture receipts reside under the ignored
-`.local-work/codex/SRR-009/` directory.
+excluded it. Build and capture receipts have private custody.
 
 | Pin | Value |
 | --- | --- |
@@ -135,8 +134,9 @@ An earlier durable positive can remain assessable independently.
 
 ## Draft Stage A run card
 
-**Approval gate.** Select the exact SHA-256 manifest and binary stated in the
-review block and the local handoff. Run the observer and log under the same
+**Approval gate.** Use the binary and source manifest identified by separate
+written authorization and verify their approved SHA-256 digests. The review
+blocks below identify historical candidates. Run the observer and log under the same
 ordinary interactive account and session as the designated Steam instance.
 Verify the protected preflight before running the command. Retain an open
 operator console and a separate shell for markers. Allow ordinary long
@@ -152,9 +152,8 @@ pauses. There is no experimental inactivity cutoff.
    Starfield process at baseline. The operator and marker shells must not
    define `__COMPAT_LAYER` or another inherited AppCompat layer: a layer maps
    `apphelp.dll` into the observed process, which is outside the fixture
-   allowlist and therefore quarantined as unexpected. A qualification attempt
-   under such a shell is preserved
-   under `.local-work/codex/SRR-009/freeze/creation-attempt-compat-layer`.
+   allowlist and therefore quarantined as unexpected. The offline
+   qualification below records that shell case.
    A Steam client self-update since SRR-008 is expected drift, not a blocker:
    preflight verifies the overlay's origin and file identity, records its
    current hash and version against the SRR-008 pin, and proceeds whether the
@@ -286,17 +285,14 @@ frames, and recovery refusal or partial restoration. Keep API-boundary
 injections distinct from OS load events, exceptions and exits. Run the suites
 from a shell without an inherited AppCompat layer: with `__COMPAT_LAYER`
 defined, the loader maps `apphelp.dll` into the disposable child and the
-unknown-module policy fails the first scenario. The preserved failing attempt
-is `.local-work/codex/SRR-009/freeze/creation-attempt-compat-layer`. One
+unknown-module policy failed the first fixture scenario. One
 qualification attempt on the rework also failed when the stopped census
 rejected the fixture child's main thread with every other pre-arm check
 green; the observer correctly refused arming rather than share the thread.
 A diagnostic build attributed the rejection to foreign debug-register state
 on that thread (occupied slots, trap flag, DR6 hits) — the preserved journal
 records the refusal, not the register dump. The transient interference was
-not reproducible afterwards and the attempt is preserved under
-`.local-work/codex/SRR-009/foreign-dr-evidence/` together with standalone
-child probes that read clean. Stage A preflight's unowned-register check is
+not reproducible afterwards. Standalone child probes read clean. Stage A preflight's unowned-register check is
 the same guard at retail.
 
 The historical run used the local SRR-008 `interactive/check-saves.py`
@@ -326,20 +322,17 @@ binary (creation 25/25, attach 22/22, stage 6/6), re-derived the binary
 timestamp-only equivalence, reproduced the preserved AppCompat-layer refusal,
 verified the STOP seals and allocator chains on its own journals, attempted
 eight falsifications without success, and confirmed every P1-AC1–P1-AC7
-criterion. The full review, its fresh evidence, and its stated limitations
-reside in the ignored local review area:
+criterion. The table identifies that historical review and candidate.
 
 | Identity | Value |
 | --- | --- |
-| Review record | `.local-work/independent-review/SRR-009/review-round2.md`, SHA-256 `ded77f8830cbe680f0ae41dc64e13a5dccfccf7b0bb3790274013b606b18184b` |
-| Reviewed task-file set | manifest-v1 `.local-work/codex/SRR-009/closing/manifest-v1.json`, SHA-256 `f777e9eb9f08e4927061aab337e9287dfcaa53180b17bda417315b08fa8c7931` (this review block is the only task-file change after that manifest) |
+| Round-2 review | SHA-256 `ded77f8830cbe680f0ae41dc64e13a5dccfccf7b0bb3790274013b606b18184b` |
+| Reviewed task-file set | manifest v1 SHA-256 `f777e9eb9f08e4927061aab337e9287dfcaa53180b17bda417315b08fa8c7931` (adding this review block was the sole change in the original handoff) |
 | Challenger-verified binary | `34b3e0acb7cf053c0f7d93e4daf9b8c4e8a16b19b6a8c6a6693135197c916019` |
 | Integrator rebuild | `399b60c6318fbcc0a71907004b5a1213136beb21bfcb010a5c405308bc762fee` (identical except the wall-clock PE TimeDateStamp) |
 
-Readiness is not authority to attach. Stage A requires the brief's separate
-written maintainer authorization citing the frozen final identity
-(closing manifest v2 and the final task patch), which the handoff records
-locally under `.local-work/codex/SRR-009/closing/`.
+The round-2 handoff identified its candidate by closing manifest v2 and
+the task patch. Stage A still required separate written authorization.
 
 **Scope deviation on record (maintainer direction, 2026-11-15).** During the
 round-2 review the challenger exercised the freeze binary's
@@ -369,14 +362,12 @@ that review are incorporated above.
 
 | Identity | Value |
 | --- | --- |
-| Round-3 review | `.local-work/independent-review/SRR-009/review-round3.md`, SHA-256 `da26307915ba44fac72f61efddfa3ad605df76d4a3ec507b170d942fda146140` |
-| Revised observer binary | `.local-work/codex/SRR-009/freeze-2/observer.exe`, SHA-256 `8962a74a230086c179f807c54de40aed5708f6e7cfaf5a75e8d103237eda6144` |
+| Round-3 review | SHA-256 `da26307915ba44fac72f61efddfa3ad605df76d4a3ec507b170d942fda146140` |
+| Revised observer binary | SHA-256 `8962a74a230086c179f807c54de40aed5708f6e7cfaf5a75e8d103237eda6144` |
 | Prior history preserved | round-2 review `ded77f88…`, manifests v1/v2, freeze binary `399b60c6…`, compat-layer and foreign-DR evidence — all unchanged |
 
-Readiness is not authority to attach. Stage A requires the brief's separate
-written maintainer authorization citing the frozen final identity (closing
-manifest v3 and the final task patch), recorded locally under
-`.local-work/codex/SRR-009/closing/`.
+The round-3 handoff identified its candidate by closing manifest v3 and
+the task patch. Stage A still required separate written authorization.
 <!-- srr009-review:end -->
 
 ## Stage A attempt — 15 November 2026
@@ -433,9 +424,8 @@ receipts. The two environment receipt ACLs were explicitly restricted
 after collection. No frozen source or configuration changed. The
 historical Phase 1 manifest, patch and reviews retain their identities.
 
-Local evidence is under `.local-work/codex/SRR-009/stage-a-20261115T014707Z/`.
-`postflight-check.json` identifies the primary and preservation receipts
-by SHA-256. The private capture contains the launch, title, refusal and
+The historical postflight manifest identifies the primary and preservation
+receipts by SHA-256. The private capture contains the launch, title, refusal and
 exit records and the bounded Steam log input. These contain operational
 paths and process details and stay local. A follow-up would require
 separate authorization. Before proposing another attempt, qualify
@@ -456,11 +446,7 @@ attempt.
 Reviewed substantive manifest SHA-256
 `44ea2b85e4d95d1d158297726981bd60c2bfee667a27f609a508276042bc7247`.
 Only this Stage A review block is excluded from the dossier digest.
-Detailed independent review is retained at
-`.local-work/independent-review/SRR-009/stage-a-20261115T014707Z/review.md`,
-SHA-256 `9300a9345e93b8892db6c5de3e0a2bd020cf36c47363f2305df2d376c997f4e9`.
-The task-only patch, primary evidence hashes and byte-replay receipts
-are retained with the local handoff.
+The independent review has SHA-256 `9300a9345e93b8892db6c5de3e0a2bd020cf36c47363f2305df2d376c997f4e9`.
 <!-- srr009-stage-a-review:end -->
 
 ## Offline admission diagnostics continuation — 15 November 2026
@@ -503,8 +489,6 @@ console output alongside `events.jsonl` and `durable-prefix.json`.
 
 ### Offline qualification and reproduction
 
-The local build and evidence are under
-`.local-work/codex/SRR-009/admission-diagnostics/qualification-final/`.
 The rebuilt observer SHA-256 is
 `c52319bceb305e0da4eb6be7e51154388b54f985f8931b3b84650e8e3a7752c3`.
 Its build uses the same pinned x64 MSVC/SDK, clean shell and lawful
@@ -544,9 +528,7 @@ used in production emitted the refusal with a durability warning.
 The final binary passed all 25 creation, 22 attach and nine staged
 disposable cases. The preceding concurrent qualification stopped its
 attach suite at `reject-retail-profile` when the harness acquired the
-child witness after the handle had signaled. That run is preserved under
-`.local-work/codex/SRR-009/admission-diagnostics/qualification/`. The
-final sequential suite completed the same refusal control and the full
+child witness after the handle had signaled. The final sequential suite completed the same refusal control and the full
 matrix. Success remains scoped to offline source, disk and fixture evidence.
 
 ### Proposed second attempt
@@ -569,10 +551,7 @@ isolated patch replay. The Stage A historical disposition is unchanged.
 
 The reviewed manifest SHA-256 is
 `42611a1f006044b1698b99cb7083f8ee3b6fd046630af2be228f30345df1b388`.
-It excludes only this new review block from the dossier digest. The
-independent review is retained under
-`.local-work/independent-review/SRR-009/admission-diagnostics/review.md`,
-SHA-256 `0ab49ca34bb99e0233c3f7a98aa56dc1cfa1d0bf9ea99a3813f62a6278800f5d`.
+It excludes only this new review block from the dossier digest. The independent review has SHA-256 `0ab49ca34bb99e0233c3f7a98aa56dc1cfa1d0bf9ea99a3813f62a6278800f5d`.
 The revised build still requires separate written authority before
 another live launch or debugger attachment.
 <!-- srr009-diagnostics-review:end -->
@@ -630,10 +609,9 @@ at the measured boundaries. The scope is the recorded configuration and
 save namespaces. Both game attempts and all earlier qualification snapshots
 remain separate.
 
-Primary receipts, stdout and stderr, the bounded private Steam log, and the
-exit witness are retained under
-`.local-work/codex/SRR-009/stage-a-second-20261115T034226Z/`.
-The local `postflight-check.json` identifies those files by SHA-256.
+The historical postflight manifest identifies the primary receipts,
+console logs, bounded Steam log and exit witness by SHA-256. These
+records have private custody.
 The approved implementation and qualification snapshot stayed frozen.
 This attempt ended at refusal and normal exit. It grants no authority for
 another launch, a changed process access mask, or Stage B.
@@ -651,9 +629,7 @@ scientific result is `INSTRUMENTATION_INCOMPLETE`.
 Reviewed substantive manifest SHA-256
 `4b2e56f696e2dcb4bc949d458d6725745bc8a894a3faa7b6e25adc5645c68d8c`.
 Only this marked review block is excluded from the dossier digest.
-The detailed review is
-`.local-work/independent-review/SRR-009/stage-a-second-20261115T034226Z/review.md`,
-SHA-256 `4a5adf277bf6c99227d4417479b0c969bf0274bfbb78358deaa0d3982d864dfe`.
+The independent review has SHA-256 `4a5adf277bf6c99227d4417479b0c969bf0274bfbb78358deaa0d3982d864dfe`.
 <!-- srr009-stage-a-second-review:end -->
 
 ## Offline retail debugger access recovery — 15 November 2026
@@ -700,8 +676,6 @@ The four-site register checks, qualified windows, correlations, Steam
 drift policy, STOP seal, and normal-exit and recovery boundaries are
 unchanged.
 
-The final local build and receipts are in
-`.local-work/codex/SRR-009/access-recovery/qualification-final/`.
 The observer SHA-256 is
 `dac1d88aea5b23e9725567b00426bfc3faa940a362e46521d59f15d10d64da88`.
 The focused and revised-handle staged controls used the same ordinary interactive account,
@@ -768,9 +742,8 @@ Both historical attempts remain `INSTRUMENTATION_INCOMPLETE`.
 
 Reviewed manifest SHA-256
 `7b7d59ccedafa2229d3fc08dbe5f4bc6cfea6de64eb3fa3321d5512ccdd15ce7`.
-Only this marked block is excluded from the dossier digest. The detailed
-review is `.local-work/independent-review/SRR-009/access-recovery/review.md`,
-SHA-256 `9aac904a2465c04e154a6545b1246e451dacbe25df8c54a0fe5688c3199a5ccf`.
+Only this marked block is excluded from the dossier digest.
+The independent review has SHA-256 `9aac904a2465c04e154a6545b1246e451dacbe25df8c54a0fe5688c3199a5ccf`.
 Retail attachment remains untested with this candidate and requires separate
 written authority.
 <!-- srr009-access-recovery-review:end -->
@@ -859,12 +832,10 @@ measurements exceeded the 40,134,217,728-byte threshold including reserve.
 
 The saved operator actions, original observer transcripts, exact immutable
 copies of both verified prefixes, process exit witness and protection
-receipts are indexed by the private `postflight-check.json` in
-`.local-work/codex/SRR-009/stage-a-third-20261115T045725Z/`.
-Run its companion `verify_attempt.py` with the pinned Python interpreter
-and `-E -B` to reproduce the sealed-journal and preservation checks from
-retained files. Verification reads the capture and snapshots. It does
-not operate Steam, Starfield, the debugger or Ghidra.
+receipts were indexed by a postflight manifest in private custody.
+The historical verifier used the pinned Python interpreter with `-E -B`
+and read the sealed journal and protection snapshots. The independent
+review below records the replay and preservation outcomes.
 
 <!-- srr009-stage-a-third-review:start -->
 The independent challenger confirmed qualified `NOT_OBSERVED` in both
@@ -876,9 +847,7 @@ The challenger verified the retained evidence and replayed the
 The substantive handoff manifest SHA-256 is
 `b3fc0d693e7cfcf0392718776ee6981ee67ae5e837971a2a1392142b98ec9049`.
 Only this marked block is excluded from its dossier digest.
-The independent report is
-`.local-work/independent-review/SRR-009/stage-a-third-20261115T045725Z/review.md`,
-SHA-256 `21cf2883e44f923f4abee0d1152bcd94a07c9be17b511c098c8e84919318f8df`.
+The independent review has SHA-256 `21cf2883e44f923f4abee0d1152bcd94a07c9be17b511c098c8e84919318f8df`.
 <!-- srr009-stage-a-third-review:end -->
 
 
@@ -904,9 +873,8 @@ prefix-601 hashes were reverified, and the sealed scientific result
 remains qualified `NOT_OBSERVED`. No game launch, debugger attachment,
 detach, or further game operation took place.
 
-The private intent, exit and evidence-reconciliation receipts are in
-`.local-work/codex/SRR-009/stage-a-third-20261115T045725Z/observer-closure-final/`.
-The exit receipt SHA-256 is
+The intent, exit and evidence-reconciliation receipts have private
+custody. The exit receipt SHA-256 is
 `4060e577f979b80e8058f1b2a0722634b2fe3124d2e3fda459c4518b81ba8319`.
 
 <!-- srr009-publication-remediation:start -->
@@ -920,7 +888,5 @@ listed in the [dependency inventory](SRR-009-publication-verification.md).
 Reviewed manifest SHA-256
 `3b8c2163309517ae53df90ca5a3b0738faf9378881e5566826be3675d2bcbb21`.
 Only this marked block is excluded from its dossier digest.
-The detailed independent report is
-`.local-work/independent-review/SRR-009/publication-remediation/review.md`,
-SHA-256 `9bbc1f3a8fe2b3fd47d7204db47a1c2b930245318374367e8bc0c668aab32bb8`.
+The independent review has SHA-256 `9bbc1f3a8fe2b3fd47d7204db47a1c2b930245318374367e8bc0c668aab32bb8`.
 <!-- srr009-publication-remediation:end -->

@@ -323,9 +323,7 @@ marked block is omitted from the dossier's manifest bytes.
 The task patch passed independent forward and reverse replay against the
 starting Git blobs with byte-for-byte comparison and an unchanged working
 index. The original untracked brief was checked separately. Ending HEAD
-and index SHA-256 match their starting identities. Detailed review and
-replay checks are retained under `.local-work/independent-review/SRR-014/`
-and `.local-work/codex/SRR-014/handoff/`. The review clears the offline
+and index SHA-256 matched their starting identities. The review cleared the offline
 handoff. The scientific limits in the lead register still apply.
 <!-- srr-014-review:end -->
 <!-- srr-014-doc-corrections-review:start -->
