@@ -108,6 +108,16 @@ versioned data and model inputs. The disposable decision fixture uses
 fabricated inputs. Retail checkpoint state and ordinary process-read
 feasibility remain untested.
 
+The [SRR-014 startup and database dossier](SRR-014-startup-allocation-component-database-lifecycle.md)
+applies to the pinned retail image reverified on 2026-11-17 UTC. It uses
+the tracked PE decoder with Python 3.14.3 and Capstone 5.0.7 for offline
+control-flow, queue, insert and synchronization evidence. The normal late
+iterator return orders its synchronous visits. Whether any given visit
+produced the historically observed title-card slots remains unresolved.
+The dossier identifies the pinned sibling records used for upstream
+runtime attribution and the lawful-input route for independently checking
+its static claims.
+
 The historical PNDT/BIOM/RSGD/IRES extraction timestamp is
 `2026-08-30 11:40:41`. The xEdit version is unknown. The 2026-09-24
 public-release remediation removed the older research-tree CSV snapshots from

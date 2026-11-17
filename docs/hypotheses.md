@@ -36,10 +36,13 @@ The exact upstream state represented by `SurveyAggregator` and the historical `p
 the candidate wrapper references from SRR-002 and establishes a conditional
 module-state construction route. [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
 resolves static startup and reset ancestry, a conditional load-order
-route and a retained component lookup. The optional sweep flag's source
-and runtime value, actual qualifying allocation at startup or during
-ordinary Save2 selection, additional demand triggers and slot persistence
-remain open. The retail descendant
+route and a retained component lookup. [SRR-014](SRR-014-startup-allocation-component-database-lifecycle.md)
+identifies the early sweep setting and orders the writer within a normal
+late visitor return. The setting's effective value in the SRR-013 title
+run, actual qualifying allocation at startup or during ordinary Save2
+selection, additional demand triggers and slot persistence remain open.
+The four populated title-card samples support a **STRONG** startup
+association within their measured scope. The retail descendant
 append loop could preserve overlapping child pointers. Actual candidate
 multiplicity depends on the upstream lists and remains unverified.
 

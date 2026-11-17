@@ -67,6 +67,18 @@ qualifies the independent resource type check on the same retail image.
 | `FUN_1409e7440`, `FUN_1409e9b40`, `FUN_1409e9bc0` | **PROVEN STATIC** `BGSResource` construction, factory type return `0x9F`, and factory call to the constructor. The constructor installs the primary vptr and record type byte. |
 | `FUN_1407bc3d0`, `FUN_14079b520` | **PROVEN STATIC** retained-slot staging and consumer path that resolves resource IDs by the native FormID getter and checks type `0x9F`. |
 
+[SRR-014](SRR-014-startup-allocation-component-database-lifecycle.md)
+qualifies the startup and DB execution roles on the same retail image.
+
+| Retail entry | Bounded native role |
+| --- | --- |
+| `FUN_141898870`, `FUN_141881660`, `FUN_14231D000` | **PROVEN STATIC** startup continuation from publication at `0x1418993E3` to the guarded galaxy module construction and `PerBiomeData` registration at `0x14231D7F1`. |
+| `FUN_14008C050`, `FUN_140305FD0` | **PROVEN STATIC** initializer route for boolean `bImportCSVBiomeData:Data`, whose value at `0x145EA6000` gates the early sweep/CSV branch. |
+| `FUN_1428D8130`, `FUN_1428D87A0`, `FUN_1428D8FE0` | **PROVEN STATIC** published DB attachment, queue callable installation, and service scheduling with direct and deferred branches. Individual submission completion is separate. |
+| `FUN_142404230`, `FUN_142404A80` | **PROVEN STATIC** shared-mode participant entry around the planet adapter and representative copy readers, and distinct ticket admission for inspected insert, removal and clear paths. |
+| `FUN_1424069F0`, `FUN_142413190` | **PROVEN STATIC** reverse-key command preparation and guarded application to the +0x358 index. The inspected path carries the key. |
+| `FUN_140773910`, `FUN_142346A60`, `FUN_1405DF5C0` | **PROVEN STATIC** PNDT proxy submission and the primary PNDT vtable +0x1A0 flag setter. Their join to the final CSV hook requires a hit on that PNDT proxy. |
+
 The CK entries below retain their original build and evidence scope.
 
 ---

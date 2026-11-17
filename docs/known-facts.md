@@ -47,6 +47,15 @@ resolves staged output IDs through the native FormID map and also checks
 type `0x9F`. See [SRR-013 structural observation](SRR-013-structural-state-observation.md#native-resource-identity)
 for the instruction anchors and the independent runtime identity predicate.
 
+**PROVEN STATIC:** The pinned retail startup continuation from context
+publication can reach guarded `BSGalaxy::ModuleState` construction and the
+`PerBiomeData` registration. The early sweep and CSV import share a branch
+gated by the current value of the default-false `bImportCSVBiomeData:Data`
+setting. The later sweep's resolved PNDT visitor calls the writer inline,
+so a normal return to `0x14094EF5C` follows the visited writes, if any.
+See [SRR-014](SRR-014-startup-allocation-component-database-lifecycle.md)
+for predicates, synchronization, the queue timing limits and sample scope.
+
 ## Input Resolution and Biome Order
 
 ```text
