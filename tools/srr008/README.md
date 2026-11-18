@@ -87,6 +87,10 @@ interactive commands and reports remain in private custody.
 
 ## Disposable module inventory
 
+Installed SFSE loaders and plugin files remain environment-inventory
+diagnostics. Their presence does not establish use by the authenticated
+Steam process and does not fail the environment receipt.
+
 Create the ignored output parent first. The receipt path is a new output.
 
 ```powershell

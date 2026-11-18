@@ -66,7 +66,7 @@ path, provider, handle and file-hash conditions from extraction.
 
 The continuation qualifies an absolute packed-file directory and an
 independently typed retained open stream as pathname witnesses. Both
-paths use the same exact manifest, signature and file identity checks.
+paths use the same exact manifest and file identity checks.
 The implementation reads file bytes independently of native FormIDs and
 uses the approved profile as a pin before opening any of its sources.
 
@@ -173,7 +173,7 @@ defining identity. A vector that names a loaded plugin without the
 corresponding canonical typed record is recorded as a contradiction.
 Registry order is unused for winning content.
 
-The signed source profile uses schema `srr017-source-files-v1` and a
+The offline source profile uses schema `srr017-source-files-v1` and a
 `files` array with `plugin`, absolute `path`, `bytes` and `sha256` for
 each independently prescribed candidate. `snapshot_source_files`
 checks stable canonical file paths, regular-file identity and the

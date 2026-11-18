@@ -8,28 +8,20 @@ coverage, native type, BGSResource vptr, pairing, replay and authorization
 checks. The [proposed run card](SRR-017-title-run-card.md) remains
 **NOT AUTHORIZED** pending a separate written single-use approval.
 
-## Scope and starting state
+## Scope
 
-The work started at research HEAD
-`f4ba50cc046b43364cc001a8aea4baea09e87eb0`. The index was empty.
-The sole pre-existing change was `.gitignore`, SHA-256
-`e28b55c4ddd8649075b2ca5d971f0ef011c6eabe74755b6920ce2687623982b9`.
-It is outside the task patch. Caller-available space was
-87,669,133,312 bytes on C: and 63,823,982,592 bytes on D:.
-
-The [previous readiness continuation](SRR-017-retail-readiness.md)
-records the earlier physical-provenance requirement and blocked verdict.
-That requirement and its resulting release blocker are **SUPERSEDED**.
-Its native path observations remain historical static evidence. This
-correction changes the acquisition contract using the existing recovered
-namespace and FormID machinery. It adds no new native mechanism or
-resource-generation rule.
+The current candidate is based on committed native-identity correction
+`37e85698e0cdeb9e970ee8df9d82096e057e09cd`. The correction retains native
+FormID identity, complete paired traversal, resource slots and evidence
+replay. Written approval follows the already qualified SRR-013 mechanism.
+Physical ESM provenance remains outside acquisition.
 
 ## Corrected implementation
 
-The exact proposed command drops the source-file profile argument.
-Signed approval pins the execution source, work manifest, native identity
-contract, selected operator/session, custody and preflight receipts. It
+The exact command uses a written maintainer approval record, following
+SRR-013. It binds execution source, work limits, title-only scope and
+canonical custody. Native operator/session identity and exact preflight
+receipt hashes are retained automatically in the one-use claim. It
 still consumes a flushed exclusive one-use claim before Steam/process
 admission, validates the mapped game image and epoch, accepts one held
 title marker and collects one pair. The executable and authorization
@@ -37,8 +29,7 @@ evidence retain their existing hashes and integrity checks.
 
 ```powershell
 & $approvedPython -E -B -m tools.srr017.retail_title observe-title `
-    $steamRoot $custody "$custody/authorization.json" `
-    "$custody/authorization.json.sig"
+    $steamRoot $custody "$custody/authorization.json"
 ```
 
 The reader collects the full/medium/small native plugin arrays and
@@ -99,15 +90,26 @@ inherited compatibility settings retain their controls. These procedures
 were exercised with synthetic receipts and owned processes. Real retail
 launch, process access and save access were outside this work.
 
-## Lead disposition and qualification
+## Operational prerequisite audit
 
-| Material lead | Performed check and result |
+Every mandatory condition in the retail command, inherited admission,
+preflight and run card was reviewed for its purpose and proportionality.
+
+| Category | Retained conditions and justification |
 | --- | --- |
-| Physical ESM/VFS provenance | Explicitly withdrawn by the maintainer. Removed directory/stream reads, source-file approval inputs, snapshots and digest/path matching from retail acquisition and replay. No further provider research was performed. |
-| Defining native identity | Independent byte fixtures exercise nonzero full, medium and small namespaces, collision, unsupported IDs and conflicting types. The complete acquired rows require native-map and resource-vptr validation. |
-| History as identity | Filtered and drifting history qualify with unresolved attribution. An independently unbacked history table qualifies only the verified native identity and records its read failure. Fatal process/work/evidence conditions retain their stopping behavior. |
-| Completeness and replay | Complete direct, 3,210-target and 4,096-target datasets are checked through sealed receipt, replay, portable export and the unchanged SRR-016 observation parser, including all zero lanes. Namespace drift, invalid assignments, wrong PNDT/BIOM/resource type, wrong resource vptr, map region crossing, paired value drift, cancellation and truncation are refusal controls. |
-| Authorization and preservation | The exact shared command continues to refuse absent/forged/stale approval, wrong scope/operator/source/custody and consumed attempts before another process admission. Independent exit and synthetic preservation checks reconcile separately from scientific qualification. |
+| Scientific validity | Pinned executable/layout and execution-source/work identity; authenticated mapped image and creation epoch; native namespace, FormID, type and resource-vptr checks; rooted counts/fences/extents; two fresh complete collections with the 25 ms gap; typed/value agreement and exact replay. Each establishes identity, coverage or repeatability of the claimed dataset. |
+| Game, save and evidence protection | Ordinary same-user medium-integrity query/read access, Steam parent/session/log checks, no inherited compatibility flags, held title checkpoint, disabled Cloud/overlays, 98/95 independent backup pairs and both designated saves, unexplained-entry reconciliation, separate exact-epoch exit witness, normal operator Quit, sealed receipts, canonical private custody and flushed one-use claims. These protect the process, protected files and attributable evidence. |
+| Ordinary preparation | Qualified local x64 Python with -E/-B and no optimization; current private config/policy and backups; fresh custody; written approval reference; operator launch/title/Quit and retained console digests. Operator SID/session and preflight hashes are recorded automatically. |
+| Finite work and capacity | Reviewed tree/map/chain/read/output ceilings, cooperative cancellation, image and input-byte limits, 40 GB available-space floor after the 512 MiB projected write reserve. These derive from fixture geometry and measured cost, stop before excess work or evidence loss, and permit no automatic retry. The title marker's 30-second intake recency checks the immediately confirmed phase and places no deadline on acquisition. |
+
+Removed requirements are SSH signing and enrollment infrastructure,
+manual operator/SID/session enrollment, a hexadecimal approval ID,
+canonical formatting for the handwritten JSON, fixed approval/preflight
+expiry, and absence of installed SFSE loader/plugin files. The latter
+remain inventory diagnostics. A normal Steam-launched authenticated
+process supplies the runtime evidence. No replacement infrastructure is
+required. New infrastructure needs explicit maintainer approval under
+the [standing workflow rule](research-workflow.md#live-observation-and-recovery).
 
 The observable claim remains two agreeing, complete root-reachable
 collections in the held epoch. Atomicity, uninterrupted lifetime,
@@ -125,18 +127,19 @@ and seven lanes were asserted independently. Independent checked replay
 regenerated byte-identical portable datasets and the unchanged SRR-016
 observation parser consumed their projections.
 
-The six native-identity unit tests and 14 existing source tests passed.
-The unchanged oracle suite passed 28 tests. The rooted reader and
-original owned admission regressions were also rerun with the corrected
-source bytes. Historical retail observations retain their original scope.
+The six native-identity tests and unchanged 28-test oracle suite passed.
+The 11 synthetic preflight tests include installation of an unused SFSE
+loader/DLL while environment qualification remains valid. The shared
+controller also accepts that inventory. Historical retail observations
+retain their original scope.
 
 | Retained qualification identity | SHA-256 |
 | --- | --- |
-| Reviewed execution manifest | `c33b26e68ce2a7b2746b7405f0de2684ae1c4d82a8e201b6aa28bef6a334f7bd` |
+| Reviewed execution manifest | `dde03db307559f0d954d7787acfbc74432f252e8c3987dbf06f690386cc17d00` |
 | Canonical work manifest | `4bf5dd930d6fa545fe5312ea9c7b62795d0f70666f483e0070a1bffc00f9d9ad` |
-| 31-control shared-flow qualification | `9fa5809ea76f0b260cafd99df9530c902a8610fa927d09ca04f90d1c984e33a1` |
-| Corpus portable export | `8eb7d3d52718e37e4a10647462732e0d09c226717bcb8e2f4e75bef3db395cf2` |
-| Upper portable export | `e7fb793a410bca7943d87d5e7be09239f88e2fbab273fd0ad4b3d84c99d43fe1` |
+| 31-control shared-flow qualification | `57959f42841f3b0a2b640e9dee3ca8716518780165b24d5dfeac1746fed40fb3` |
+| Corpus portable export | `9beb42e3aded330261a46bb5860343a2088de1fccc519aba7e3e9e30b2515f8a` |
+| Upper portable export | `3753caab1233b3f844e64ca37514d26066cb3d1a3937be9e3bff026ca2df249c` |
 
 Reproduce from the checkout using a fresh owned run name.
 
@@ -147,43 +150,44 @@ python -E -B -m tools.srr016.qualify_oracle
 python -E -B -m tools.srr017.retail_title execution-manifest
 ```
 
-These commands write newly generated private fixture journals, claims,
-signatures, synthetic protection/exit receipts and qualification summaries.
+These commands write private fixture journals, claims, synthetic
+protection/exit receipts and qualification summaries.
 They leave the Ghidra project untouched. The proposed retail command
-still requires separately enrolled maintainer trust and a fresh signed
-single-use approval, normal operator launch/Quit and the prescribed
-preservation receipts. Offline readiness supplies no live observation.
+requires fresh written single-use maintainer approval, normal operator
+launch/Quit and the prescribed preservation receipts. Offline readiness supplies no live observation.
 
 <!-- srr-017-identity-review:start -->
-**READY_TO_REQUEST_SINGLE_LIVE_AUTHORIZATION.** The independent challenger
-accepted the exact retail command, native namespace mapping, complete
-paired acquisition, combined work limits, preservation procedure and
-evidence replay under the corrected contract. This is an offline
-readiness decision. A live observation still requires separate maintainer
-approval and all operational gates on the proposed run card.
+**READY_TO_REQUEST_SINGLE_LIVE_AUTHORIZATION.** The independent reviewer
+accepted the written SRR-013-style approval binding and the exact
+three-argument retail command. The review challenged the necessity and
+proportionality of every mandatory prerequisite in the command,
+admission path, preflight and run card. Remaining conditions establish
+scientific validity, protect the game/saves/evidence, or prepare the
+already qualified workflow. No additional infrastructure or credentials
+are required.
 
-The challenger personally checked all 17 task files against reviewed
-manifest SHA-256
-`622750d41a071bc09ed349b04c87bd5d3f5e40bec45c12bd0ec5939df186db7c`.
-Each line records the byte SHA-256, two spaces and the sorted
-repository-relative path, terminated by LF. Only this marked body's
-contents are excluded from its dossier hash.
+The reviewer personally checked all 11 task files against manifest SHA-256
+`f0b3e363bb7dce273bd1b9d5af2a1238d0ee44544601b7702d2b6f1c59e68f05`.
+It lists sorted byte hashes and repository-relative paths separated by
+two spaces, terminated by LF. Only this marked body's contents are
+excluded from its dossier hash. An independent reconstruction of the
+committed baseline verified task-patch forward and reverse application
+against every delivered byte.
 
-Independent byte fixtures challenged full/medium/small namespace
-assignments, missing namespaces, invalid IDs, native-map ID/type
-disagreement, resource vptr and unreadable history. Checked replay
-regenerated every raw and canonical key and all 51,170 words across
-7,310 direct/corpus/upper rows. Relative DATA directories and absent or
-changed ESM bytes qualified. Namespace drift, paired value drift,
-incorrect native identity and work/evidence overruns retained refusals.
-Resealed read tampering, wrong attempt digest and altered portable keys,
-row counts and type witnesses were independently refused.
+Nine independently constructed plain-approval controls accepted readable
+JSON and refused incorrect source/work/scope/custody, blank approval
+reference, duplicate members and obsolete trust fields. An exclusive claim
+preceded process admission and refused reuse. The actual production CLI
+refused absent approval on disposable input. Full checked replay
+regenerated 7,310 rows and all 51,170 words. Native identity/type/vptr,
+namespace, pairing, cancellation and finite-work refusals remained intact.
+Wrong attempt hashes, changed marker epochs, edited portable datasets and
+resealed native-read tampering were independently refused.
 
-The substantive standalone Markdown review records separate judgments
-for admission, identity export, combined budget, operational protection
-and scientific boundaries. The challenger independently reconstructed
-the committed baseline and verified the task patch in both directions
-against every delivered byte. The pre-existing `.gitignore` change is
-preserved and excluded. HEAD and the empty index remain at their
-starting state. No real retail process or protected save was accessed.
+The substantive standalone Markdown report records these checks and
+the operational audit. The scientific reader, native identity and
+FormID validation code are unchanged. HEAD and the empty index remain
+at the starting commit. All qualification used owned processes and
+synthetic preservation receipts. A live extraction requires a fresh
+separate written approval and the current preservation procedure.
 <!-- srr-017-identity-review:end -->

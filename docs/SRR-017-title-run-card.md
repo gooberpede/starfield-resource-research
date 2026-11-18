@@ -4,88 +4,62 @@
 separately authorized title-card observation. It gives the exact retail
 entry point and the independent checks required to assess that candidate.
 Use it only after the release decision and a new maintainer authorization.
-SRR-013 approvals and disposable signatures confer no retail authority.
+Earlier run approvals confer no authority for a new attempt.
 
 ## Exact invocation and one-use custody
 
-From the reviewed checkout, set absolute local paths for the reviewed
-64-bit Python executable, the Steam root, and an existing restricted
-custody directory below the checkout's private work root. The two
-approval files have the fixed basenames shown here.
+Use the reviewed checkout, qualified x64 Python executable and an existing
+restricted private custody directory below the checkout's `.local-work` root.
+Verify the execution/work digests printed by the offline command against
+the maintainer-reviewed candidate.
 
 ```powershell
 & $approvedPython -E -B -m tools.srr017.retail_title execution-manifest
 & $approvedPython -E -B -m tools.srr017.retail_title observe-title `
-    $steamRoot $custody "$custody/authorization.json" `
-    "$custody/authorization.json.sig"
+    $steamRoot $custody "$custody/authorization.json"
 ```
 
-The first command is offline and prints the canonical execution manifest
-digest, exact runtime SHA-256, arguments, source byte hashes, executable
-pin and combined work manifest. The retail command checks these values
-again from the execution checkout. Preserve the source and Python bytes
-on this checkout through replay. The owned equivalent uses a private
-test seam and the same controller, acquisition, replay and export rules.
+The separate written maintainer approval authorizes one responsive title
+checkpoint and one read-only pair. Record its reference in an ordinary
+UTF-8 JSON file at `$custody/authorization.json`. The six fields are below.
+Whitespace and key ordering may follow the operator's normal JSON editor.
+Duplicate members refuse. Hashes identify exact execution sources and
+work limits, using the command's canonical manifest digest.
+
+| Field | Required value |
+| --- | --- |
+| `schema` | `srr017-title-authorization-v2` |
+| `scope` | `srr017-retail-title` |
+| `source_sha256` | Reviewed execution manifest digest |
+| `work_sha256` | Canonical digest of that manifest's `work` member |
+| `custody` | Canonical absolute path of this private run directory |
+| `approval_reference` | Nonempty reference to the separately issued written maintainer approval |
+
+The observer checks that record, current execution sources and preflight
+receipts, authenticates its ordinary operator/session, and durably creates
+one exclusive `retail-authorization.used` claim before any Steam baseline
+or game process admission. An existing claim bars reuse after success or
+failure. The record is the SRR-013 approval binding adapted to the complete
+SRR-017 reader. The command does not infer approval from a passing test.
+
+Use freshly generated preflight receipts for the intended run. The claim
+retains their exact hashes and the native operator/session identity. A
+fixed approval expiry is unnecessary for this one-use mechanism. The
+immediately confirmed title marker retains its existing intake recency
+check. Acquisition has finite work caps and cooperative cancellation.
+
+Native loaded-plugin assignments and the authoritative native FormID map
+resolve defining identities. Physical ESM provenance and winning-content
+attribution are outside acquisition. Installed SFSE files remain an
+on-disk inventory diagnostic. The operator launches normally through Steam
+and the reader authenticates that exact process and mapped executable.
+
+The owned qualification command exercises the same controller with
+synthetic protection evidence and owned test processes.
 
 ```powershell
 & $approvedPython -E -B -m tools.srr017.qualify_retail_title $uniqueRunName
 ```
-
-The real signer is a separately enrolled maintainer. On the observation
-host, the existing trusted deployment must provide exactly one
-`srr017-maintainer namespaces="srr017-retail-title" ssh-ed25519` public
-key record in `C:\Program Files\SRR017\allowed_signers`. The deployment
-owner must authenticate the enrolled public key out of band. The
-ordinary observation token must lack write and replacement access to
-the trust anchor and verifier. The observer never enrolls a key, changes
-ACLs or elevates. The command uses the system OpenSSH verifier at
-`C:\Windows\System32\OpenSSH\ssh-keygen.exe`. If the trust anchor or
-unprivileged verifier requirement is unavailable, the command refuses
-before game admission. Provisioning is separate from both the approved
-operator run and the owned qualification.
-
-The maintainer approves the one launch, operator, restricted custody and
-bounds by signing exact UTF-8 JSON bytes in the `srr017-retail-title`
-SSHSIG namespace. Use sorted JSON keys, compact separators, ASCII escapes
-and one final LF. The schema has these fields.
-
-| Fields | Bound value |
-| --- | --- |
-| `schema`, `scope`, `purpose` | `srr017-title-authorization-v1`, `srr017-retail-title`, `one-responsive-title-readonly-pair` |
-| `approval_id` | New unique 32-character lowercase hex ID |
-| `operator_sid`, `steam_session` | Approved Windows user SID and interactive session number |
-| `steam_root`, `custody` | Canonical Steam and custody paths |
-| `source_sha256`, `work_sha256` | Canonical SHA-256 of the command manifest and its `work` member, without final LF |
-| `input_sha256` | Canonical SHA-256 of `IDENTITY_CONTRACT` in the reviewed command, binding native namespace and PNDT/BIOM/RSGD/IRES validation |
-| `trust_sha256`, `verifier_sha256` | Exact approved allowlist and OS SSH verifier byte SHA-256 |
-| `retail_sha256` | `7e9adb1414a8e1b325e5e1f097b9b17b78deb7eebeda37a333351a43a60f9d28` for Starfield.exe 1.16.244.0 |
-| `pre_environment_sha256`, `pre_protection_sha256` | Exact SHA-256 of the two preflight receipt byte files |
-| `issued_utc_ns`, `expires_utc_ns` | Signed Unix nanosecond interval no longer than 24 hours, checked at claim and marker admission |
-
-The maintainer retains their signing key independently of the observer
-and uses the following command on the reviewed approval JSON. Transfer
-the original JSON bytes and detached signature to the agreed directory.
-
-```powershell
-& $approvedSshKeygen -Y sign -f $maintainerPrivateKey -n srr017-retail-title $approval
-```
-
-The native loaded-plugin namespace supplies defining plugin names and
-local record identities. The native FormID map independently validates
-each relevant record's stored ID and type, and each resource's vptr.
-Relative `DATA\` directories are admitted. ESM backing files, file hashes,
-provider selection and winning-content attribution are outside this
-identity contract. The expected population and reproducer remain later
-comparison inputs.
-
-The strict approval and preflight checks precede any Steam baseline or
-game process open. After verification, the tool creates and durably
-flushes one exclusive `retail-authorization.used` file in the approved
-custody. Keep the claim with the original custody. Its existence bars
-every retry, including failed admission. Distinct signed custody and
-fresh review are required for any later attempt. An expiry is an
-admission boundary. The acquisition itself has finite work caps and
-cooperative cancellation without a duration deadline.
 
 ## Before launch
 
@@ -101,8 +75,8 @@ cooperative cancellation without a duration deadline.
    future operational authorization. Check exactly 98 Documents and 95
    Steam remote original/backup pairs, both designations and zero
    unclassified or other entries. The predecessor checker independently
-   hashes each original and backup. Give the maintainer the two exact
-   preflight receipt hashes for the approval. The observer consumes
+   hashes each original and backup. Retain both preflight receipts in
+   custody. The claim binds their exact byte hashes. The observer consumes
    these receipts without opening any save files.
 
 ```powershell
@@ -110,9 +84,9 @@ cooperative cancellation without a duration deadline.
 & $approvedPython -E -B tools/srr008/preflight.py protection --config $config --output "$custody/pre-protection"
 ```
 
-3. Invoke the exact signed command. Wait for the displayed authenticated
-   baseline prompt. The operator performs one normal Steam launch and
-   holds the responsive title card. Type `launched` only at that
+3. Invoke the reviewed command with the written approval record. Wait for
+   the authenticated baseline prompt. Perform one normal Steam launch and
+   hold the responsive title card. Type `launched` only at that
    checkpoint. The controller checks the unique selected process, its
    Steam parent, application log, creation FILETIME, mapped executable,
    user SID and access rights.
@@ -165,7 +139,7 @@ zero unexplained differences, including transient inventories, after
 normal Quit. Reconcile Steam Cloud and overlays, source, application
 and protection controls as in preflight. Protection and retirement have
 their own verdict independent of scientific qualification. Keep raw
-addresses, source paths, process epoch tokens, logs, signed lease
+addresses, source paths, process epoch tokens, logs, written approval
 records and protection manifests in restricted custody. Export only
 after checked replay and the separate custody review.
 

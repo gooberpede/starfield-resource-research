@@ -1,6 +1,7 @@
-"""Exercise the exact signed title controller on disposable children."""
+"""Exercise the exact written-authorization title controller on disposable children."""
 
 import argparse
+import json
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 import os
@@ -32,17 +33,6 @@ def expected_error(action, code=None):
         raise AssertionError("a disallowed run or tampered replay was admitted")
 
 
-def make_keys(directory):
-    key, wrong = (directory / name for name in ("approval-signer", "untrusted-signer"))
-    for output in (key, wrong):
-        subprocess.run([str(title.SSH_PATH), "-q", "-t", "ed25519", "-N", "", "-f", str(output)],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    public = key.with_suffix(".pub").read_bytes().split()
-    trust = directory / "allowed_signers"
-    trust.write_bytes(b'srr017-maintainer namespaces="srr017-retail-title" ' + b" ".join(public[:2]) + b"\n")
-    return key, wrong, trust
-
-
 def make_receipts(directory, phase, changed=False):
     kind = "srr-save-environment-receipt/1"
     utc = datetime.now(timezone.utc).isoformat()
@@ -53,6 +43,8 @@ def make_receipts(directory, phase, changed=False):
                        "StateFlags": "4", "installdir": "Starfield"},
                    "cloud_flag": "0", "overlay_flag": "0", "configured_save_path_agrees": True,
                    "configured_save_paths": [], "sfse_loader": False}
+    if directory.name == "installed-sfse":
+        environment["sfse_loader"] = True
     protection = {"schema": kind, "mode": "protection", "ok": True, "utc": utc, "backup_path": "synthetic backup input",
                   "backup_entry_count": 193, "policy_file_sha256": "5" * 64,
                   "designations": {"owned-000.sfs": True, "owned-001.sfs": True}}
@@ -74,27 +66,20 @@ def make_receipts(directory, phase, changed=False):
         title.write_exclusive(folder / "receipt.json", value)
 
 
-def authorize(directory, steam, fixture_source, key, trust, *, stale=False, changes=None):
+def authorize(directory, steam, fixture_source=None, *, changes=None):
     make_receipts(directory, "pre")
     manifest = title.candidate_manifest()
     approval = directory / "authorization.json"
-    start = time_ns() - (60_000_000_000 if stale else 500_000_000)
     value = {
-        "schema": "srr017-title-authorization-v1", "scope": census.RETAIL_FIXTURE_SCOPE,
-        "approval_id": f"{start:032x}", "purpose": "one-responsive-title-readonly-pair",
-        "operator_sid": SID, "steam_session": current_session(), "steam_root": str(steam), "custody": str(directory),
-        "source_sha256": title.digest_manifest(manifest), "work_sha256": title.digest_manifest(manifest["work"]),
-        "input_sha256": title.digest_manifest(title.IDENTITY_CONTRACT), "trust_sha256": file_sha256(trust),
-        "verifier_sha256": file_sha256(title.SSH_PATH), "retail_sha256": census.RETAIL_SHA256,
-        "issued_utc_ns": start, "expires_utc_ns": start + (1_000_000_000 if stale else 600_000_000_000),
-        "pre_environment_sha256": file_sha256(directory / "pre-environment" / "receipt.json"),
-        "pre_protection_sha256": file_sha256(directory / "pre-protection" / "receipt.json"),
+        "schema": "srr017-title-authorization-v2", "scope": census.RETAIL_FIXTURE_SCOPE,
+        "approval_reference": "Maintainer's written approval for this owned fixture run",
+        "custody": str(directory), "source_sha256": title.digest_manifest(manifest),
+        "work_sha256": title.digest_manifest(manifest["work"]),
     }
     value.update(changes or {})
-    title.write_exclusive(approval, value)
-    subprocess.run([str(title.SSH_PATH), "-Y", "sign", "-f", str(key), "-n", title.SIGN_NAMESPACE, str(approval)],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    return approval, directory / "authorization.json.sig"
+    # A human-readable JSON record is admitted, as in SRR-013.
+    approval.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    return (approval,)
 
 
 def current_session():
@@ -109,31 +94,28 @@ def test_no_begin(*args, **kwargs):
     raise AssertionError("an authorization rejection reached a process backend")
 
 
-def gate_tests(directory, steam, fixture_source, key, untrusted, trust):
+def gate_tests(directory, steam, fixture_source):
     cases = (
-        ("forged", untrusted, False, {}, "retail_authorization_signature"),
-        ("stale", key, True, {}, "retail_authorization_stale"),
-        ("wrong-operator", key, False, {"operator_sid": SID[:-1] + "2"}, "retail_authorization_mismatch"),
-        ("wrong-source", key, False, {"source_sha256": "8" * 64}, "retail_authorization_mismatch"),
-        ("wrong-scope", key, False, {"scope": "srr013-structural-title"}, "retail_authorization_mismatch"),
-        ("wrong-custody", key, False, {"custody": str(steam)}, "retail_authorization_mismatch"),
+        ("blank-approval", {"approval_reference": " "}, "retail_authorization_format"),
+        ("wrong-work", {"work_sha256": "8" * 64}, "retail_authorization_mismatch"),
+        ("wrong-source", {"source_sha256": "8" * 64}, "retail_authorization_mismatch"),
+        ("wrong-scope", {"scope": "srr013-structural-title"}, "retail_authorization_mismatch"),
+        ("wrong-custody", {"custody": str(steam)}, "retail_authorization_mismatch"),
     )
-    services = title.Services("simulated", lambda: (SID, current_session()), lambda: (trust, title.SSH_PATH),
+    services = title.Services("simulated", lambda: (SID, current_session()),
                               test_no_begin, test_no_begin, test_no_begin, fake_space)
     findings = {}
-    for name, signer, stale, changes, code in cases:
+    for name, changes, code in cases:
         custody = directory / name
         custody.mkdir()
-        paths = authorize(custody, steam, fixture_source, signer, trust, stale=stale, changes=changes)
+        paths = authorize(custody, steam, fixture_source, changes=changes)
         expected_error(lambda: title.acquire(steam, custody, *paths, services=services), code)
         assert not (custody / title.CLAIM).exists()
         findings[name] = code
-
-    # The production CLI gets no authority, and is pointed only at the fake fixture root.
     custody = directory / "real-unapproved"
     custody.mkdir()
     args = [sys.executable, "-E", "-B", "-m", "tools.srr017.retail_title", "observe-title", str(steam), str(custody),
-            *(str(custody / name) for name in ("authorization.json", "authorization.json.sig"))]
+            str(custody / "authorization.json")]
     result = subprocess.run(args, capture_output=True, cwd=title.ROOT, check=False)
     assert result.returncode == 1 and b"Refused:" in result.stderr and not (custody / title.CLAIM).exists()
     findings["unapproved-production-command"] = result.returncode
@@ -141,7 +123,7 @@ def gate_tests(directory, steam, fixture_source, key, untrusted, trust):
 
 
 @contextmanager
-def owned_services(directory, target, steam, trust, scenario, case, fixture_source):
+def owned_services(directory, target, steam, scenario, case, fixture_source):
     processes = {}
     observed = {"begin_calls": 0, "open_calls": 0}
     original_plugin = fixture_source.read_bytes() if fixture_source.exists() else None
@@ -206,7 +188,7 @@ def owned_services(directory, target, steam, trust, scenario, case, fixture_sour
             elif case == "pair-values":
                 processes["command"]("clear")
 
-        services = title.Services("simulated", lambda: (SID, current_session()), lambda: (trust, title.SSH_PATH),
+        services = title.Services("simulated", lambda: (SID, current_session()),
                                   begin, select, respond, fake_space, between)
         try:
             yield services, observed
@@ -224,6 +206,7 @@ CONTROLS = (
     ("direct", "direct", None, None, {}),
     ("corpus", "corpus", None, None, {}),
     ("upper", "upper", None, None, {}),
+    ("installed-sfse", "direct", None, None, {}),
     ("source-filtered", "source-filtered", None, None, {}),
     ("source-unreadable", "source-unreadable", None, None, {}),
     ("vector-drift", "direct", None, None, {}),
@@ -252,20 +235,19 @@ def run(directory):
     directory.mkdir(parents=True, exist_ok=False)
     steam = directory / "fixture-steam"
     steam.mkdir()
-    key, untrusted, trust = make_keys(directory)
     target, build = qualify_census.build_fixture(directory, map_capacity=census.RETAIL_LIMITS["form_capacity"])
     fixture_source = directory / "fixture.esm"
     fixture_sources(fixture_source)
-    controls = gate_tests(directory, steam, fixture_source, key, untrusted, trust)
+    controls = gate_tests(directory, steam, fixture_source)
     for name, scenario, failure, source_failure, overrides in CONTROLS:
         custody = directory / name
         custody.mkdir()
         source = fixture_source
-        paths = authorize(custody, steam, source, key, trust)
+        paths = authorize(custody, steam, source)
         if name == "absent-esm":
             fixture_source.unlink()
         limits = {**census.RETAIL_LIMITS, **overrides}
-        with owned_services(custody, target, steam, trust, scenario, name, fixture_source) as (services, called):
+        with owned_services(custody, target, steam, scenario, name, fixture_source) as (services, called):
             state = title.acquire(steam, custody, *paths, services=services, limits=limits)
             assert (state["failure"] or [None])[0] == failure, (name, state)
             assert state["source_binding_failure"] == source_failure, (name, state)
@@ -297,7 +279,8 @@ def run(directory):
                                                                    services=services))
                     finally:
                         receipt.write_bytes(raw)
-            elif name in {"source-filtered", "source-unreadable", "vector-drift", "relative-data", "absent-esm", "changed-esm"}:
+            elif name in {"installed-sfse", "source-filtered", "source-unreadable", "vector-drift",
+                          "relative-data", "absent-esm", "changed-esm"}:
                 assert dataset["acquisition"] == "QUALIFIED" and len(dataset["rows"]) == 4, (name, dataset)
                 assert all(len(row["slots"]) == 7 for row in dataset["rows"])
                 if name == "source-unreadable":

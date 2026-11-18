@@ -11,7 +11,7 @@ identities. Every acquisition decision uses the native evidence.
 | Field | Meaning |
 | --- | --- |
 | `schema` | `srr017-allocations-v1` |
-| `source` | `OWNED_DISPOSABLE` for fixture processes or `RETAIL_ATTESTED` for the separately signed retail protocol with a verified executable/epoch |
+| `source` | `OWNED_DISPOSABLE` for fixture processes or `RETAIL_ATTESTED` for the separately approved retail protocol with a verified executable/epoch |
 | `scope` | Reachable mixed store at the responsive title-card checkpoint, simulated for owned targets |
 | `retail_layout_version`, `retail_sha256`, `target_image_sha256` | Layout applicability and actual observed target image |
 | `capture_reader_sha256`, `replay_reader_sha256`, `receipt_sha256` | Reader identities at capture and replay, and original private receipt byte hash |
@@ -88,7 +88,7 @@ An SRR-017 owned receipt also rechecks the independent authorization and
 claim files in its original private custody directory. The source-index
 pin independently governs the later typed ESM join.
 
-Retail-facing replay opens the signed approval and its identity-contract pin,
+Retail-facing replay opens the written approval and the reviewed source/work binding,
 the paired memory seal and the independently committed attempt
 in their original private custody. Supply the two hashes retained
 independently from the capture console. A readable raw pair with insufficient namespace binding produces

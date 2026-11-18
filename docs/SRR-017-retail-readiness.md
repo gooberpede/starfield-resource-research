@@ -7,7 +7,7 @@ requirements and release disposition. The physical-provenance blocker
 and associated requirements below are **SUPERSEDED**.
 
 **BLOCKED for a request to observe retail.** The continuation adds a
-signed, single-use retail-facing title command and applies its acquisition,
+single-use retail-facing title command and applies its acquisition,
 source binding and replay to owned processes. The pinned executable has a
 separate relative-path VFS provider route for loaded plugins. A plugin's
 native relative name and an identically named installation file leave its
@@ -48,7 +48,7 @@ tests. No real retail process or protected save access occurred.
 
 ## Paired acquisition and usable export
 
-The signed title controller checks separately held approval against the
+The title controller checks separately held written approval against the
 execution/source/work manifest, validated launch environment, scoped
 operator/session, approval window, canonical private directory, and
 independently prescribed source files. It exclusively claims the directory
@@ -124,7 +124,7 @@ outside the population. [Original allocation study](SRR-016-whole-store-census.m
 
 | Decision | Conditions |
 | --- | --- |
-| `READY_TO_REQUEST_SINGLE_LIVE_AUTHORIZATION` | Frozen retail command, complete epoch-bound defining-source proof for the intended loaded profile, and combined work envelope all independently qualify offline. The maintainer independently supplies signed approval under the proposed run card in a separate step. |
+| `READY_TO_REQUEST_SINGLE_LIVE_AUTHORIZATION` | Frozen retail command, complete epoch-bound defining-source proof for the intended loaded profile, and combined work envelope all independently qualify offline. The maintainer supplies written approval under the proposed run card in a separate step. |
 | `BLOCKED` (current) | The ordinary relative-name VFS route still lacks an independently qualified method covering every relevant closed plugin. A name, slot and matching disk hash cannot establish which provider supplied that file. The current scope refuses this case and retains the native diagnostics instead of qualifying an unjoinable dataset. |
 
 ## Offline qualification evidence

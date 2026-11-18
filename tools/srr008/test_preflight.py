@@ -86,6 +86,15 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("Output already exists", errors)
         self.assertEqual(same, data)
 
+    def test_installed_sfse_is_diagnostic(self):
+        game = Path(self.settings["steam_root"]) / "steamapps/common/Starfield"
+        put(game / "sfse_loader.exe", b"synthetic installed loader")
+        put(game / "Data/SFSE/Plugins/fixture.dll", b"synthetic installed plugin")
+        code, data, errors = self.cli("environment")
+        self.assertEqual((code, errors), (0, ""))
+        self.assertTrue(data["ok"] and data["sfse_loader"])
+        self.assertEqual(data["sfse_directories"]["install"]["entries"][0]["name"], "fixture.dll")
+
     def test_same_size_hash_mismatch_fails(self):
         put(self.backup / SAVE, b"Synthetic manual")
         code, data, _ = self.cli()

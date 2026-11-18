@@ -1,4 +1,4 @@
-"""Proposed single-use retail title-card command. A real signed approval is required."""
+"""Single-use retail title-card command bound to written maintainer approval."""
 
 import argparse
 from contextlib import nullcontext
@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 import re
 import stat
-import subprocess
 import sys
 from time import time_ns
 
@@ -25,11 +24,7 @@ from structural_title import cancellation_signal, operator_response
 
 ROOT = Path(__file__).resolve().parents[2]
 COMMAND = ("python", "-E", "-B", "-m", "tools.srr017.retail_title", "observe-title",
-           "<steam-root>", "<custody>", "<authorization.json>", "<authorization.json.sig>")
-SIGNER = "srr017-maintainer"
-SIGN_NAMESPACE = "srr017-retail-title"
-TRUST_PATH = Path("C:/Program Files/SRR017/allowed_signers")
-SSH_PATH = Path("C:/Windows/System32/OpenSSH/ssh-keygen.exe")
+           "<steam-root>", "<custody>", "<authorization.json>")
 CLAIM = "retail-authorization.used"
 RECEIPT = "title.jsonl"
 IDENTITY_CONTRACT = {"schema": "srr017-native-formid-identity-v1", "namespace": "native-loaded-plugins",
@@ -37,13 +32,9 @@ IDENTITY_CONTRACT = {"schema": "srr017-native-formid-identity-v1", "namespace": 
 ATTEMPT = "retail-attempt.json"
 PROTECTION_SIZE = 2 * 1024 * 1024
 AUTH_SIZE = 8192
-TRUST_SIZE = 1024
-APPROVAL_MAX_NS = 24 * 60 * 60 * 1_000_000_000
 HEX_256 = re.compile(r"[0-9a-f]{64}")
-SIGNED_FIELDS = {
-    "schema", "scope", "approval_id", "purpose", "operator_sid", "steam_session", "steam_root", "custody",
-    "source_sha256", "work_sha256", "input_sha256", "trust_sha256", "verifier_sha256", "retail_sha256",
-    "pre_environment_sha256", "pre_protection_sha256", "issued_utc_ns", "expires_utc_ns",
+AUTHORIZATION_FIELDS = {
+    "schema", "scope", "source_sha256", "work_sha256", "custody", "approval_reference",
 }
 SOURCES = (
     "tools/srr008/inventory.py", "tools/srr008/preflight.py", "tools/srr008/save_policy.py",
@@ -168,63 +159,12 @@ def digest_manifest(value):
     return digest(census.encode(value))
 
 
-def validate_signed_fields(data, expected, clock):
-    demand(set(data) == SIGNED_FIELDS and data["schema"] == "srr017-title-authorization-v1"
-           and data["purpose"] == "one-responsive-title-readonly-pair"
-           and isinstance(data["approval_id"], str) and re.fullmatch(r"[0-9a-f]{32}", data["approval_id"]),
-           "retail_authorization_format", "authorization lacks the exact signed one-use fields")
+def validate_authorization(data, expected):
+    demand(set(data) == AUTHORIZATION_FIELDS and data["schema"] == "srr017-title-authorization-v2"
+           and isinstance(data["approval_reference"], str) and data["approval_reference"].strip(),
+           "retail_authorization_format", "authorization must identify the separate written maintainer approval")
     demand(all(data.get(key) == value for key, value in expected.items()), "retail_authorization_mismatch",
-           "authorization disagrees with source, work, input, path, operator or protected evidence")
-    issued, expires = data["issued_utc_ns"], data["expires_utc_ns"]
-    demand(type(issued) is int and type(expires) is int and 0 < issued <= clock < expires
-           and expires - issued <= APPROVAL_MAX_NS,
-           "retail_authorization_stale", "authorization is stale, premature or has an excessive validity interval")
-
-
-def verify_sshsig(authority_path, signature, payload, verifier):
-    """Verify the exact bytes with the maintained OS OpenSSH executable."""
-    trust = file_bytes(authority_path, TRUST_SIZE)
-    demand(re.fullmatch(rb'srr017-maintainer namespaces="srr017-retail-title" ssh-ed25519 [A-Za-z0-9+/=]{60,100}\r?\n',
-                        trust) is not None,
-           "retail_trust_invalid", "the OS trust file must contain one scoped maintainer key")
-    signature_bytes = file_bytes(signature, AUTH_SIZE)
-    result = subprocess.run(
-        [str(verifier), "-Y", "verify", "-f", str(authority_path), "-I", SIGNER, "-n", SIGN_NAMESPACE,
-         "-s", str(signature)],
-        input=payload, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-    )
-    demand(result.returncode == 0 and file_bytes(authority_path, TRUST_SIZE) == trust
-           and file_bytes(signature, AUTH_SIZE) == signature_bytes,
-           "retail_authorization_signature", "maintainer signature or signed input could not be verified")
-    return digest(trust), digest(signature_bytes)
-
-
-def protect_trust_path():
-    """Refuse a trust anchor that the ordinary observer could edit or replace."""
-    import ctypes as c
-    from ctypes import wintypes as w
-
-    trust = existing_local(TRUST_PATH)
-    verifier = existing_local(SSH_PATH)
-    kernel = c.WinDLL("kernel32", use_last_error=True)
-    create = kernel.CreateFileW
-    create.argtypes = (w.LPCWSTR, w.DWORD, w.DWORD, w.LPVOID, w.DWORD, w.DWORD, w.HANDLE)
-    create.restype = w.HANDLE
-    close = kernel.CloseHandle
-    close.argtypes, close.restype = (w.HANDLE,), w.BOOL
-    invalid = c.c_void_p(-1).value
-    # DELETE, WRITE_DAC, WRITE_OWNER, data/write-attributes and (for directories) DELETE_CHILD.
-    # Test each independently. A denial of a combined mask would not rule out partial mutation rights.
-    for item in (trust, trust.parent, trust.parent.parent, verifier, verifier.parent, verifier.parent.parent):
-        demand(not item.is_symlink(), "retail_trust_invalid", "the trust or verifier path is a symlink")
-        for access in (0x10000, 0x40000, 0x80000, 2, 4, 0x100, *((0x40,) if item.is_dir() else ())):
-            handle = create(str(item), access, 7, None, 3, 0x02000000 if item.is_dir() else 0, None)
-            if handle not in (None, invalid):
-                close(handle)
-                raise ReadFailure("retail_trust_writable", "the observer could modify the trust or verifier chain")
-            demand(c.get_last_error() in (5, 1314), "retail_trust_unverified",
-                   "the observer's write access to the trust chain could not be ruled out")
-    return trust, verifier
+           "authorization disagrees with the reviewed source, work, scope or custody")
 
 
 def real_operator():
@@ -289,7 +229,7 @@ def check_environment(report, image_sha256):
            and report["manifest_fields"] == {"appid": str(STEAM_APP), "buildid": str(STEAM_APP_BUILD),
                                              "StateFlags": "4", "installdir": "Starfield"}
            and report["cloud_flag"] == report["overlay_flag"] == "0"
-           and report["configured_save_path_agrees"] is True and report["sfse_loader"] is False,
+           and report["configured_save_path_agrees"] is True,
            "environment_refused", "the pinned environment, disabled Cloud/overlay or launch path disagrees")
 
 
@@ -312,16 +252,14 @@ def available_space():
     return result
 
 
-def approval_files(custody):
-    return tuple(existing_local(custody / name)
-                 for name in ("authorization.json", "authorization.json.sig"))
+def approval_file(custody):
+    return existing_local(custody / "authorization.json")
 
 
 @dataclass(frozen=True)
 class Services:
     target_kind: str
     operator: object
-    trust: object
     begin: object
     open: object
     prompt: object
@@ -333,44 +271,42 @@ class Services:
         return census.RETAIL_SCOPE if self.target_kind == "retail" else census.RETAIL_FIXTURE_SCOPE
 
 
-REAL = Services("retail", real_operator, protect_trust_path, begin_retail, open_retail,
+REAL = Services("retail", real_operator, begin_retail, open_retail,
                 operator_response, available_space)
 
 
-def _verify_approval(steam_root, directory, paths, services, *, replay_clock=None):
-    approval, signature = approval_files(directory)
-    demand(tuple(Path(x) for x in paths) == (approval, signature),
-           "retail_authorization_location", "approval evidence must use the fixed private custody paths")
-    raw = file_bytes(approval, AUTH_SIZE)
-    value = object_from(raw, canonical=True)
-    trust, verifier = services.trust()
-    verifier_sha256 = digest(file_bytes(verifier, 4 * 1024 * 1024))
-    trust_sha256, signature_sha256 = verify_sshsig(trust, signature, raw, verifier)
+def _verify_approval(steam_root, directory, authorization, services, *, recorded_claim=None):
+    demand(Path(authorization) == approval_file(directory), "retail_authorization_location",
+           "use authorization.json in the approved private custody directory")
+    raw = file_bytes(authorization, AUTH_SIZE)
+    value = object_from(raw)
     manifest = candidate_manifest()
+    expected = {
+        "schema": "srr017-title-authorization-v2", "scope": services.scope,
+        "custody": str(directory), "source_sha256": digest_manifest(manifest),
+        "work_sha256": digest_manifest(manifest["work"]),
+    }
+    validate_authorization(value, expected)
     preflight, pins = preflight_receipts(directory, "pre")
-    if replay_clock is None:
+    if recorded_claim is None:
         operator_sid, session = services.operator()
+        clock = time_ns()
     else:
-        operator_sid, session = value.get("operator_sid"), value.get("steam_session")
+        operator_sid, session = recorded_claim["operator_sid"], recorded_claim["steam_session"]
+        clock = recorded_claim["claimed_utc_ns"]
     demand(type(session) is int and session > 0 and isinstance(operator_sid, str)
            and re.fullmatch(r"S-1-\d+(?:-\d+)+", operator_sid),
-           "operator_sid_unverified", "the authorization did not bind a native operator and session")
-    expected = {
-        "scope": services.scope, "operator_sid": operator_sid, "steam_session": session,
-        "steam_root": str(steam_root), "custody": str(directory),
-        "source_sha256": digest_manifest(manifest), "work_sha256": digest_manifest(manifest["work"]),
-        "input_sha256": digest_manifest(IDENTITY_CONTRACT), "retail_sha256": RETAIL_APPLICABILITY["sha256"],
-        "trust_sha256": trust_sha256, "verifier_sha256": verifier_sha256, **pins,
-    }
-    clock = time_ns() if replay_clock is None else replay_clock
-    validate_signed_fields(value, expected, clock)
-    demand(all(0 <= clock - utc_ns(receipt["utc"]) <= APPROVAL_MAX_NS for receipt in preflight.values()),
-           "preflight_stale", "signed preflight receipts must precede reservation and be current")
-    check_environment(preflight["environment"], expected["retail_sha256"])
+           "operator_sid_unverified", "the observer must use an authenticated ordinary interactive session")
+    demand(type(clock) is int and clock > 0 and all(utc_ns(receipt["utc"]) <= clock for receipt in preflight.values()),
+           "preflight_order", "preflight receipts must precede this attempt")
+    check_environment(preflight["environment"], RETAIL_APPLICABILITY["sha256"])
     check_protection(preflight["protection"])
-    claim = {**expected, "approval_id": value["approval_id"], "authorization_sha256": digest(raw),
-             "signature_sha256": signature_sha256, "claimed_utc_ns": clock}
-    return claim, value["expires_utc_ns"]
+    return {
+        **expected, "approval_reference": value["approval_reference"],
+        "authorization_sha256": digest(raw), "steam_root": str(steam_root),
+        "operator_sid": operator_sid, "steam_session": session,
+        "claimed_utc_ns": clock, **pins,
+    }
 
 
 def check_exit_bound(directory, identity, image):
@@ -422,7 +358,7 @@ def meter_process_census(api, initial, maximum):
 
 
 def acquire(
-    steam, custody, authorization, signature, *,
+    steam, custody, authorization, *,
     services=REAL, limits=None,
 ):
     """Run the exact integrated command. Only its private services are substituted in owned tests."""
@@ -437,8 +373,7 @@ def acquire(
     limits = RETAIL_WORK["census"] if limits is None else limits
     demand(services.target_kind == "simulated" or limits == RETAIL_WORK["census"], "retail_limits",
            "the retail invocation fixes the exact reviewed census work limits")
-    authority, expires = _verify_approval(
-        steam_root, directory, (authorization, signature), services)
+    authority = _verify_approval(steam_root, directory, authorization, services)
     works = services.space()
     write_exclusive(directory / CLAIM, authority, AUTH_SIZE)
     path = directory / RECEIPT
@@ -448,17 +383,15 @@ def acquire(
         with cancellation_signal() as cancelled:
             hashes = ImageDigestMeter(cancelled)
             poll_no_cancel(cancelled)
-            demand(time_ns() < expires, "retail_authorization_stale", "authorization expired before Steam admission")
             with services.begin(steam_root, digest_file=hashes) as baseline:
                 demand(baseline.session == authority["steam_session"], "steam_session_unverified",
-                       "authenticated Steam session disagrees with signed approval")
+                       "authenticated Steam session differs from the admitted observer session")
                 actual, caps = meter_backend(baseline.api, limits)
                 process_censuses = meter_process_census(baseline.api, 2 if services.target_kind == "retail" else 1,
                                                          RETAIL_WORK["steam_census_calls_max"])
                 demand(services.prompt("Baseline held. Launch once through Steam. At the responsive title card type launched: ")
                        == "launched", "operator_declined", "operator declined the designated launch or phase")
                 poll_no_cancel(cancelled)
-                demand(time_ns() < expires, "retail_authorization_stale", "authorization expired before game admission")
                 with services.open(baseline, digest_file=hashes) as reader:
                     bound = reader.identity()
                     image = reader.path
@@ -472,7 +405,6 @@ def acquire(
                            == "title", "operator_declined", "operator declined the responsive title marker")
                     check_exit_bound(directory, bound, image)
                     poll_no_cancel(cancelled)
-                    demand(time_ns() < expires, "retail_authorization_stale", "authorization expired before marker")
                     marker = mark(attempt, bound, "title")
                     state["epoch"] = token
                     binding = {"target_kind": services.target_kind, "authority": authority, "attempt": attempt,
@@ -513,19 +445,17 @@ def replay_retail(path, *, attempt_sha256, services=REAL):
     directory = private_directory(path.parent)
     demand(path == directory / RECEIPT, "retail_receipt_location", "use the named receipt in original custody")
     claim = object_from(file_bytes(existing_local(directory / CLAIM), AUTH_SIZE), canonical=True)
-    clock = claim.get("claimed_utc_ns")
-    demand(type(clock) is int and clock > 0, "retail_approval_clock", "claim has an invalid authorization clock")
-    authority, expires = _verify_approval(Path(claim["steam_root"]), directory,
-                                                   approval_files(directory), services, replay_clock=clock)
-    demand(authority == claim, "retail_replay_claim", "independent signed authorization claim disagrees")
+    authority = _verify_approval(Path(claim["steam_root"]), directory,
+                                approval_file(directory), services, recorded_claim=claim)
+    demand(authority == claim, "retail_replay_claim", "retained written authorization claim disagrees")
     report = census.replay(path, retail_authority=authority)
     header = next(census._load_receipt(path))
     marker = header["binding"]["marker"]
-    demand(authority["claimed_utc_ns"] <= marker["utc_ns"] < expires, "retail_replay_marker",
-           "the held title declaration falls outside its approval window")
+    demand(authority["claimed_utc_ns"] <= marker["utc_ns"], "retail_replay_marker",
+           "the held title declaration precedes its authorization claim")
     state = checked_attempt(directory, attempt_sha256, authority)
     demand(state["receipt_sha256"] == journal_hash(path, census.RETAIL_LIMITS["journal_bytes"]),
-           "retail_replay_attempt", "attempt closeout does not bind its signed approval")
+           "retail_replay_attempt", "attempt closeout does not bind its written approval")
     source_failure = state["source_binding_failure"]
     if report["failure"] is None and not state["failure"] and source_failure is None:
         identity = report["identity_brackets"][0][0]
@@ -547,7 +477,7 @@ def checked_attempt(directory, attempt_sha256, authority):
     demand(digest(state_bytes) == attempt_sha256, "retail_replay_attempt", "attempt closeout hash disagrees")
     state = object_from(state_bytes, canonical=True)
     demand(state["authorization_sha256"] == authority["authorization_sha256"],
-           "retail_replay_attempt", "attempt closeout does not bind its signed approval")
+           "retail_replay_attempt", "attempt closeout does not bind its written approval")
     return state
 
 
@@ -570,9 +500,9 @@ def exit_details(directory, state, target_kind):
 def verify_closeout(directory, *, attempt_sha256, services=REAL):
     directory = private_directory(directory)
     claim = object_from(file_bytes(existing_local(directory / CLAIM), AUTH_SIZE), canonical=True)
-    authority, _ = _verify_approval(Path(claim["steam_root"]), directory, approval_files(directory),
-                                       services, replay_clock=claim["claimed_utc_ns"])
-    demand(authority == claim, "retail_replay_claim", "independent signed authorization claim disagrees")
+    authority = _verify_approval(Path(claim["steam_root"]), directory, approval_file(directory),
+                                services, recorded_claim=claim)
+    demand(authority == claim, "retail_replay_claim", "retained written authorization claim disagrees")
     state = checked_attempt(directory, attempt_sha256, authority)
     error = None
     try:
@@ -603,8 +533,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("execution-manifest", help="show the exact source, work and invocation offline")
-    observe = commands.add_parser("observe-title", help="use one separately signed maintainer approval")
-    for field in ("steam", "custody", "authorization", "signature"):
+    observe = commands.add_parser("observe-title", help="use one separate written maintainer approval")
+    for field in ("steam", "custody", "authorization"):
         observe.add_argument(field, type=Path)
     replay = commands.add_parser("replay-retail")
     replay.add_argument("path", type=Path)
@@ -618,7 +548,7 @@ def main():
             manifest = candidate_manifest()
             result = {"manifest": manifest, "sha256": digest_manifest(manifest)}
         elif args.command == "observe-title":
-            result = acquire(args.steam, args.custody, args.authorization, args.signature)
+            result = acquire(args.steam, args.custody, args.authorization)
             attempt_hash = digest(file_bytes(args.custody / ATTEMPT, PROTECTION_SIZE))
             result = {"failure": result["failure"], "source_binding_failure": result["source_binding_failure"],
                       "attempt_sha256": attempt_hash, "receipt_sha256": result.get("receipt_sha256")}

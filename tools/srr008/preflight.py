@@ -339,10 +339,8 @@ def environment(cfg):
     installed = namespace(game)
     native_candidates = [entry for entry in installed["entries"]
                          if re.search(r"sfse|\.dll$", entry["name"], re.I)]
-    plugin_dlls = [entry for location in sfse_dirs.values() for entry in location["entries"]
-                   if entry["name"].casefold().endswith(".dll")]
     return dict(ok=(retail["sha256"] == cfg["expected_game_sha256"] and fields == app and
-                    cloud == overlay == "0" and path_agrees and not sfse_loader and not plugin_dlls),
+                    cloud == overlay == "0" and path_agrees),
                 retail_executable=retail, manifest=manifest, manifest_fields=fields, cloud_flag=cloud,
                 overlay_flag=overlay, steam_files={"local": local, "shared": shared, "cache": cache},
                 configurations=configurations, configured_save_paths=save_paths, configured_save_path_agrees=path_agrees,

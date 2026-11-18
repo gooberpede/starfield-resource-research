@@ -87,6 +87,12 @@ to available space on the drives. There is no fixed size cap on `.local-work/`.
 
 ## Live observation and recovery
 
+Justify each mandatory operational prerequisite by scientific validity,
+game/save protection or evidence integrity. Reuse previously qualified
+mechanisms. New privileged setup, credentials, external services or other
+infrastructure require explicit maintainer approval before they become
+mandatory. A chosen precaution alone does not establish a requirement.
+
 An admission or safety gate that can stop acquisition should retain an
 attributable predicate and cause at a verifiable durable boundary. If
 durability fails, report that failure and retain the earlier trusted
