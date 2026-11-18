@@ -6,10 +6,10 @@ running compatible process; it never launches or closes the game. This
 implementation task authorizes offline qualification only. See the
 [run card](SRR-017-title-run-card.md) for the current invocation.
 
-**Latest live result:** the capacity-corrected operator attempt stopped at
-`index_fence` after 1,202 mixed descriptors. It preserved partial raw records
-but no complete, identity-resolved pair. See the actual observations below;
-the earlier 8,192-descriptor refusal retains its original scope.
+**Latest live result: FINISHED — QUALIFIED.** Two complete title-card
+collections reconciled all 18,314 mixed descriptors and agreed on 3,211
+identity-resolved Planet → Biome rows and all seven resource slots. The
+prior incomplete observations below retain their original classifications.
 
 ## Scope and implementation
 
@@ -183,6 +183,91 @@ patch excludes that pre-existing report change.
 The actual observations below retain their original disposition and scope.
 The former 8,192-descriptor refusal describes the previous implementation;
 it is not a condition of the new operator command.
+
+## Qualified operator observation at 16:13 AEDT on 18 November 2026
+
+**PROVEN — FINISHED / QUALIFIED.** The operator explicitly requested one
+extraction after normally launching to the responsive title card. The
+command began at 05:13:33 UTC (16:13:33 AEDT), selected PID 52272 and used
+clean committed checkout `bd993bebc1376c3a019bc61bc7bd5e16221f6a6c`.
+The pinned retail executable, reviewed execution source
+`4c958ae9cd557c5e952bfa0c20b48b7fb80e9f344eac2c7f523c219cdafb26f3`
+and unchanged work
+`490060e6deafda06b4383a3de300c68fa1adaf71691830ba3a5cfb4d0aa20b60`
+matched. There was one observation pair and no retry or implementation change.
+
+Each collection declared and visited 18,314 mixed descriptors: 3,211 typed
+targets plus 15,103 certified mixed exclusions. Both have verified coverage,
+572 tree windows (565 blocks, six leaves and one internal node), and 2,870
+reached native FormID-map entries. There were zero mixed/target refusals,
+zero unresolved source fields and no acquisition failure. Rooted graph,
+typed inputs, slot values, complete form witnesses and namespace identity
+all agree. Both collections have opening and closing process identities
+and consumed-window revalidation; these do not imply atomicity.
+
+The 3,211 unique edges cover 1,445 normalized PNDT identities (1,437
+`starfield.esm`, eight `shatteredspace.esm`), 428 BIOM identities (425/three
+respectively), and 45 distinct IRES identities. There are 3,192 rows with a
+base-game defining PNDT and 19 with a Shattered Space defining PNDT. All
+7,445 nonzero resource occurrences resolve to native `starfield.esm` IRES
+records with the required type/vptr. Raw runtime IDs, normalized defining
+plugin/local IDs, seeds, RSGD references and all seven slot words survive.
+The equal native namespace has 38 assigned plugins: eight full, nine medium
+and 21 small; its normalized digest is
+`64724895b5a71ebe4ff60305d4cf0bde2d93e18699b5c66ed5705143db77803a`.
+This is defining identity, not physical-file or winning-content attribution.
+
+| Slot | Nonzero words | Explicit zero words |
+| --- | ---: | ---: |
+| Common | 2,985 | 226 |
+| Uncommon | 1,425 | 1,786 |
+| Rare | 730 | 2,481 |
+| Exotic | 364 | 2,847 |
+| Unique | 8 | 3,203 |
+| Special | 472 | 2,739 |
+| Everywhere | 1,461 | 1,750 |
+| Total | 7,445 | 15,032 |
+
+All 22,477 words are retained. One all-zero row is explicitly present:
+`starfield.esm:05E3A5` → `starfield.esm:120C76`. Its native forms resolve
+and its observed BIOM has zero RSGD references; the seven zero words are
+observed payload values, not an inferred empty allocation. No generation,
+eligibility or comparison conclusion is inferred from that row.
+
+The sealed pair used 44,748 operations and 9,787,692 requested bytes;
+backend totals including image authentication were 44,769 process reads,
+44,854 region queries and 9,795,947 bytes. Evidence and normalized exports
+remain private. All output hashes reconcile; checked offline replay
+regenerates byte-identical dataset and comparator projection.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Sealed receipt | `3a48b04479bf88a8821a704a77d684cd6941585c075323ce53c0d6a14a1efea3` |
+| Qualified normalized dataset | `15711109761112c3ce3b2f5bf2a03966ccdb26a277ea7ec0961f0147b16eedb4` |
+| Comparator projection | `496ccd835e2e3de062aa07f812f15f406097c8f8948610a3f7952d6b08ae7c16` |
+| Source/work and output manifest | `3441ccf092bef63ed7c9046a21ae99bb343e303443f85b1064d8215b2e971357` |
+
+The command exited successfully and the operator was immediately told they
+could Quit normally. No further game access occurred. Process exit and save
+preservation are not independently measured by this operator workflow.
+The result is complete for the admitted rooted store at this title-card
+checkpoint. It establishes neither all-galaxy completeness nor atomicity,
+intermediate mutation absence, completed allocator execution or oracle
+agreement. No oracle or reproducer comparison was performed.
+
+**Independent disposition: QUALIFIED_COMPLETE_ROOTED_STORE_PAIR.** The
+reviewer independently reconstructed all 572 native pages and 18,314
+positions in each collection, checked routing minima/fences, leaf links,
+strict global order and exact counts, and classified all target/exclusion
+prefixes. Independent FNV native-map traversal checked 2,870 reached entries
+and 1,950 typed PNDT/BIOM/RSGD/IRES identities per collection. Every raw and
+normalized row, metadata field and seven resource words was checked against
+retained bytes. All plugin assignments and paired axes agree. Dataset and
+comparator projection regenerated byte-for-byte, and all hashes/source/work
+identities reconciled. Review was entirely offline with live entry points
+replaced by failing tripwires; no oracle comparison or broader completion
+claim was made. The standalone substantive review SHA-256 is
+`ef5a93a1e538fe517466a44fd5212e37b85a8bb5a9859ebe680abac04a83851e`.
 
 ## Operator title-card observation at 15:17 AEDT on 18 November 2026
 

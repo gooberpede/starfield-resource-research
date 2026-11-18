@@ -6,6 +6,17 @@ Creation Kit addresses below apply to the live-traced CK Galaxy View Apply path.
 
 ## Pinned retail static evidence
 
+**PROVEN (retail title-card observation, 18 November 2026):** two complete
+read-only collections of the published `BSComponentDB2::DB +0x300` store
+reconciled 18,314 mixed descriptors into 3,211 qualified PNDT → BIOM rows
+and 15,103 exclusions each, with no refusals. Native/normalized identities
+cover 1,445 PNDT, 428 BIOM and 45 resource records. All 22,477 slot words
+agree, including 15,032 zeroes and one all-zero row. Checked sealed replay
+regenerates the same export. This is completeness of the admitted rooted
+store at the operator-held checkpoint, not all-galaxy completeness,
+allocator-completion evidence, atomicity or oracle agreement.
+[Identity, counts and evidence](SRR-017-identity-correction.md#qualified-operator-observation-at-1613-aedt-on-18-november-2026)
+
 **PROVEN STATIC:** On the pinned retail 1.16.244.0 image, mixed-index leaf
 splitting in `FUN_1403835E0` promotes the last left **block minimum**
 (`0x140383E2E`, `0x140383F53–0x140383F67`), not that block's last record.
@@ -434,3 +445,17 @@ FinalPlanetaryResources
 ```
 
 An atmospheric FormID must not mask failure of an RSGD path expected to produce the same identity. Deduplicate only at the final player-facing membership boundary while retaining occurrence and assignment provenance internally.
+
+
+## SRR-018 bounded retail/model comparison
+
+**PROVEN (offline reconciliation, not universal native oracle parity):**
+the verified SRR-017 title-card extraction contains every one of the
+3,210 canonical model PNDT/BIOM keys plus exactly the seven-zero Volii
+Alpha / OceanLifeVoliiAlpha key. There are no model-only or duplicate
+keys. All corresponding diagnostic lane vectors agree; only four rows
+have existing conditional oracle support, and strict effective-input
+attestation admits none. All 1,445 derived terrestrial-plus-model-atmosphere
+planet memberships agree, with atmospheric contributions explicitly
+unmeasured in this capture. No generation rule changes follow.
+See [comparison denominators, provenance and limits](SRR-016-oracle.md#srr-018-comparison-of-the-verified-srr-017-title-card-capture).
