@@ -1,193 +1,197 @@
 # SRR-017 native FormID identity correction
 
-**Current contract.** The maintainer withdrew physical ESM backing
-provenance on 18 November 2026. Defining identity is the native loaded
-plugin basename and local record ID decoded from an independently
-validated runtime FormID. The corrected command preserves all rooted
-coverage, native type, BGSResource vptr, pairing, replay and authorization
-checks. The [proposed run card](SRR-017-title-run-card.md) remains
-**NOT AUTHORIZED** pending a separate written single-use approval.
+**Current contract.** The operator starts Starfield, holds the responsive
+title card and explicitly requests extraction. The command reads an already
+running compatible process; it never launches or closes the game. This
+implementation task authorizes offline qualification only. See the
+[run card](SRR-017-title-run-card.md) for the current invocation.
 
-## Scope
+## Scope and implementation
 
-The current candidate is based on committed native-identity correction
-`37e85698e0cdeb9e970ee8df9d82096e057e09cd`. The correction retains native
-FormID identity, complete paired traversal, resource slots and evidence
-replay. Written approval follows the already qualified SRR-013 mechanism.
-Physical ESM provenance remains outside acquisition.
+The command is `python -E -B -m tools.srr017.extract --output DIRECTORY`.
+It selects the unique compatible Starfield executable, or the operator's
+`--pid` when multiple compatible processes exist, and reports the selection.
+It authenticates the executable/layout and creation epoch through the
+existing query/read-only interface. It obtains one pair of independently
+rooted full-store collections and checks the sealed receipt before export.
+No launch, Quit or automatic acquisition retry occurs.
 
-## Corrected implementation
+The full/medium/small loaded-plugin namespace is checked against TESFile
+flags, indices, names and the native registry. PNDT, BIOM, RSGD and resource
+IDs retain their native map, stored-ID, type and resource-vptr validation.
+Invalid or conflicting assignments, duplicate identities, incorrect types,
+incomplete coverage and inconsistent observations refuse qualification.
+Every qualified Planet/Biome row retains native and normalized identities
+and all seven resource slots, including zero slots and all-zero rows.
 
-The exact command uses a written maintainer approval record, following
-SRR-013. It binds execution source, work limits, title-only scope and
-canonical custody. Native operator/session identity and exact preflight
-receipt hashes are retained automatically in the one-use claim. It
-still consumes a flushed exclusive one-use claim before Steam/process
-admission, validates the mapped game image and epoch, accepts one held
-title marker and collects one pair. The executable and authorization
-evidence retain their existing hashes and integrity checks.
+Defining-record identity is distinct from winning-content attribution.
+Physical ESM paths, provider witnesses, handles and hashes are outside the
+acquisition requirements. A relative `DATA\` directory is valid. Optional
+source history is diagnostic; unreadable or contradictory history alone
+cannot invalidate defining identity. Exhausted work, cancellation, process
+exit, changed epoch and evidence failures stop acquisition. Oracle data is
+not read during acquisition.
 
-```powershell
-& $approvedPython -E -B -m tools.srr017.retail_title observe-title `
-    $steamRoot $custody "$custody/authorization.json"
-```
+## Operational prerequisites and work
 
-The reader collects the full/medium/small native plugin arrays and
-cross-checks each assigned slot with its TESFile flags/index/name and the
-native registry. It no longer requests directory, provider, stream or
-backing-file windows in the retail profile. A relative `DATA\` directory,
-closed stream, missing local ESM or changed local ESM is outside the
-identity gate.
+| Remaining condition | Purpose |
+| --- | --- |
+| Operator-held title card and explicit current request | Defines the intended checkpoint; the tool cannot prove UI state. |
+| Compatible executable/layout and stable process epoch | Makes fixed-address interpretation applicable to the selected process. |
+| Query/read access and readable native structures | Obtains evidence without target writes. Ordinary access failure is reported. |
+| Published DB, rooted census, native identity/type checks and agreeing pair | Establishes the admitted store's coverage, identity and values. |
+| Finite read, tree, namespace and output limits; cooperative cancellation | Bounds work and evidence size without an elapsed acquisition deadline. |
+| Writable ordinary output filenames and checked sealed replay | Retains evidence and reproduces the scientific decisions. No special directory or one-use credential is required. |
 
-`bind_native_namespace` converts that checked roster to an index. Each
-runtime ID resolves through its native full, medium or small index,
-preserving respectively 24, 16 or 12 local bits. It rejects unsupported
-IDs, unassigned slots, duplicate names/assignments and conflicting
-types. Its type claims consume the reader's existing FormID-map
-stored-ID/type validation. Every nonzero resource still requires the
-correct native BGSResource vptr. PNDT/BIOM key and payload checks remain
-part of acquisition. The exported defining identity retains the observed
-runtime ID, exact raw index words and all seven resource lanes.
+The census envelope remains 8,192 descriptors, 1,024 windows, depth 5,
+8,388,608 map buckets, 8,192 reached map entries, 256 entries per chain,
+80,000 pair events, 32 MiB requested and a 128 MiB journal. The 25 ms
+minimum separation preserves fresh paired reads; it is not a deadline.
+The portable document ceiling is 64 MiB. Executable hashing and backend
+queries/reads are bounded and reported by the command's work manifest.
+Existing native namespace ceilings remain unchanged.
 
-The exporter joins the two checked native namespaces and emits their
-deterministic digest. Winning-content and file-relative source record
-fields remain null. Ordered native history, where readable, is diagnostic.
-A missing, filtered, changed, contradictory or unreadable history alone
-cannot invalidate a defining identity. Read/region failures confined to
-history are retained as diagnostics. Work exhaustion, cancellation,
-process exit, epoch change and evidence failures still stop acquisition.
-Namespace and native-form read failures remain admission failures.
+Steam registry, parent/session/log attribution, authorization records,
+claims, signatures, preflight/postflight, saves, overlays/Cloud, disk floors,
+exit witnesses and administrative infrastructure are not consulted by this
+command. Older admission/run instructions are superseded for new captures.
+No alternative infrastructure replaces them. Output write errors are
+ordinary failures. Useful raw/partial evidence is retained where possible.
+The Ghidra project and game/save files are not modified.
 
-The old on-disk source helper is retained for historical offline analysis
-and legacy fixture tests. The retail command and retail export use only
-the new native index. Oracle inputs remain outside acquisition.
+The claim is two agreeing complete collections of the admitted rooted store
+in one epoch. It establishes neither atomicity nor intervening mutation
+absence, completed allocator execution, all-galaxy coverage, or oracle
+agreement. A partial or identity-unresolved result is never qualified.
 [Interchange](SRR-017-interchange.md) ·
 [Native identity evidence](SRR-017-source-identity.md)
 
-## Work envelope and preservation
+## Qualification and independent review
 
-The corrected flow uses the previously qualified finite paired envelope
-of 8,192 descriptors, 1,024 windows, root level 5, 8,388,608 map buckets,
-8,192 reached map entries, 256 entries per chain, 80,000 pair events,
-32 MiB requested and a 128 MiB journal. Backend aggregate maxima remain
-80,176 region queries, 80,040 process reads and 34,079,640 requested bytes.
-There is no elapsed acquisition cutoff or automatic retry.
+The shared operator controller passed 20 owned-process controls on Python
+3.14.3. The 3,210-row corpus and 4,096-row upper fixture exported and
+replayed every one of 51,142 slot words, retaining 189 and 241 all-zero
+rows respectively. Their rooted mixed populations were 3,600 and 5,120.
+Independent field checks covered native/normalized keys and row metadata,
+not only counts. A relative `DATA\` fixture also qualified.
 
-Native namespace and optional history remain under their original
-individual ceilings and paired rereads. Removing ESM snapshots eliminates
-all per-source file reads and source snapshot outputs from this command.
-The 64 MiB portable-output cap, image hash limits and 512 MiB write
-reserve on each drive remain conservative bounds. Both drives must retain
-40,000,000,000 caller-available bytes after that reserve. The original
-budget measurements remain in the
-[capacity and admission dossier](SRR-017-title-admission.md).
+Explicit PID, absent/multiple processes, incompatible executable, read
+failure, cancellation before selection and during collection, native
+namespace drift, paired input drift, invalid namespace, PNDT mismatch,
+wrong BIOM/resource types, exhausted work, truncated replay, output
+collision and an existing ordinary directory were exercised. Indeterminate
+receipts replayed with the same refusal. Tripwires failed on old admission,
+authorization, registry, save, preflight/exit and process-launch interfaces;
+none was invoked. Every owned target remained alive until its fixture owner
+quit it. The existing 20 native/source tests and 28 oracle tests passed.
+No retail handle was opened.
 
-The proposed run card preserves one ordinary Steam launch, the responsive
-title checkpoint, a separate epoch-bound exit witness, operator normal
-Quit and pre/post protection for 98 Documents plus 95 Steam remote
-original/backup pairs and both designated saves. Cloud/overlays and
-inherited compatibility settings retain their controls. These procedures
-were exercised with synthetic receipts and owned processes. Real retail
-launch, process access and save access were outside this work.
-
-## Operational prerequisite audit
-
-Every mandatory condition in the retail command, inherited admission,
-preflight and run card was reviewed for its purpose and proportionality.
-
-| Category | Retained conditions and justification |
+| Qualified identity | SHA-256 |
 | --- | --- |
-| Scientific validity | Pinned executable/layout and execution-source/work identity; authenticated mapped image and creation epoch; native namespace, FormID, type and resource-vptr checks; rooted counts/fences/extents; two fresh complete collections with the 25 ms gap; typed/value agreement and exact replay. Each establishes identity, coverage or repeatability of the claimed dataset. |
-| Game, save and evidence protection | Ordinary same-user medium-integrity query/read access, Steam parent/session/log checks, no inherited compatibility flags, held title checkpoint, disabled Cloud/overlays, 98/95 independent backup pairs and both designated saves, unexplained-entry reconciliation, separate exact-epoch exit witness, normal operator Quit, sealed receipts, canonical private custody and flushed one-use claims. These protect the process, protected files and attributable evidence. |
-| Ordinary preparation | Qualified local x64 Python with -E/-B and no optimization; current private config/policy and backups; fresh custody; written approval reference; operator launch/title/Quit and retained console digests. Operator SID/session and preflight hashes are recorded automatically. |
-| Finite work and capacity | Reviewed tree/map/chain/read/output ceilings, cooperative cancellation, image and input-byte limits, 40 GB available-space floor after the 512 MiB projected write reserve. These derive from fixture geometry and measured cost, stop before excess work or evidence loss, and permit no automatic retry. The title marker's 30-second intake recency checks the immediately confirmed phase and places no deadline on acquisition. |
+| Execution source manifest | `20ad3d895a85dd8d79bca6ce3a8c4c0253b485d80999eaf08f6696303d74d204` |
+| Work manifest | `63598b091189ecb3bfdf16b2519183bbff4763f748f1ccda131f721271eae4ef` |
+| 20-control qualification result | `c314fbd297ffef0974d6d53881ca8321a074333129b5314fb2436465b36b06f1` |
 
-Removed requirements are SSH signing and enrollment infrastructure,
-manual operator/SID/session enrollment, a hexadecimal approval ID,
-canonical formatting for the handwritten JSON, fixed approval/preflight
-expiry, and absence of installed SFSE loader/plugin files. The latter
-remain inventory diagnostics. A normal Steam-launched authenticated
-process supplies the runtime evidence. No replacement infrastructure is
-required. New infrastructure needs explicit maintainer approval under
-the [standing workflow rule](research-workflow.md#live-observation-and-recovery).
+Reproduce using the run card's offline commands with a new ordinary output
+directory. `--identity` prints the exact byte-hashed execution dependency
+manifest and work limits without opening a process. The manifest includes
+historical helper modules because the reader reuses their API bindings;
+this does not invoke their retired admission gates. Qualification builds
+only disposable fixture binaries and writes rebuildable evidence.
 
-The observable claim remains two agreeing, complete root-reachable
-collections in the held epoch. Atomicity, uninterrupted lifetime,
-intermediate mutation/ABA, other stores and queued work remain outside
-that claim. Expected population and exact-value oracle qualification
-follow separately.
+The starting HEAD is `8321a3b`; the initial worktree already contained this
+dossier's failed-attempt report and the supplied untracked correction
+brief. The task patch excludes both pre-existing changes. The historical
+attempt section below is preserved byte-for-byte.
 
-## Verification and release
+The historical section below describes the superseded controller's actual
+attempt. Its Steam registration failure is not a prerequisite or blocker
+for the operator command above. Its recorded no-observation result is
+unchanged.
 
-The exact shared controller passed 31 controls. Its owned service seam
-opened only the test children. The direct, corpus and upper exports
-preserved 4, 3,210 and 4,096 rows respectively, totaling 7,310 rows and
-51,170 lane words. Each row's raw and canonical keys, native metadata
-and seven lanes were asserted independently. Independent checked replay
-regenerated byte-identical portable datasets and the unchanged SRR-016
-observation parser consumed their projections.
+## Authorized retail attempt on 18 November 2026
 
-The six native-identity tests and unchanged 28-test oracle suite passed.
-The 11 synthetic preflight tests include installation of an unused SFSE
-loader/DLL while environment qualification remains valid. The shared
-controller also accepts that inventory. Historical retail observations
-retain their original scope.
+**ADMISSION_REFUSED — NO_OBSERVATION.** One separately authorized
+invocation used committed candidate `8321a3b`, approved execution digest
+`dde03db307559f0d954d7787acfbc74432f252e8c3987dbf06f690386cc17d00`
+and work digest
+`4bf5dd930d6fa545fe5312ea9c7b62795d0f70666f483e0070a1bffc00f9d9ad`.
+The installed retail executable matched the pinned 1.16.244.0 hash.
+The working tree and index were clean before preparation.
 
-| Retained qualification identity | SHA-256 |
+The one-use claim was durably consumed. The command then returned
+`steam_install_unverified: Steam installation registry witness unavailable`
+with observer exit status 1. A read-only post-failure diagnosis of
+`HKEY_CURRENT_USER\Software\Valve\Steam`, value `SteamPath`,
+returned `FileNotFoundError`, Windows error 2, in the executing account.
+The retained attempt's exact byte SHA-256 matches the independent console
+value
+`c694c2d331349b3ec89658f2b4fdbe29ac332716710865d109314f670c54bf6e`.
+
+Source ordering and the retained console show that this failure precedes
+Steam process selection/open, log-baseline retention and the operator
+launch prompt. The operator had confirmed the intended existing Steam
+account and disabled NVIDIA overlay, but was never asked to launch.
+There was no authenticated game epoch, title marker, target-bound
+receipt, native memory journal or partial journal. There was no second
+invocation, launch or observation. The approved implementation and work
+limits were preserved.
+
+| Scientific or operational axis | Actual result |
 | --- | --- |
-| Reviewed execution manifest | `dde03db307559f0d954d7787acfbc74432f252e8c3987dbf06f690386cc17d00` |
-| Canonical work manifest | `4bf5dd930d6fa545fe5312ea9c7b62795d0f70666f483e0070a1bffc00f9d9ad` |
-| 31-control shared-flow qualification | `57959f42841f3b0a2b640e9dee3ca8716518780165b24d5dfeac1746fed40fb3` |
-| Corpus portable export | `9beb42e3aded330261a46bb5860343a2088de1fccc519aba7e3e9e30b2515f8a` |
-| Upper portable export | `3753caab1233b3f844e64ca37514d26066cb3d1a3937be9e3bff026ca2df249c` |
+| Native descriptors and Planet/Biome/resource population | Unmeasured. No allocation rows or slot words were acquired. |
+| All-zero targets, zero lanes, coverage and absence | Unmeasured. An empty dataset is not inferred. |
+| Collection agreement | No collection began. |
+| Acquisition and export qualification | No qualified extraction or normalized dataset. The attempt's native receipt hash is null. |
+| Evidence integrity | Written approval, consumed claim, reviewed manifest, console and failure attempt retained privately. The attempt hash independently reconciled. There is no native seal to replay. |
+| Protected saves | Preflight and postflight passed all 98 Documents and 95 Steam remote original/backup pairs, both designated saves, and no unclassified or other entries. Protected and transient inventories reconciled exactly. |
+| Environment and space | Executable/build, disabled Steam Cloud/overlay and save-path checks passed before and after. Both drives exceeded the required available-space floor plus reserve. |
+| Game retirement | No admitted target. Closeout reports protection `UNCHANGED`, `EXIT_UNVERIFIED` and null epoch because no game exit witness was bound. It establishes no game exit code. |
 
-Reproduce from the checkout using a fresh owned run name.
+The independent reviewer inspected the actual approval, claim, console,
+attempt and protection/environment receipts. Offline revalidation of
+the written authorization and exact source/work bindings passed. The
+reviewer verified the failure's position before process admission and
+all pre/post reconciliation fields, including transient inventories.
+The substantive standalone review classifies the result as refused
+admission with preservation passed and scientific measurements unavailable.
+The original offline qualification retains its scope.
 
-```powershell
-python -E -B -m tools.srr017.qualify_retail_title $newRunName
-python -E -B -m unittest -v tools.srr017.test_native_identity tools.srr017.test_source
-python -E -B -m tools.srr016.qualify_oracle
-python -E -B -m tools.srr017.retail_title execution-manifest
-```
-
-These commands write private fixture journals, claims, synthetic
-protection/exit receipts and qualification summaries.
-They leave the Ghidra project untouched. The proposed retail command
-requires fresh written single-use maintainer approval, normal operator
-launch/Quit and the prescribed preservation receipts. Offline readiness supplies no live observation.
+This authorization is consumed. The concrete runtime blocker is the
+unavailable Steam registration witness in the observer account. Any
+later launch or observation needs separate maintainer authorization.
 
 <!-- srr-017-identity-review:start -->
-**READY_TO_REQUEST_SINGLE_LIVE_AUTHORIZATION.** The independent reviewer
-accepted the written SRR-013-style approval binding and the exact
-three-argument retail command. The review challenged the necessity and
-proportionality of every mandatory prerequisite in the command,
-admission path, preflight and run card. Remaining conditions establish
-scientific validity, protect the game/saves/evidence, or prepare the
-already qualified workflow. No additional infrastructure or credentials
-are required.
+**READY_FOR_SEPARATELY_AUTHORIZED_OPERATOR_EXTRACTION.** Independent
+challenge found no blocking scientific or operational-prerequisite defect.
+The reviewer inspected the exact controller, native census changes, retained
+reader/export dependencies and current run card. Retained requirements
+establish compatible decoding, bounded work, native validity, coverage or
+replay integrity; none requires credentials, external services, privileged
+setup, save attestations or special custody infrastructure.
 
-The reviewer personally checked all 11 task files against manifest SHA-256
-`f0b3e363bb7dce273bd1b9d5af2a1238d0ee44544601b7702d2b6f1c59e68f05`.
-It lists sorted byte hashes and repository-relative paths separated by
-two spaces, terminated by LF. Only this marked body's contents are
-excluded from its dossier hash. An independent reconstruction of the
-committed baseline verified task-patch forward and reverse application
-against every delivered byte.
+The reviewer independently reproduced both large exports using separately
+written field/slot arithmetic and checked all 51,142 words and 430 zero
+rows. A separate all-seven controller fixture preserved all seven distinct
+nonzero lanes in ordinal order. Additional byte-fixture challenges covered
+all plugin scales,
+relative/missing physical paths, invalid/unmapped IDs, namespace conflicts,
+wrong PNDT/BIOM/RSGD/resource types, resource vptrs, cyclic native chains,
+short reads and exhausted namespace work. Nine independently resealed
+receipt challenges refused changed binding/source/epoch/profile/work,
+native read bytes, report contents and post-report events. Separate
+same-controller runs retained indeterminate first-pass evidence on second
+collection cancellation and refused invalid/absent PID, namespace drift
+and exhausted work. Owned targets remained alive until fixture-owner Quit.
 
-Nine independently constructed plain-approval controls accepted readable
-JSON and refused incorrect source/work/scope/custody, blank approval
-reference, duplicate members and obsolete trust fields. An exclusive claim
-preceded process admission and refused reuse. The actual production CLI
-refused absent approval on disposable input. Full checked replay
-regenerated 7,310 rows and all 51,170 words. Native identity/type/vptr,
-namespace, pairing, cancellation and finite-work refusals remained intact.
-Wrong attempt hashes, changed marker epochs, edited portable datasets and
-resealed native-read tampering were independently refused.
-
-The substantive standalone Markdown report records these checks and
-the operational audit. The scientific reader, native identity and
-FormID validation code are unchanged. HEAD and the empty index remain
-at the starting commit. All qualification used owned processes and
-synthetic preservation receipts. A live extraction requires a fresh
-separate written approval and the current preservation procedure.
+The reviewer checked all six task files against normalized manifest
+`32c4006019e71a04ded6316e6146a9b6fb95354d76521c1adeb71d3f6e983fee`.
+It hashes sorted UTF-8 lines of byte SHA-256, two spaces and relative path;
+only this marked review body is excluded from the dossier hash.
+The detailed independent report records methods, limitations and evidence
+identities. These conclusions do not depend on access to private evidence.
+The execution/work hashes above identify the qualified candidate. There is
+no remaining mandatory infrastructure blocker. Live extraction awaits
+maintainer acceptance/commit and an explicit current request after they
+launch and hold the title card; this task performed no retail operation.
 <!-- srr-017-identity-review:end -->

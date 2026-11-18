@@ -30,6 +30,7 @@ from tools.srr017.source import SourceIdentityError
 
 RECEIPT_SCHEMA = "srr016-disposable-census-v1"
 RETAIL_RECEIPT_SCHEMA = "srr017-title-census-v1"
+OPERATOR_RECEIPT_SCHEMA = "srr017-operator-census-v1"
 OBSERVATION_SCHEMA = "srr016-observation-v1"
 RETAIL_SHA256 = RETAIL_APPLICABILITY["sha256"]
 CANONICAL = re.compile(r"[^:/\\\x00-\x1f]{1,255}\.(?:esm|esl|esp):[0-9A-F]{6}")
@@ -591,12 +592,18 @@ def pair(reader, binding, remap, limits, gap):
                 start = reader.identity(STRUCTURAL_MODE)
                 brackets[-1].append(start)
                 check_binding = binding
-                if binding["target_kind"] == "retail":
+                if binding.get("operator_initiated") is True:
+                    validate_operator_binding(binding)
+                    expected = binding["selected_identity"]
+                    require(all(start.get(key) == value for key, value in expected.items()),
+                            "process_identity_changed", "selected executable or process epoch changed")
+                elif binding["target_kind"] == "retail":
                     # The independently verified SRR-017 claim is checked at both entry points.
                     # Reuse SRR-013's executable, profile, epoch and Steam transcript predicates.
                     check_binding = {**binding, "authority": {**binding["authority"],
                                                               "scope": "srr013-structural-title"}}
-                validate_identity(check_binding, start)
+                if binding.get("operator_initiated") is not True:
+                    validate_identity(check_binding, start)
                 require(start == brackets[0][0], "process_identity_changed", "epoch or mapped image changed")
                 collection = WholeCollection(reader, start["image_base"], remap, limits,
                                              binding.get("namespace_profile"))
@@ -702,6 +709,89 @@ def source_identity():
              "srr013/retail_admission.py", "srr017/namespace.py", "srr017/source.py")
     root = Path(__file__).resolve().parents[1]
     return sha256(encode({name: sha256((root / name).read_bytes()).hexdigest() for name in paths})).hexdigest()
+
+
+def validate_operator_binding(binding):
+    """Bind decoding to the selected epoch/layout, without launch or authorization policy."""
+    if (not isinstance(binding, dict) or set(binding) != {
+            "operator_initiated", "target_kind", "namespace_profile", "selected_identity"}
+            or binding["operator_initiated"] is not True
+            or binding["target_kind"] not in ("retail", "simulated")
+            or binding["namespace_profile"] != RETAIL_NAMESPACE_PROFILE):
+        raise ValueError("invalid operator observation binding")
+    identity = binding["selected_identity"]
+    profile = "srr017-operator-retail" if binding["target_kind"] == "retail" else "srr017-operator-owned"
+    if (not isinstance(identity, dict) or set(identity) != {"pid", "creation", "image_sha256", "profile"}
+            or any(type(identity[key]) is not int or identity[key] <= 0 for key in ("pid", "creation"))
+            or identity["profile"] != profile
+            or not isinstance(identity["image_sha256"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", identity["image_sha256"])
+            or binding["target_kind"] == "retail" and identity["image_sha256"] != RETAIL_SHA256):
+        raise ValueError("invalid selected process identity")
+
+
+def capture_operator(path, reader, *, limits=None, cancelled=None, between=None, target_kind="simulated"):
+    """Record one fresh native pair from an already selected read-only reader."""
+    binding = {"operator_initiated": True, "target_kind": target_kind,
+               "namespace_profile": RETAIL_NAMESPACE_PROFILE,
+               "selected_identity": {"pid": reader.expected_epoch[0], "creation": reader.expected_epoch[1],
+                                     "image_sha256": reader.sha256, "profile": reader.profile_name}}
+    validate_operator_binding(binding)
+    limits = _checked_limits(limits, retail_flow=True)
+    with pending_journal(Path(path)) as raw:
+        journal = BoundedJournal(raw, limits["journal_bytes"])
+        start, utc = monotonic_ns(), time_ns()
+        journal.write({"kind": "start", "schema": OPERATOR_RECEIPT_SCHEMA, "limits": limits,
+                       "remap": {}, "reader_source_sha256": source_identity(),
+                       "remap_sha256": sha256(encode({})).hexdigest(), "start_ns": start,
+                       "start_utc_ns": utc, "utc": datetime.now(timezone.utc).isoformat(), "binding": binding})
+        recorded = ExactRecordingReader(reader, journal, limits, None, cancelled)
+
+        def gap():
+            if between is not None:
+                between()
+            sleep(GAP_SEC)
+
+        report = pair(recorded, binding, {}, limits, gap)
+        end = monotonic_ns()
+        add_timing(report, recorded.timing, start, end)
+        journal.write({"kind": "report", "data": report, "end_ns": end})
+    return report
+
+
+def replay_operator(path):
+    """Check the seal and reproduce every operator observation read and decision."""
+    path = Path(path)
+    events = _load_receipt(path)
+    header = next(events, None)
+    if (not isinstance(header, dict) or set(header) != {
+            "kind", "schema", "limits", "remap", "reader_source_sha256", "remap_sha256",
+            "start_ns", "start_utc_ns", "utc", "binding"}
+            or header["kind"] != "start" or header["schema"] != OPERATOR_RECEIPT_SCHEMA
+            or header["reader_source_sha256"] != source_identity()
+            or header["remap"] != {} or header["remap_sha256"] != sha256(encode({})).hexdigest()
+            or any(type(header[key]) is not int or header[key] <= 0 for key in ("start_ns", "start_utc_ns"))):
+        raise ValueError("invalid operator receipt header or reader source")
+    validate_operator_binding(header["binding"])
+    limits = _checked_limits(header["limits"], retail_flow=True)
+    if path.stat().st_size > limits["journal_bytes"]:
+        raise ValueError("receipt exceeds its declared journal ceiling")
+    first = next(events, None)
+    if first is None:
+        raise ValueError("receipt has no observation")
+    cursor = ReceiptEvents(first, events)
+    reader = CheckedReplayReader(cursor, limits)
+    report = pair(reader, header["binding"], {}, limits, lambda: None)
+    terminal = next(cursor, None)
+    if (not isinstance(terminal, dict) or terminal.get("kind") != "report"
+            or type(terminal.get("end_ns")) is not int or terminal["end_ns"] < header["start_ns"]):
+        raise ValueError("receipt has no closing observation boundary")
+    add_timing(report, reader.timing, header["start_ns"], terminal["end_ns"])
+    if terminal != {"kind": "report", "data": report, "end_ns": terminal["end_ns"]}:
+        raise ValueError("operator receipt differs from checked replay")
+    if next(cursor, None) is not None:
+        raise ValueError("receipt contains events after the report")
+    return report
 
 
 def capture(path, attempt_directory, admission, binding, remap, *, limits=None,

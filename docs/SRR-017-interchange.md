@@ -1,17 +1,18 @@
 # SRR-017 allocation dataset v1
 
 This export represents every qualified PNDT → BIOM allocation edge reachable
-from the registered mixed store at the recorded checkpoint. The producer
-replays a sealed native receipt and joins the observed IDs to an independently
-prepared typed source index. The source index supplies names and source
-identities. Every acquisition decision uses the native evidence.
+from the registered mixed store at the recorded checkpoint. The operator producer
+replays a sealed native receipt and resolves IDs through the independently
+read paired native loaded-plugin namespaces and typed native FormID map.
+Every acquisition decision uses native evidence. Historical owned-source
+receipts retain their original typed source-index interpretation.
 [Native store contract](SRR-015-native-extraction.md) ·
 [SRR-016 interchange](SRR-016-interchange.md)
 
 | Field | Meaning |
 | --- | --- |
 | `schema` | `srr017-allocations-v1` |
-| `source` | `OWNED_DISPOSABLE` for fixture processes or `RETAIL_ATTESTED` for the separately approved retail protocol with a verified executable/epoch |
+| `source` | `OWNED_DISPOSABLE` for fixture processes or `RETAIL_ATTESTED` for the operator-selected retail process with a verified executable/epoch (not Steam attribution) |
 | `scope` | Reachable mixed store at the responsive title-card checkpoint, simulated for owned targets |
 | `retail_layout_version`, `retail_sha256`, `target_image_sha256` | Layout applicability and actual observed target image |
 | `capture_reader_sha256`, `replay_reader_sha256`, `receipt_sha256` | Reader identities at capture and replay, and original private receipt byte hash |
@@ -75,45 +76,41 @@ lane's canonical source ID for a nonzero value and a dash for an explicit
 zero. Only render this as a complete view when `acquisition` is `QUALIFIED`.
 Inspect `unqualified_collections` and the pair/count fields for diagnostics.
 
-## Replay and comparison
+## Operator replay and comparison
 
-Use an independently retained receipt byte SHA-256 and an independently
-reviewed source identity digest. The export reads the receipt and the two
-source JSON inputs, emits compact canonical JSON and LF on stdout, and
-opens no process or Ghidra project. Exit 0 denotes a qualified export,
-exit 1 emits an indeterminate export, and exit 2 denotes an input or
-replay refusal. Use fresh output names. Keep private replay and public
-redistribution clearance as separate decisions.
-An SRR-017 owned receipt also rechecks the independent authorization and
-claim files in its original private custody directory. The source-index
-pin independently governs the later typed ESM join.
+The active operator receipt schema is `srr017-operator-census-v1`. Its
+checked replay requires its exact reader source, bounded event stream,
+seal, selected executable/epoch binding, unchanged native decisions and
+terminal report. It needs no original authorization, custody claim,
+Steam attribution, source JSON or physical ESM files. It opens no process.
+The controller checks replay before writing `dataset.json`; qualified
+results also produce the deterministic `srr016-observation-v1` projection
+in `observation.json`. The original raw words remain exact integers in
+that projection. Its adapter checks count conservation and redundant
+native witnesses. Neither export reads a ledger or oracle.
 
-Retail-facing replay opens the written approval and the reviewed source/work binding,
-the paired memory seal and the independently committed attempt
-in their original private custody. Supply the two hashes retained
-independently from the capture console. A readable raw pair with insufficient namespace binding produces
-an indeterminate export and preserves its per-pass rows.
+For independent replay from Python:
 
-```powershell
-python -E -B -m tools.srr017.export --retail $receipt `
-    --receipt-sha256 $receiptSha --attempt-sha256 $attemptSha
+```python
+from pathlib import Path
+from tools.srr017.extract import replay_dataset
+report, dataset = replay_dataset(Path("output/receipt.jsonl"))
 ```
 
-```powershell
-python -B -m tools.srr017.export $receipt $sourceManifest $namespace `
-    --receipt-sha256 $receiptSha --identity-sha256 $identitySha
-python -B -m tools.srr017.export $receipt $sourceManifest $namespace `
-    --receipt-sha256 $receiptSha --identity-sha256 $identitySha --comparator
-```
+The command's offline replay option is documented in the
+[run card](SRR-017-title-run-card.md). Compare regenerated canonical
+`output_bytes(dataset)` with the retained `dataset.json` and independently
+retained manifest/receipt hashes. A changed or unfinished journal refuses;
+a readable incomplete pair retains diagnostic collections without claiming
+a qualified export. A self-consistent seal establishes internal integrity,
+not authenticity against deliberate wholesale replacement. Retain the
+output manifest and reviewed source identity independently for that purpose.
 
-The second invocation projects deterministic `srr016-observation-v1`
-rows with the same canonical keys, raw keys converted to exact integers,
-seven raw words and
-seven canonical resources or nulls. The SRR-016 observation parser
-validates that projection. The adapter checks count conservation and the
-redundant native witnesses before projecting. For evidentiary use,
-regenerate from the pinned sealed inputs. The export never reads a ledger or an oracle.
-A compatible projection can remain outside an applicable comparison
-when independent effective-input or expected-population evidence is
-unknown. Both views can be regenerated from the same sealed native
-receipt and pinned identity documents.
+Older `tools.srr017.export --retail` and three-positional-input invocations
+belong to historical authorization/source-index receipts. Their original
+checks remain available for those schemas and are superseded for new
+operator captures. They are not prerequisites of operator replay.
+
+A compatible projection can remain outside an applicable comparison when
+independent effective-input or expected-population evidence is unknown.
+That comparison is subsequent work, not an acquisition gate.
