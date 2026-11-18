@@ -56,7 +56,8 @@ def check_identity(value, word, signature, *, defining_only=False, native_only=F
         assert value["source"] is None
 
 
-def check_fields(case, dataset, *, expected_namespace=False, defining_only=False, native_only=False):
+def check_fields(case, dataset, *, expected_namespace=False, defining_only=False, native_only=False,
+                 optional_history=False):
     expected = qualify_census.independent_truth(case)
     reference = [(first, second, lanes) for first, second, width, *lanes in expected if width == 144]
     assert dataset["acquisition"] == "QUALIFIED"
@@ -90,7 +91,7 @@ def check_fields(case, dataset, *, expected_namespace=False, defining_only=False
         for index, ref in enumerate(native["biom_rsgds"]):
             check_identity(ref, 0x300000 + (biome_relative + index) % 5, "RSGD",
                            defining_only=defining_only, native_only=native_only)
-        assert len(native["biom_rsgds"]) == 2
+        assert len(native["biom_rsgds"]) == (513 if case == "many-rsgds" else 2)
         override = native["override_rsgd"]
         if case == "optional-absent" and ordinal == 0:
             assert override == {"runtime_form_id": 0x750000, "source": None,
@@ -108,7 +109,8 @@ def check_fields(case, dataset, *, expected_namespace=False, defining_only=False
         assert projected[key]["slots"] == list(map(canonical, lanes))
         if expected_namespace:
             typed_forms = [native["pndt"], native["biom"], override, *native["biom_rsgds"], *native["slots"]]
-            assert all(form["native_source_plugins"] == ["fixture.esm"]
+            assert all((optional_history and "native_source_plugins" not in form)
+                       or form["native_source_plugins"] == ["fixture.esm"]
                        for form in typed_forms if form["native_status"] == "VERIFIED")
     assert set(projected) == {(canonical(first >> 32), canonical(second)) for first, second, _ in reference}
     return {"mixed": len(expected), "rows": len(reference), "lane_words": 7 * len(reference),

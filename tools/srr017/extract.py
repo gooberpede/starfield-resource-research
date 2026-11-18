@@ -46,11 +46,13 @@ REAL = Services()
 
 
 def work_manifest(limits=None):
-    limits = census._checked_limits(census.RETAIL_LIMITS if limits is None else limits, retail_flow=True)
+    limits = census._checked_limits(limits, operator=True)
     return {"census": limits, "backend": backend_caps(limits),
             "process_census_rows": MAX_PROCESSES, "process_census_calls": 1,
             "image_hashes": MAX_PROCESSES + 8, "image_hash_bytes_each": GAME_IMAGE_BYTES,
-            "portable_output_bytes_each": OUTPUT_BYTES}
+            "portable_output_bytes_each": OUTPUT_BYTES,
+            "namespace": dict(vars(census.OPERATOR_NAMESPACE_LIMITS)),
+            "rsgd_pointer_chunk": 512}
 
 
 def source_manifest():

@@ -82,6 +82,11 @@ def run(directory):
         "bad-biome-type": ("INCOMPLETE", "form_type_mismatch"),
         "bad-resource-type": ("INCOMPLETE", "resource_form_type_mismatch"),
         "work-budget": ("INCOMPLETE", "observation_budget"),
+        "byte-budget": ("INCOMPLETE", "observation_budget"),
+        "bad-count": ("INCOMPLETE", "index_shape"),
+        "bad-span": ("INCOMPLETE", "record_span"),
+        "cycle": ("INCOMPLETE", "pointer_alias"),
+        "capacity-declared-huge": ("INCOMPLETE", "index_shape"),
         "wrong-image": ("FAILED", "wrong_executable"),
     }
 
@@ -97,10 +102,18 @@ def run(directory):
             assert result["status"] == "FINISHED", result
             report, dataset = extract.replay_dataset(directory / name / "receipt.jsonl")
             counts = check_fields("direct" if scenario == "relative-data" else scenario, dataset,
-                                  expected_namespace=True, defining_only=True, native_only=True)
-            check_adapter_refusals(dataset)
+                                  expected_namespace=True, defining_only=True, native_only=True,
+                                  optional_history=scenario == "capacity-64k")
+            if not scenario.startswith("capacity-"):
+                check_adapter_refusals(dataset)
             assert report["failure"] is None
-            results[name] = {"status": result["status"], **counts}
+            results[name] = {"status": result["status"], **counts,
+                             "events": report["events"], "requested_bytes": report["requested_bytes"],
+                             "tree_windows": [item["tree_windows"] for item in report["collections"]],
+                             "map_entries": [item["map_entries"] for item in report["collections"]],
+                             "backend": result["backend"]["actual"],
+                             "receipt_bytes": (directory / name / "receipt.jsonl").stat().st_size,
+                             "dataset_bytes": (directory / name / "dataset.json").stat().st_size}
         else:
             assert (result["status"], result["failure"][0]) == expected_failures[name], result
             if result["status"] == "INCOMPLETE":
@@ -110,7 +123,7 @@ def run(directory):
             results[name] = {"status": result["status"], "failure": result["failure"]}
         return result
 
-    for case in ("corpus", "upper", "relative-data"):
+    for case in ("corpus", "upper", "relative-data", "all-seven", "many-rsgds", "capacity-32k", "capacity-64k"):
         observe(case, scenario=case, success=True)
     with qualify_census.fixture(target, "direct") as (first, _), qualify_census.fixture(target, "direct") as (second, _):
         ambiguous = guarded_run(directory / "multiple", services=services, notify=lambda _text: None)
@@ -138,7 +151,10 @@ def run(directory):
     observe("bad-owner-key", scenario="bad-owner-key")
     observe("bad-biome-type", scenario="bad-biome-type")
     observe("bad-resource-type", scenario="bad-resource-type")
-    observe("work-budget", kwargs={"limits": {**census.RETAIL_LIMITS, "events": 5}})
+    for case in ("bad-count", "bad-span", "cycle", "capacity-declared-huge"):
+        observe(case, scenario=case)
+    observe("work-budget", kwargs={"limits": {**census.OPERATOR_LIMITS, "events": 5}})
+    observe("byte-budget", kwargs={"limits": {**census.OPERATOR_LIMITS, "requested_bytes": 64}})
     observe("wrong-image", kwargs={"services": replace(services, expected_sha256="0" * 64)})
     receipt = directory / "corpus" / "receipt.jsonl"
     corrupt = directory / "corrupt.jsonl"

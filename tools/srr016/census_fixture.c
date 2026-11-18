@@ -40,10 +40,10 @@ typedef struct { uint32_t id; Byte *data; } Form;
 
 static Byte *image, *index_header, *map_table;
 static Byte *plugin_source;
-static Form forms[2048];
+static Form forms[16384];
 static size_t form_count;
-static uint32_t map_indices[2048];
-static Row rows[5121];
+static uint32_t map_indices[16384];
+static Row rows[65537];
 static Tree primary, other;
 static const char *scenario;
 
@@ -156,7 +156,8 @@ static Byte *bucket(uint32_t index)
 
 static void make_forms(size_t target_count)
 {
-    size_t owner_count = (target_count + 11) / 12;
+    size_t owner_width = mode("capacity-64k") ? 4 : 12;
+    size_t owner_count = (target_count + owner_width - 1) / owner_width;
     for (uint32_t i = 0; i < owner_count + 1; ++i) {
         uint32_t id = i == owner_count ? EXCEPTIONAL_OWNER : OWNER + i;
         Byte *form = new_form(id, 0xba, 0x58);
@@ -167,11 +168,11 @@ static void make_forms(size_t target_count)
     for (unsigned i = 0; i < _countof(rsgds); ++i) rsgds[i] = new_form(RSGD + i, 0xab, 0x32);
     for (unsigned i = 0; i < 13; ++i) {
         Byte *form = new_form(BIOM + i, 0xa0, 0x318);
-        Byte *list = heap(16);
-        dword(form + 0x308, 2);
+        unsigned count = mode("many-rsgds") ? 513 : 2;
+        Byte *list = heap((size_t)count * 8);
+        dword(form + 0x308, count);
         address(form + 0x310, list);
-        address(list, rsgds[i % 5]);
-        address(list + 8, rsgds[(i + 1) % 5]);
+        for (unsigned ref = 0; ref < count; ++ref) address(list + (size_t)ref * 8, rsgds[(i + ref) % 5]);
     }
     for (unsigned i = 0; i < 64; ++i) {
         Byte *form = new_form(RESOURCE + i, 0x9f, 0x118);
@@ -283,19 +284,23 @@ static void make_forms(size_t target_count)
 
 static void make_rows(size_t targets, size_t mixed)
 {
+    size_t owner_width = mode("capacity-64k") ? 4 : 12;
     for (size_t i = 0; i < targets; ++i) {
-        uint32_t owner = i + 1 == targets ? EXCEPTIONAL_OWNER : OWNER + (uint32_t)(i / 12);
+        uint32_t owner = i + 1 == targets ? EXCEPTIONAL_OWNER : OWNER + (uint32_t)(i / owner_width);
         Row *row = &rows[i];
         row->key = (Key){key_first(owner, DISC), BIOM + i % 12};
         row->width = 0x90;
-        if (i % 17) {
+        if (i % 17 && (mode("capacity-32k") || mode("capacity-64k"))) {
+            for (unsigned lane = 0; lane < 7; ++lane)
+                row->slots[lane] = RESOURCE + (uint32_t)((i + lane) % 64);
+        } else if (i % 17) {
             row->slots[0] = RESOURCE + (uint32_t)(i % 64);
             row->slots[2] = RESOURCE + (uint32_t)((i + 1) % 64);
             row->slots[6] = RESOURCE + (uint32_t)((i + 2) % 64);
         }
     }
     for (size_t i = 0; i < mixed; ++i) {
-        uint32_t owner = OWNER + (uint32_t)(i % ((targets + 11) / 12));
+        uint32_t owner = OWNER + (uint32_t)(i % ((targets + owner_width - 1) / owner_width));
         Row *row = &rows[targets + i];
         row->key = (Key){key_first(owner, DISC + 1), 0xfeed0000 + i};
         row->width = i % 2 ? 0x20 : 0x38;
@@ -452,7 +457,7 @@ static void build(void)
     if (mode("empty")) targets = mixed = 0;
     if (mode("direct") || mode("all-seven") || mode("holes") || mode("bad-hole") || mode("wrapper") ||
         mode("reuse") || mode("wrong-type") || mode("blank-mixed") || mode("namespace-invalid") ||
-        mode("source-filtered") || mode("source-unreadable") || mode("map-region-crossing") || mode("relative-data")) {
+        mode("source-filtered") || mode("source-unreadable") || mode("map-region-crossing") || mode("relative-data") || mode("capacity-declared-huge") || mode("many-rsgds")) {
         targets = 4;
         mixed = 2;
         block_width = 16;
@@ -471,6 +476,13 @@ static void build(void)
         block_width = 13;
         leaf_width = 7;
         min_depth = 4;
+    }
+    if (mode("capacity-32k") || mode("capacity-64k")) {
+        targets = mode("capacity-32k") ? 24576 : 49152;
+        mixed = targets / 3;
+        block_width = 13;
+        leaf_width = 7;
+        min_depth = 7;
     }
     if (mode("duplicate")) {
         targets = 2;
@@ -492,6 +504,7 @@ static void build(void)
     if (mode("duplicate")) rows[1] = rows[0];
     build_tree(&primary, targets + mixed, block_width, leaf_width, min_depth);
     publish(&primary);
+    if (mode("capacity-declared-huge")) qword(index_header + 0x48, UINT64_MAX);
     if (mode("switch")) {
         build_tree(&other, primary.count, block_width - 1, leaf_width, min_depth);
     }

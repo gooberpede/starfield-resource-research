@@ -222,21 +222,25 @@ def independent_truth(case):
     # arithmetic and sort composite identities once without parsing native memory.
     if case == "empty":
         return []
-    count, mixed = {"direct": (4, 2), "all-seven": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
-                    "corpus": (3210, 390), "upper": (4096, 1024)}.get(case, (36, 12))
+    count, mixed = {"direct": (4, 2), "many-rsgds": (4, 2), "all-seven": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
+                    "corpus": (3210, 390), "upper": (4096, 1024),
+                    "capacity-32k": (24576, 8192), "capacity-64k": (49152, 16384)}.get(case, (36, 12))
     targets = []
+    owner_width = 4 if case == "capacity-64k" else 12
     for ordinal in range(count):
-        owner, biome = divmod(ordinal, 12)
+        owner, biome = ordinal // owner_width, ordinal % 12
         owner = 0x1FFFE0 if ordinal == count - 1 else 0x100000 + owner
         first = owner * (1 << 32) + 0x10025
         slots = [0] * 7
         if ordinal % 17:
             for offset, lane in enumerate((0, 2, 6)):
                 slots[lane] = 0x400000 + ((ordinal + offset) % 64)
+        if case in ("capacity-32k", "capacity-64k") and ordinal % 17:
+            slots = [0x400000 + ((ordinal + lane) % 64) for lane in range(7)]
         if case == "all-seven" and ordinal == 1:
             slots = list(range(0x400000, 0x400007))
         targets.append((first, 0x200000 + biome, 0x90, *slots))
-    excluded = [(0x100000 * (1 << 32) + (ordinal % ((count + 11) // 12)) * (1 << 32) + 0x10026,
+    excluded = [(0x100000 * (1 << 32) + (ordinal % ((count + owner_width - 1) // owner_width)) * (1 << 32) + 0x10026,
                  0xFEED0000 + ordinal, 0x20 if ordinal % 2 else 0x38, *([0] * 7))
                 for ordinal in range(mixed)]
     return sorted((*targets, *excluded))

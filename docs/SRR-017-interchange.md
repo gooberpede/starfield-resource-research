@@ -78,7 +78,7 @@ Inspect `unqualified_collections` and the pair/count fields for diagnostics.
 
 ## Operator replay and comparison
 
-The active operator receipt schema is `srr017-operator-census-v1`. Its
+The active operator receipt schema is `srr017-operator-census-v2`. Its
 checked replay requires its exact reader source, bounded event stream,
 seal, selected executable/epoch binding, unchanged native decisions and
 terminal report. It needs no original authorization, custody claim,
@@ -97,7 +97,9 @@ from tools.srr017.extract import replay_dataset
 report, dataset = replay_dataset(Path("output/receipt.jsonl"))
 ```
 
-The command's offline replay option is documented in the
+Historical operator-v1 receipts require their original pinned reader; v2
+records the population-independent work envelope. The command's offline
+replay option is documented in the
 [run card](SRR-017-title-run-card.md). Compare regenerated canonical
 `output_bytes(dataset)` with the retained `dataset.json` and independently
 retained manifest/receipt hashes. A changed or unfinished journal refuses;

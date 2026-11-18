@@ -27,7 +27,7 @@ PLUGIN_CHUNK = 256 * 8
 @dataclass(frozen=True)
 class NamespaceLimits:
     slots: int = 256
-    registry_nodes: int = 512
+    registry_nodes: int | None = 512
     reads: int = 1024
     requested_bytes: int = 512 * 1024
 
@@ -40,7 +40,8 @@ def collect_namespace(read, image_base, limits=NamespaceLimits(), *, claim=None,
     The registry order is retained for evidence and conveys no winner ranking.
     """
     if (not 1 <= limits.slots <= sum(INDEX_MAX.values()) + len(INDEX_MAX)
-            or not 1 <= limits.registry_nodes <= REGISTRY_IMPLEMENTATION_MAX
+            or (limits.registry_nodes is not None
+                and not 1 <= limits.registry_nodes <= REGISTRY_IMPLEMENTATION_MAX)
             or not 1 <= limits.reads <= 32_768
             or not 1 <= limits.requested_bytes <= 16 * 1024 * 1024):
         raise SourceIdentityError("invalid_namespace_limits", "invalid work limits")
@@ -93,7 +94,7 @@ def collect_namespace(read, image_base, limits=NamespaceLimits(), *, claim=None,
     seen_nodes = set()
     file_pointer = first_file
     while True:
-        if len(file_data) >= limits.registry_nodes:
+        if limits.registry_nodes is not None and len(file_data) >= limits.registry_nodes:
             raise SourceIdentityError("namespace_registry_budget", "too many file nodes")
         if file_pointer in file_data:
             raise SourceIdentityError("namespace_plugin_pointer_alias", "registry")

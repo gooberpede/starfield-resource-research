@@ -24,13 +24,13 @@ from observe import (
     GAP_NS, GAP_SEC, AcquisitionStop, JournalFailure, RecordingReader, ReplayReader,
     add_timing, encode, pending_journal,
 )
-from tools.srr017.namespace import FormSourceVectors, collect_namespace
+from tools.srr017.namespace import FormSourceVectors, NamespaceLimits, collect_namespace
 from tools.srr017.source import SourceIdentityError
 
 
 RECEIPT_SCHEMA = "srr016-disposable-census-v1"
 RETAIL_RECEIPT_SCHEMA = "srr017-title-census-v1"
-OPERATOR_RECEIPT_SCHEMA = "srr017-operator-census-v1"
+OPERATOR_RECEIPT_SCHEMA = "srr017-operator-census-v2"
 OBSERVATION_SCHEMA = "srr016-observation-v1"
 RETAIL_SHA256 = RETAIL_APPLICABILITY["sha256"]
 CANONICAL = re.compile(r"[^:/\\\x00-\x1f]{1,255}\.(?:esm|esl|esp):[0-9A-F]{6}")
@@ -78,6 +78,19 @@ RETAIL_LIMITS = {
     "journal_bytes": 128 * 1024 * 1024,
 }
 
+# Operator acquisition is bounded by performed work, not a predicted population.
+# Depth protects the Python recursion stack; chain length bounds cached lookup
+# work that need not issue additional reads. Other extents use native validation.
+OPERATOR_LIMITS = {
+    "tree_depth": 64,
+    "form_chain": 65_536,
+    "events": 4_000_000,
+    "requested_bytes": 512 * 1024 * 1024,
+    "journal_bytes": 1024 * 1024 * 1024,
+}
+OPERATOR_NAMESPACE_LIMITS = NamespaceLimits(slots=4605, registry_nodes=None,
+                                           reads=32_768, requested_bytes=16 * 1024 * 1024)
+
 
 def validate_remap(remap):
     """Validate an independently furnished, one-to-one runtime ID witness."""
@@ -123,6 +136,7 @@ class WholeCollection(Collection):
         self.source_witness = {}
         self.source_failure = None
         self.provenance_windows = set()
+        self.biome_lists = {}
 
     def exact(self, address, size, alignment):
         self.read_count += 1
@@ -149,21 +163,24 @@ class WholeCollection(Collection):
 
     def window(self, address):
         require(address not in self.windows, "pointer_alias", f"revisited tree window {address:#x}")
-        require(len(self.windows) < self.limits["tree_windows"], "traversal_budget", "tree window cap exceeded")
+        if "tree_windows" in self.limits:
+            require(len(self.windows) < self.limits["tree_windows"], "traversal_budget", "tree window cap exceeded")
         self.claim(address, NODE_END, "tree window")
         self.windows.add(address)
         return self.read(address, NODE_END, 8)
 
     def form_map(self):
         mapping = super().form_map()
-        require(mapping["capacity"] <= self.limits["form_capacity"], "traversal_budget",
-                "FormID capacity exceeds the independent envelope")
+        if "form_capacity" in self.limits:
+            require(mapping["capacity"] <= self.limits["form_capacity"], "traversal_budget",
+                    "FormID capacity exceeds the independent envelope")
         return mapping
 
     def map_entry(self, index):
         if index not in self.map_indices:
-            require(len(self.map_indices) < self.limits["map_entries"], "traversal_budget",
-                    "distinct FormID chain entry cap exceeded")
+            if "map_entries" in self.limits:
+                require(len(self.map_indices) < self.limits["map_entries"], "traversal_budget",
+                        "distinct FormID chain entry cap exceeded")
             address = self.map["table"] + index * 0x18
             key, form, next_ = unpack("I4xQI", self.read(address, 20, 8))
             if next_ != 0xFFFFFFFF:
@@ -234,8 +251,9 @@ class WholeCollection(Collection):
             require(pndt == owner_key, "pndt_key_mismatch", "PNDT generation key disagrees")
             biom_form = self.form(biom, 0xA0)
             count = self.scalar(biom_form + 0x308, "I")
-            require(count <= self.limits["biom_rsgds"], "rsgd_list_budget",
-                    "BIOM RSGD list exceeds the independent envelope")
+            if "biom_rsgds" in self.limits:
+                require(count <= self.limits["biom_rsgds"], "rsgd_list_budget",
+                        "BIOM RSGD list exceeds the independent envelope")
             list_ = self.scalar(biom_form + 0x310, "Q")
             rsgds = self.biome_rsgds(count, list_)
             override_form = None
@@ -253,6 +271,33 @@ class WholeCollection(Collection):
                     "override": override_form, "override_reason": override_reason}
         finally:
             self.reading_inputs = False
+
+    def biome_rsgds(self, count, list_):
+        if "biom_rsgds" in self.limits:
+            return super().biome_rsgds(count, list_)
+        # Never allocate from an untrusted list count. Each chunk is charged
+        # before its contents can produce references; all witnesses are reread
+        # at close. Repeated BIOM inputs can reuse this same checked list.
+        if not count:
+            return []
+        key = (count, list_)
+        if key in self.biome_lists:
+            return self.biome_lists[key]
+        self.claim(list_, count * 8, "BIOM RSGD list")
+        result = []
+        for start in range(0, count, 512):
+            self.reader.pulse()
+            width = min(512, count - start)
+            addresses = unpack(f"{width}Q", self.read(list_ + start * 8, width * 8, 8))
+            for address in addresses:
+                self.reader.pulse()
+                pointer(address, 0x2F)
+                form_id = self.scalar(address + 0x28, "I")
+                require(form_id != 0 and self.form(form_id, 0xAB) == address,
+                        "rsgd_list_identity", "BIOM RSGD pointer differs from the authoritative form")
+                result.append({"form_id": form_id, "address": address})
+        self.biome_lists[key] = result
+        return result
 
     def typed(self, data, diagnostic, offset, k0, k1, size, wrapper):
         require(wrapper and (k0 & 0xFFFFFFFF) == (0x10000 | self.discriminator) and k0 >> 32,
@@ -309,7 +354,7 @@ class WholeCollection(Collection):
                 and directory == 0x10 + count * 4 and directory <= frontier < NODE_END
                 and holes <= NODE_END - frontier,
                 "index_shape", "malformed packed block header or occupancy")
-        require(len(self.records) + count <= min(self.total, self.limits["entries"]),
+        require(len(self.records) + count <= min(self.total, self.limits.get("entries", self.total)),
                 "index_shape", "packed descriptors exceed the admitted mixed count")
         descriptors = list(struct.iter_unpack("<HH", data[0x10:directory]))
         occupied = 0
@@ -363,7 +408,8 @@ class WholeCollection(Collection):
         self.publication = self.anchors()
         self.map = self.form_map()
         opening_reads = tuple(self.structure)
-        require(self.total <= self.limits["entries"], "traversal_budget", "mixed descriptor cap exceeded")
+        if "entries" in self.limits:
+            require(self.total <= self.limits["entries"], "traversal_budget", "mixed descriptor cap exceeded")
         if self.root:
             self.walk(self.root)
         require(not self.leaves or self.leaves[-1][1] == 0,
@@ -418,7 +464,9 @@ class WholeCollection(Collection):
             return data
 
         try:
-            namespace = collect_namespace(source_read, self.base, claim=self.claim)
+            namespace = collect_namespace(source_read, self.base, claim=self.claim,
+                                          **({"limits": OPERATOR_NAMESPACE_LIMITS}
+                                             if "entries" not in self.limits else {}))
             rows = {}
             private_namespace = {**namespace, "file_pointers": {
                 f"{address:016X}": fields for address, fields in namespace["file_pointers"].items()}}
@@ -675,13 +723,13 @@ def make_report(passes, brackets, failure, calls, byte_count, remap, *, admissio
     return report
 
 
-def _checked_limits(limits, *, legacy=False, retail_flow=False):
+def _checked_limits(limits, *, legacy=False, retail_flow=False, operator=False):
     if limits is None:
-        return dict(RETAIL_LIMITS if retail_flow else LIMITS)
-    ceilings = RETAIL_LIMITS if retail_flow else LIMITS if legacy else OWNED_EXTENDED_LIMITS
+        return dict(OPERATOR_LIMITS if operator else RETAIL_LIMITS if retail_flow else LIMITS)
+    ceilings = OPERATOR_LIMITS if operator else RETAIL_LIMITS if retail_flow else LIMITS if legacy else OWNED_EXTENDED_LIMITS
     if not isinstance(limits, dict) or limits.keys() != ceilings.keys() or any(
             type(value) is not int or not 0 < value <= ceilings[key] for key, value in limits.items()):
-        raise ValueError("receipt limits exceed the disposable qualification envelope")
+        raise ValueError("receipt limits exceed the qualified work envelope")
     return limits
 
 
@@ -737,7 +785,7 @@ def capture_operator(path, reader, *, limits=None, cancelled=None, between=None,
                "selected_identity": {"pid": reader.expected_epoch[0], "creation": reader.expected_epoch[1],
                                      "image_sha256": reader.sha256, "profile": reader.profile_name}}
     validate_operator_binding(binding)
-    limits = _checked_limits(limits, retail_flow=True)
+    limits = _checked_limits(limits, operator=True)
     with pending_journal(Path(path)) as raw:
         journal = BoundedJournal(raw, limits["journal_bytes"])
         start, utc = monotonic_ns(), time_ns()
@@ -762,7 +810,7 @@ def capture_operator(path, reader, *, limits=None, cancelled=None, between=None,
 def replay_operator(path):
     """Check the seal and reproduce every operator observation read and decision."""
     path = Path(path)
-    events = _load_receipt(path)
+    events = _load_receipt(path, ceiling=OPERATOR_LIMITS["journal_bytes"])
     header = next(events, None)
     if (not isinstance(header, dict) or set(header) != {
             "kind", "schema", "limits", "remap", "reader_source_sha256", "remap_sha256",
@@ -773,7 +821,7 @@ def replay_operator(path):
             or any(type(header[key]) is not int or header[key] <= 0 for key in ("start_ns", "start_utc_ns"))):
         raise ValueError("invalid operator receipt header or reader source")
     validate_operator_binding(header["binding"])
-    limits = _checked_limits(header["limits"], retail_flow=True)
+    limits = _checked_limits(header["limits"], operator=True)
     if path.stat().st_size > limits["journal_bytes"]:
         raise ValueError("receipt exceeds its declared journal ceiling")
     first = next(events, None)
@@ -856,10 +904,9 @@ def capture(path, attempt_directory, admission, binding, remap, *, limits=None,
     return report
 
 
-def _load_receipt(path):
+def _load_receipt(path, *, ceiling=RETAIL_LIMITS["journal_bytes"]):
     if path.suffix == ".partial":
         raise ValueError("pending receipt was not durably published")
-    ceiling = RETAIL_LIMITS["journal_bytes"]
     if path.stat().st_size > ceiling:
         raise ValueError("receipt exceeds the journal ceiling")
     digest = sha256()

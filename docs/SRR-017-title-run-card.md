@@ -42,6 +42,14 @@ possible. Work has finite read/tree/memory/output limits and no elapsed
 acquisition deadline. Failure does not cause an automatic retry, relaunch
 or budget increase. An operator may explicitly request a later attempt.
 
+The operator v2 reader has no separate descriptor/population ceiling. It
+retains native count reconciliation, structure and identity checks, with
+finite limits of 4,000,000 pair operations, 512 MiB requested memory,
+1 GiB journal and 512 MiB per portable output. Tree depth 64 protects the
+reader stack; long cached FormID chains remain bounded. See the dossier
+for the combined limit audit and large-population qualification. These
+are resource limits, not a prediction of the retail population.
+
 ## Read the result and Quit
 
 - **FINISHED**: the whole admitted rooted store and normalized export are
