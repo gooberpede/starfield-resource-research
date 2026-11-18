@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
     unsigned char *address;
     Key first;
+    Key maximum_minimum;
 } Node;
 typedef struct {
     Node root;
@@ -330,7 +331,7 @@ static Node block(const Row *rows, unsigned count, Tree *tree, int faults)
     }
     put32(data + 0xC, position);
     tree->count += count;
-    return (Node){data, rows[0].key};
+    return (Node){data, rows[0].key, rows[0].key};
 }
 
 static Node leaf(const Node *blocks, unsigned count)
@@ -341,7 +342,7 @@ static Node leaf(const Node *blocks, unsigned count)
         putkey(data + 0x18 + 0x10 * i, blocks[i].first);
         putptr(data + 0xa98 + 8 * i, blocks[i].address);
     }
-    return (Node){data, blocks[0].first};
+    return (Node){data, blocks[0].first, blocks[count - 1].maximum_minimum};
 }
 
 static Node internal(const Node *children, unsigned count, uint32_t level)
@@ -350,10 +351,12 @@ static Node internal(const Node *children, unsigned count, uint32_t level)
     put32(data, level);
     put32(data + 4, count - 1);
     for (unsigned i = 0; i < count; ++i) {
-        if (i) putkey(data + 8 + 0x10 * (i - 1), children[i].first);
+        if (i) putkey(data + 8 + 0x10 * (i - 1),
+                      is_mode("native-boundary") || is_mode("native-depth2")
+                          ? children[i - 1].maximum_minimum : children[i].first);
         putptr(data + 0xa88 + 8 * i, children[i].address);
     }
-    return (Node){data, children[0].first};
+    return (Node){data, children[0].first, children[count - 1].maximum_minimum};
 }
 
 static void link_leaves(Node *leaves, unsigned count)
@@ -576,7 +579,7 @@ static void build_target(void)
         int depth = 1;
         if (is_mode("direct")) depth = -1;
         if (is_mode("leaf-only") || is_mode("lying-minimum")) depth = 0;
-        if (is_mode("depth2")) depth = 2;
+        if (is_mode("depth2") || is_mode("native-depth2")) depth = 2;
         make_tree(&primary, depth, 0, 1);
     }
     make_tree(&inserted, 1, 1, 0);
@@ -606,7 +609,7 @@ static void build_target(void)
 int main(int argc, char **argv)
 {
     static const char *const modes[] = {
-        "populated", "zero", "mixed", "direct", "leaf-only", "depth2", "holes", "root-end", "absent", "duplicate",
+        "populated", "zero", "mixed", "direct", "leaf-only", "depth2", "native-boundary", "native-depth2", "holes", "root-end", "absent", "duplicate",
         "wrong-owner", "wrong-type", "wrong-registry", "wrong-map", "map-loop", "wrong-rnam", "wrong-seed",
         "wrong-override", "ineligible-zero", "wrong-biom", "unaligned", "unreadable", "loop", "bad-count", "overlap",
         "bad-directory", "bad-minimum", "excessive", "leaf-decoy", "empty", "mapped-image",

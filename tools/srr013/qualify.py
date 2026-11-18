@@ -22,6 +22,8 @@ ACCEPTED = {
     "populated": (POPULATED,) * 4,
     "direct": (POPULATED,) * 4,
     "depth2": (POPULATED,) * 4,
+    "native-boundary": (POPULATED,) * 4,
+    "native-depth2": (POPULATED,) * 4,
     "leaf-only": (POPULATED,) * 4,
     "predecessor": (POPULATED,) * 4,
     "holes": (POPULATED,) * 4,

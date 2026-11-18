@@ -368,7 +368,10 @@ class WholeCollection(Collection):
         keys = tuple(self.classify_record(data, address, path, ordinal, size, offset)
                      for ordinal, (size, offset) in enumerate(descriptors))
         require(advertised is None or keys[0] == advertised, "block_minimum", "invalid leaf block minimum")
-        self.check_fences(keys, fences)
+        # Internal pivots fence routing keys (packed-block minima), not the
+        # records following a minimum. Native leaf splits promote the last
+        # left block minimum, so that block can legitimately spill past it.
+        self.check_fences(keys[:1], fences)
 
     def walk(self, address, path=(), fences=(), level=None):
         data = self.window(address)

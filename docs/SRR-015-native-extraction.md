@@ -111,7 +111,7 @@ census(reader, independent_limits):
     identity = verify_epoch_image_and_checkpoint(reader)
     anchors = authenticate_publication_registry_root_and_form_map(identity)
     require(root_is_null == (mixed_count == 0))
-    admit_count_within_independent_envelope(mixed_count)
+    bound_performed_work_without_allocating_from_mixed_count()
 
     # FUN_1403832A0 defines ordered children and lower-bound semantics.
     # Enumerate every used child position even if no expected key selects it.
@@ -121,10 +121,11 @@ census(reader, independent_limits):
         for block in leaf_order_blocks(leaf):
             # Direct-block root acts as a one-block sequence.
             validate_directory_frontier_holes_and_all_record_spans(block)
+            verify_block_min_leaf_key_and_ancestor_routing_fences(block.minimum)
             for descriptor in block_directory_order(block):
                 key, vptr = read_exact_edge_prefix(descriptor)
                 count_descriptor_once()
-                verify_block_min_leaf_key_global_order_and_ancestor_fences(key)
+                verify_global_record_order(key)
                 if standard_type_and_wrapper_agree_as_target(key, vptr):
                     collect_typed_payload_and_independent_identity(descriptor)
                 else:
@@ -145,9 +146,11 @@ Claim before following a pointer and reject cycles, shared children and
 cross-role aliasing. Every non-root child level decreases by exactly one.
 Validate record minimum prefix length 0x20, directory/frontier bounds,
 pairwise disjoint spans, block free-space credit and exact leaf-advertised
-minima. Internal separators admit equality on either side as in the frozen
-decoder's fence check. Demand global nondecreasing order including cross-page
-adjacency. A duplicate target straddling a fence is still a duplicate. Check
+minima. Inclusive ancestor fences apply to routing keys/block minima, not
+the later records of a packed block. Native leaf splitting promotes the
+last left block minimum, so its following records can exceed that pivot.
+**SUPERSEDED:** applying those fences to each record maximum. Demand strict
+global record order in the census, including cross-page adjacency. A duplicate target straddling a fence is still a duplicate. Check
 both end links against root-derived edges. The sentinel null block with slot
 `0xFE0` in `FUN_1403A4250` is a terminal cursor, never a record descriptor.
 Root traversal and the neighbor walk must agree before accepting the terminal

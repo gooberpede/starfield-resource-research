@@ -36,6 +36,8 @@ EXPECTATIONS = {
     "menu": (ZERO_REASON,) * 4,
     "settled-gameplay": (NONZERO_REASON, ZERO_REASON, NONZERO_REASON, NONZERO_REASON),
     "structural-different": (NONZERO_REASON,) * 4,
+    "native-boundary": (NONZERO_REASON,) * 4,
+    "native-depth2": (NONZERO_REASON,) * 4,
     "structural-missing": expected_for_second("resource_form_absent"),
     "structural-wrong-type": expected_for_second("resource_form_type_mismatch"),
     "structural-alias": expected_for_second("resource_pointer_alias"),

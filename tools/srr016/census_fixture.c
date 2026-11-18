@@ -23,7 +23,7 @@ enum {
 typedef unsigned char Byte;
 typedef struct { uint64_t high, low; } Key;
 typedef struct { Key key; unsigned width; uint32_t slots[7]; } Row;
-typedef struct { Byte *page; Key minimum; } Node;
+typedef struct { Byte *page; Key minimum, maximum_minimum; } Node;
 typedef struct {
     Node root;
     size_t count;
@@ -61,6 +61,12 @@ static void qword(Byte *p, uint64_t value) { memcpy(p, &value, sizeof(value)); }
 static void address(Byte *p, const Byte *value) { qword(p, (uintptr_t)value); }
 static void set_key(Byte *p, Key key) { qword(p, key.high); qword(p + 8, key.low); }
 static int mode(const char *name) { return strcmp(scenario, name) == 0; }
+static int native_pivots(void)
+{
+    return (!strncmp(scenario, "native-", 7) && !mode("native-right-equality")) ||
+           mode("capacity-32k") || mode("capacity-64k");
+}
+static Key get_key(const Byte *p) { Key key; memcpy(&key, p, sizeof(key)); return key; }
 
 static uint32_t read_dword(const Byte *p)
 {
@@ -341,7 +347,7 @@ static Node packed(Tree *tree, size_t first, unsigned count, unsigned gap)
         tree->edges[first + slot] = edge;
     }
     dword(base + 12, cursor);
-    return (Node){base, rows[first].key};
+    return (Node){base, rows[first].key, rows[first].key};
 }
 
 static Node combine(Tree *tree, const Node *nodes, size_t count, unsigned level)
@@ -355,10 +361,13 @@ static Node combine(Tree *tree, const Node *nodes, size_t count, unsigned level)
     for (unsigned i = 0; i < count; ++i) {
         unsigned key_base = level ? 0x8 : 0x18;
         unsigned pointer_base = level ? 0xa88 : 0xa98;
-        if (!level || i) set_key(base + key_base + (i - (level != 0)) * 16, nodes[i].minimum);
+        if (!level || i) {
+            Key key = level && native_pivots() ? nodes[i - 1].maximum_minimum : nodes[i].minimum;
+            set_key(base + key_base + (i - (level != 0)) * 16, key);
+        }
         address(base + pointer_base + i * 8, nodes[i].page);
     }
-    return (Node){base, nodes[0].minimum};
+    return (Node){base, nodes[0].minimum, nodes[count - 1].maximum_minimum};
 }
 
 static void build_tree(Tree *tree, size_t count, unsigned block_width, unsigned leaf_width, unsigned min_depth)
@@ -457,7 +466,7 @@ static void build(void)
     if (mode("empty")) targets = mixed = 0;
     if (mode("direct") || mode("all-seven") || mode("holes") || mode("bad-hole") || mode("wrapper") ||
         mode("reuse") || mode("wrong-type") || mode("blank-mixed") || mode("namespace-invalid") ||
-        mode("source-filtered") || mode("source-unreadable") || mode("map-region-crossing") || mode("relative-data") || mode("capacity-declared-huge") || mode("many-rsgds")) {
+        mode("source-filtered") || mode("source-unreadable") || mode("map-region-crossing") || mode("relative-data") || mode("capacity-declared-huge") || mode("many-rsgds") || mode("native-direct")) {
         targets = 4;
         mixed = 2;
         block_width = 16;
@@ -483,6 +492,18 @@ static void build(void)
         block_width = 13;
         leaf_width = 7;
         min_depth = 7;
+    }
+    if (mode("native-leaf") || mode("native-two-leaf")) {
+        block_width = 14;
+        leaf_width = mode("native-leaf") ? 8 : 3;
+        min_depth = 0;
+    }
+    if (mode("native-multilevel") || mode("native-cross-node")) min_depth = 3;
+    if (mode("native-cross-node")) {
+        targets = 360;
+        mixed = 120;
+        block_width = 14;
+        leaf_width = 3;
     }
     if (mode("duplicate")) {
         targets = 2;
@@ -522,6 +543,50 @@ static void build(void)
     if (mode("namespace-invalid")) plugin_source[0x218] = 0xff;
     if (mode("optional-absent")) dword(primary.edges[0] + 0x6c, 0x750000);
     if (mode("bad-fence")) set_key(primary.first_branch + 8, (Key){1, 1});
+    if (mode("native-pivot-below") || mode("native-gap")) {
+        Key key = get_key(primary.first_branch + 8);
+        check(key.low > 0 && key.low < UINT64_MAX, "fixture pivot arithmetic");
+        key.low += mode("native-gap") ? 1 : (uint64_t)-1;
+        set_key(primary.first_branch + 8, key);
+    }
+    if (mode("native-pivot-above")) {
+        uint64_t right;
+        memcpy(&right, primary.first_branch + 0xa90, sizeof(right));
+        Key key = get_key((Byte *)(uintptr_t)right + 0x18);
+        check(key.low < UINT64_MAX, "fixture right pivot arithmetic");
+        ++key.low;
+        set_key(primary.first_branch + 8, key);
+    }
+    if (mode("native-separator-order")) {
+        set_key(primary.first_branch + 8, (Key){UINT64_MAX, UINT64_MAX});
+        set_key(primary.first_branch + 24, (Key){0, 0});
+    }
+    if (mode("native-descending-records") || mode("native-duplicate-records")) {
+        Byte *base = primary.first_block;
+        uint16_t first, second;
+        memcpy(&first, base + 0x12, sizeof(first));
+        memcpy(&second, base + 0x16, sizeof(second));
+        Key key = get_key(base + first + 0x10);
+        if (mode("native-descending-records")) {
+            uint32_t first_descriptor = read_dword(base + 0x10);
+            dword(base + 0x10, read_dword(base + 0x14));
+            dword(base + 0x14, first_descriptor);
+        } else set_key(base + second + 0x10, key);
+    }
+    if (mode("native-neighbor-overlap")) {
+        uint64_t next;
+        memcpy(&next, primary.first_leaf + 0xaa0, sizeof(next));
+        uint32_t count = read_dword(primary.first_block + 4);
+        uint16_t offset;
+        memcpy(&offset, primary.first_block + 0x12 + 4 * (count - 1), sizeof(offset));
+        /* The next block's first descriptor offset locates its true minimum. */
+        uint16_t next_offset;
+        memcpy(&next_offset, (Byte *)(uintptr_t)next + 0x12, sizeof(next_offset));
+        Key key = get_key((Byte *)(uintptr_t)next + next_offset + 0x10);
+        ++key.low;
+        set_key(primary.first_block + offset + 0x10, key);
+        dword(primary.first_block + offset + 0x60, (uint32_t)key.low);
+    }
     if (mode("bad-minimum")) set_key(primary.first_leaf + 0x18, (Key){1, 1});
     if (mode("bad-link")) address(primary.first_leaf + 8, primary.first_leaf);
     if (mode("cycle")) address(primary.root.page + 0xa88, primary.root.page);

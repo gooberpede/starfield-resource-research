@@ -339,13 +339,24 @@ class Collection:
         records = self.block(leaf.pointers[index], (leaf.address, index))
         first, last = records[0].key, records[-1].key
         require(first == leaf.keys[index], "block_minimum", "leaf minimum disagrees with block")
+        self.check_fences((first,), path)
+        following = None
         if index + 1 < len(leaf.keys):
-            require(last <= leaf.keys[index + 1], "index_order", "overlapping adjacent block keys")
-        self.check_fences((first, last), path)
+            following = leaf.keys[index + 1]
+        else:
+            adjacent, _ = self.neighbor(leaf, path, 1)
+            if adjacent is not None:
+                following = adjacent.keys[0]
+        # Bound records by the actual next block minimum, including across
+        # leaves. An ancestor pivot may equal this block's first key and is
+        # not a bound on its later records (native FUN_1403835E0 leaf split).
+        require(following is None or last <= following,
+                "index_order", "overlapping adjacent block keys")
         return records
 
     @staticmethod
     def check_fences(keys, path):
+        """Check routing keys/pivots and block minima, never packed-record maxima."""
         if not keys:
             return
         for parent, child in path:

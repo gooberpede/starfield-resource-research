@@ -87,6 +87,16 @@ def run(directory):
         "bad-span": ("INCOMPLETE", "record_span"),
         "cycle": ("INCOMPLETE", "pointer_alias"),
         "capacity-declared-huge": ("INCOMPLETE", "index_shape"),
+        "native-pivot-below": ("INCOMPLETE", "index_fence"),
+        "native-pivot-above": ("INCOMPLETE", "index_fence"),
+        "native-separator-order": ("INCOMPLETE", "index_order"),
+        "native-descending-records": ("INCOMPLETE", "index_order"),
+        "native-duplicate-records": ("INCOMPLETE", "duplicate_identity"),
+        "native-neighbor-overlap": ("INCOMPLETE", "index_order"),
+        "bad-fence": ("INCOMPLETE", "index_fence"),
+        "bad-minimum": ("INCOMPLETE", "block_minimum"),
+        "bad-link": ("INCOMPLETE", "leaf_link_mismatch"),
+        "alias-child": ("INCOMPLETE", "pointer_alias"),
         "wrong-image": ("FAILED", "wrong_executable"),
     }
 
@@ -123,7 +133,9 @@ def run(directory):
             results[name] = {"status": result["status"], "failure": result["failure"]}
         return result
 
-    for case in ("corpus", "upper", "relative-data", "all-seven", "many-rsgds", "capacity-32k", "capacity-64k"):
+    for case in ("corpus", "upper", "relative-data", "all-seven", "many-rsgds",
+                 "native-direct", "native-leaf", "native-two-leaf", "native-multilevel",
+                 "native-cross-node", "native-right-equality", "native-gap", "capacity-32k", "capacity-64k"):
         observe(case, scenario=case, success=True)
     with qualify_census.fixture(target, "direct") as (first, _), qualify_census.fixture(target, "direct") as (second, _):
         ambiguous = guarded_run(directory / "multiple", services=services, notify=lambda _text: None)
@@ -152,6 +164,10 @@ def run(directory):
     observe("bad-biome-type", scenario="bad-biome-type")
     observe("bad-resource-type", scenario="bad-resource-type")
     for case in ("bad-count", "bad-span", "cycle", "capacity-declared-huge"):
+        observe(case, scenario=case)
+    for case in ("native-pivot-below", "native-pivot-above", "native-separator-order",
+                 "native-descending-records", "native-duplicate-records", "native-neighbor-overlap",
+                 "bad-fence", "bad-minimum", "bad-link", "alias-child"):
         observe(case, scenario=case)
     observe("work-budget", kwargs={"limits": {**census.OPERATOR_LIMITS, "events": 5}})
     observe("byte-budget", kwargs={"limits": {**census.OPERATOR_LIMITS, "requested_bytes": 64}})

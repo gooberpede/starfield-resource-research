@@ -31,6 +31,13 @@ TREE_CASES = {
     "empty": (0, 0, 0, 0, 0),
     "direct": (6, 1, 1, 0, 0),
     "all-seven": (6, 1, 1, 0, 0),
+    "native-direct": (6, 1, 1, 0, 0),
+    "native-leaf": (48, 5, 4, 1, 0),
+    "native-two-leaf": (48, 7, 4, 2, 1),
+    "native-multilevel": (48, 14, 7, 4, 3),
+    "native-cross-node": (480, 52, 35, 12, 3),
+    "native-right-equality": (48, 13, 7, 4, 2),
+    "native-gap": (48, 13, 7, 4, 2),
     "holes": (6, 1, 1, 0, 0),
     "ordinary": (48, 13, 7, 4, 2),
     "corpus": (3600, 181, 150, 22, 3),
@@ -56,6 +63,9 @@ NEGATIVES = {
     "map-alias": "form_id_mismatch", "map-table-edge": "pointer_alias",
     "map-cycle": "form_map_unverified", "map-sentinel": "form_map_unverified",
     "map-duplicate": "form_duplicate", "decoy-invalid": "form_id_mismatch",
+    "native-pivot-below": "index_fence", "native-pivot-above": "index_fence",
+    "native-separator-order": "index_order", "native-descending-records": "index_order",
+    "native-duplicate-records": "duplicate_identity", "native-neighbor-overlap": "index_order",
     "unreadable": "unreadable_region", "region-crossing": "unreadable_region",
     "short-read": "read_incomplete",
     "mid-clear": "structural_change", "mid-insert": "structural_change",
@@ -222,7 +232,8 @@ def independent_truth(case):
     # arithmetic and sort composite identities once without parsing native memory.
     if case == "empty":
         return []
-    count, mixed = {"direct": (4, 2), "many-rsgds": (4, 2), "all-seven": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
+    count, mixed = {"direct": (4, 2), "native-direct": (4, 2), "native-cross-node": (360, 120),
+                    "many-rsgds": (4, 2), "all-seven": (4, 2), "holes": (4, 2), "stable-clear": (4, 2),
                     "corpus": (3210, 390), "upper": (4096, 1024),
                     "capacity-32k": (24576, 8192), "capacity-64k": (49152, 16384)}.get(case, (36, 12))
     targets = []

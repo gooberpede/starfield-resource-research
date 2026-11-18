@@ -6,9 +6,10 @@ running compatible process; it never launches or closes the game. This
 implementation task authorizes offline qualification only. See the
 [run card](SRR-017-title-run-card.md) for the current invocation.
 
-**Latest live result:** the operator observation was incomplete because the
-published 18,314-descriptor store exceeded the reviewed 8,192 ceiling. No
-allocation rows were acquired; see the actual-observation section below.
+**Latest live result:** the capacity-corrected operator attempt stopped at
+`index_fence` after 1,202 mixed descriptors. It preserved partial raw records
+but no complete, identity-resolved pair. See the actual observations below;
+the earlier 8,192-descriptor refusal retains its original scope.
 
 ## Scope and implementation
 
@@ -19,6 +20,17 @@ It authenticates the executable/layout and creation epoch through the
 existing query/read-only interface. It obtains one pair of independently
 rooted full-store collections and checks the sealed receipt before export.
 No launch, Quit or automatic acquisition retry occurs.
+
+**PROVEN STATIC:** the pinned native writer promotes a left leaf's final
+block minimum; lookup can route right and select a previous-leaf block.
+The corrected census therefore applies ancestor fences to routing pivots
+and block minima, not later records in a packed block. It still checks
+strict global record order, advertised minima, node routing, links and
+counts. The shared selected-key reader additionally checks the actual next
+block minimum across root-derived leaf boundaries. The former record-maximum
+fence is **SUPERSEDED**, rather than suppressed on one anomalous path.
+[Native rule and exact locators](SRR-012-acquisition-evidence.md#separator-meaning-and-packed-records) ·
+[Checked separator contract](SRR-016-native.md#separator-semantics)
 
 The full/medium/small loaded-plugin namespace is checked against TESFile
 flags, indices, names and the native registry. PNDT, BIOM, RSGD and resource
@@ -95,10 +107,17 @@ agreement. A partial or identity-unresolved result is never qualified.
 
 ## Qualification and independent review
 
-The exact operator controller passed 29 owned-process controls on Python
-3.14.3, including complete paired native acquisition, normalization, export
-and checked replay substantially above the 18,314 retail declaration.
-Every target's keys, metadata and seven words were independently asserted.
+The corrected operator controller passed 46 owned-process controls on
+Python 3.14.3. Native-shaped direct/root-leaf/two-leaf/multilevel/cross-node
+cases include pivots equal to final left block minima while later records
+exceed them. Synthetic pivot gaps and right-minimum equality also qualify
+as navigation-compatible fixture geometry; they are not claimed as observed
+retail writer states.
+Misplaced pivots/minima, descending/duplicate/overlapping records, wrong
+separator order, links, counts and aliases still refuse. Complete paired
+acquisition, normalization, export and replay were repeated at population
+scale using the native promoted-minimum geometry. Every target's keys,
+metadata and seven words were independently asserted.
 
 | Mixed descriptors | Qualified target rows | Slot words | All-zero rows | Tree windows / reached map entries per pass |
 | ---: | ---: | ---: | ---: | ---: |
@@ -127,21 +146,105 @@ No retail handle was opened and all owned targets retired normally.
 
 | Qualified identity | SHA-256 |
 | --- | --- |
-| Execution source manifest | `062ec189671de1e37e55294083de8da186701ee8ec166b73a9fa91752b0386ae` |
+| Execution source manifest | `4c958ae9cd557c5e952bfa0c20b48b7fb80e9f344eac2c7f523c219cdafb26f3` |
 | Work manifest | `490060e6deafda06b4383a3de300c68fa1adaf71691830ba3a5cfb4d0aa20b60` |
-| 29-control qualification result | `c5cdf1f6498a176cdbff2e9cbdb371cef69f6427d47e5448759275fb348a5138` |
+| 46-control qualification result | `28ce33ba9ccd177ad9b6a5de06fa60325585e8db2d434416954b140545dcd75d` |
+
+Affected regressions also passed: SRR-013 strict 51 controls, structural
+63 new observations plus four replay challenges (including the strict and
+prior retail-like owned baselines); SRR-016 whole census 73 owned controls,
+eight tamper controls and one remap refusal; SRR-017 export eight positive
+and nine negative controls. The existing 20 native/source and 28 oracle
+tests passed. No work limit, oracle, reproducer or operational gate changed.
+The fresh pinned static export manifest SHA-256 is
+`244cdfebc8a421c7576bdb76af29b46b985bad0c35ebe8d1995322981611c121`;
+it pins function/window text and machine-byte hashes, recovered with the
+tracked PE inspection tool and existing Capstone 5.0.7.
+
+Frozen old execution source
+`062ec189671de1e37e55294083de8da186701ee8ec166b73a9fa91752b0386ae`
+from `8a963710` reproduces the original receipt's exact `index_fence` and
+byte-identical indeterminate export. Work identity remains
+`490060e6deafda06b4383a3de300c68fa1adaf71691830ba3a5cfb4d0aa20b60`.
+The current public replayer refuses that receipt's old source pin. An
+explicitly diagnostic checked prefix consumes the original 4,251 operations,
+passes the former `[0, 83]` boundary, then requires a read at operation 4,252
+where the retained stream instead ends the failed collection. No read or
+second collection is fabricated; historical raw targets remain unqualified.
 
 Reproduce using the run card's offline commands with a new ordinary output
 directory. `--identity` prints the exact byte-hashed execution dependencies
 and work limits without opening a process. Qualification builds disposable
 fixtures and writes rebuildable evidence; it never opens Starfield. The
-starting HEAD was `90ff8d62043dabc9b36703d91e70f43ce5534444`, with the actual
+starting HEAD was `8a963710ce297dd97ef56d8840cf6ed2f8544656`, with the actual
 incomplete-observation report already modified in the worktree. The task
 patch excludes that pre-existing report change.
 
 The actual observations below retain their original disposition and scope.
 The former 8,192-descriptor refusal describes the previous implementation;
 it is not a condition of the new operator command.
+
+## Operator title-card observation at 15:17 AEDT on 18 November 2026
+
+**INCOMPLETE — ACQUISITION_INDETERMINATE.** The operator explicitly
+requested one attempt at the responsive title card. At 04:17:28 UTC
+(15:17:28 AEDT), the unchanged reviewed operator-v2 command selected
+Starfield PID 34104. Checkout `8a963710ce297dd97ef56d8840cf6ed2f8544656`
+was clean; its execution identity was
+`062ec189671de1e37e55294083de8da186701ee8ec166b73a9fa91752b0386ae`,
+its work identity was
+`490060e6deafda06b4383a3de300c68fa1adaf71691830ba3a5cfb4d0aa20b60`,
+and the executable matched the pinned retail hash.
+
+The collection declared 18,314 mixed descriptors and traversed 1,202:
+37 mixed exclusions and 1,165 native-typed target records. It then refused
+`index_fence: keys cross a root-derived separator`. Resource limits were
+not exhausted. This records the reader's fence comparison; it does not
+establish whether the discrepancy reflects a decoder assumption, changed
+memory or a native structure issue. No check was bypassed or changed.
+
+The retained raw targets contain 512 distinct runtime PNDT IDs, 302 distinct
+runtime BIOM IDs and all 8,155 slot words, including 5,480 zero lanes and
+no all-zero target row in this partial subset. Those counts describe only
+unqualified diagnostic records. Complete coverage and closing witnesses
+were not reached; native namespace acquisition and the second collection
+did not begin. No normalized identity or qualified export is established.
+The empty qualified row list is not an empty population. Downstream
+`source_binding_incomplete`/namespace source issues reflect the absent
+namespace collection, not demonstrated invalid loaded-plugin identities.
+
+The sealed receipt contains 4,251 acquisition events and 396,207 requested
+bytes. Backend totals including image checks were 4,260 process reads,
+4,294 region queries and 399,509 bytes. Output hashes reconcile, and checked
+offline replay reproduces the exact refusal and byte-identical diagnostic
+export. Retained evidence identities:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Sealed receipt | `2d43d7aa323cde6c2b5b7743864fbd0d3b160c2823a8da69d0ee30d0b9471508` |
+| Indeterminate dataset | `e794d7e34b6505c7bc375cd08853e326c2a8bef4f0d562c1f0986a4bb5516614` |
+| Source/work and output manifest | `3670b465acaa45d1f72bf0319e9d4b82a94d1a95172a1dbc99f37f8bb01f3500` |
+
+The operator was told immediately that they could Quit normally. There was
+no retry, limit enlargement, code change or further live access. Quit and
+save preservation were not independently measured under this workflow.
+No atomicity, allocator completion, complete population or oracle agreement
+is claimed. The concrete unresolved observation is the fence refusal;
+any implementation diagnosis/correction requires separate offline work,
+and another live attempt requires an explicit operator request.
+
+Independent offline review verified all evidence hashes, the exact fourteen
+execution files and work identity, receipt seal and byte-identical replay.
+An offline trace isolated the predicate in `check_fences`: a 14-descriptor
+packed block at path `[0, 83]` exceeded its inherited level-1 parent's
+child-0 upper fence. The block's first key equals that fence; later keys
+exceed it. No lower fence applies there. This establishes the reader's
+specific failed comparison, not native corruption or its cause. The walk
+had reached 86 windows and 1,335 native map entries, within all budgets.
+The reviewer confirmed every partial count and the absence of closing
+identity, namespace and paired agreement; the only supported disposition
+is an incomplete diagnostic observation. The standalone review SHA-256 is
+`468f053d8005cd1704c7be242b198fd8a18029a67bc675ab97c57d3a9417f2b0`.
 
 ## Operator title-card observation on 18 November 2026
 
@@ -260,34 +363,39 @@ later launch or observation needs separate maintainer authorization.
 
 <!-- srr-017-identity-review:start -->
 **READY_FOR_SEPARATELY_AUTHORIZED_OPERATOR_EXTRACTION.** Independent
-challenge accepted the capacity correction and the necessity audit. No
-unresolved blocker remains within the qualified work envelope. Scientific
-identity, count reconciliation, malformed-structure refusals, pairing,
-cancellation and evidence integrity remain mandatory.
+challenge accepted the narrow separator correction with no unresolved native
+or implementation blocker. This is offline readiness, not a new retail
+observation or authorization.
 
-The reviewer independently checked every large-fixture target and all
-516,096 slot words against separate arithmetic, including metadata,
-normalized identities and 4,338 all-zero rows, and checked byte-identical
-export replay. Separate byte fixtures qualified all 4,605 native plugin
-slots and 8,701 registry files, plus 600 ordered RSGD pointers across two
-chunks. Wrong RSGD types/pointer identities, namespace exhaustion,
-cancellation and resealed receipt edits refused. Tree-depth and cached
-chain controls directly exercised the remaining stack/computation bounds.
+The reviewer personally rechecked the pinned lookup, split, truncation,
+insertion and cursor bytes: internal equality routes left, leaf lookup can
+choose a previous-leaf block, and a leaf split promotes its last left block
+minimum rather than record maximum. Independent byte examples covered seven
+valid geometries, including unsigned qword boundaries, and nine malformed
+geometries. Seventy-five selected-key queries and 21 malformed selected
+routing/overlap/link cases challenged the shared primitive. The documented
+pivot-gap/equality admission examples are explicitly fixture/navigation
+evidence, separate from the proven static native writer shape.
 
-One material review finding identified the remaining plugin-registry
-count ceiling as redundant and its claimed native implementation extent
-as unsupported. The active ceiling was removed; the 8,701-file test
-exceeds the previous 8,192 bound and still validates under actual read/byte
-budgets. Native slot-space invariants, registry cycle and alias checks
-remain. No replacement prerequisite was introduced.
+The reviewer independently checked all 73,728 large-fixture targets and
+516,096 slot words, including normalized identities, metadata and 4,338
+all-zero rows; replay regenerated byte-identical exports. Six independently
+resealed evidence attacks refused. Source/work identity, compiled fixture
+provenance and all seventeen pinned static exports reconciled.
 
-The reviewer checked the eleven-file manifest
-`8bba2da64fc2393883f9b17bd7585173f9e2c034849fd433fc2df1dedd7550f8`.
-It hashes sorted lines of byte SHA-256, two spaces and relative path,
-terminated by LF; only this marked review body is excluded from the
-dossier hash. The historical refused attempt is unchanged. The later
-incomplete observation retains its original result and explicit old
-source/work identities. No retail operation occurred during correction.
-The detailed independent report records the substantive methods and
-resolved finding; these conclusions need no private-file dependency.
+Frozen old source independently reproduces the exact historical refusal
+and indeterminate export. The corrected raw prefix passes the former block
+then needs uncaptured operation 4,252. No source pin is bypassed in the
+public replayer; no read, closure or second collection was invented. The
+retained retail result remains `ACQUISITION_INDETERMINATE`.
+
+The fourteen-file review manifest is
+`469486653aa8683a9a387f2b22684cca319bdeb11c0492c326e6e4fbae7c2dda`.
+It hashes sorted UTF-8 lines of byte SHA-256, two spaces and relative path,
+terminated by LF; only this marked review body is excluded from the dossier
+hash. Tracked conclusions are self-contained and require no private review
+files. No scientific check, work limit or operator prerequisite was removed
+except the contradicted record-maximum application of routing fences;
+minima/pivot fences, genuine record boundaries and complete paired coverage
+remain mandatory. No live operation occurred during this correction.
 <!-- srr-017-identity-review:end -->

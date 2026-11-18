@@ -6,6 +6,16 @@ Creation Kit addresses below apply to the live-traced CK Galaxy View Apply path.
 
 ## Pinned retail static evidence
 
+**PROVEN STATIC:** On the pinned retail 1.16.244.0 image, mixed-index leaf
+splitting in `FUN_1403835E0` promotes the last left **block minimum**
+(`0x140383E2E`, `0x140383F53–0x140383F67`), not that block's last record.
+Unsigned two-word lookup can route beyond that pivot and choose the previous
+leaf's final block (`0x1403832EE–0x14038339C`), then continue through records.
+The former external reader's record-maximum ancestor fence is **SUPERSEDED**;
+routing fences remain valid on pivots/block minima. The retained partial
+retail receipt demonstrates that boundary geometry, but establishes no
+complete population or paired export. See [native separator semantics](SRR-016-native.md#separator-semantics).
+
 **PROVEN STATIC:** In retail `Starfield.exe` 1.16.244.0, the orchestrator
 at preferred VA `0x140779760` passes separately maintained family and
 shared ID arrays to `0x140777870` at `0x140779C86`. The per-biome body

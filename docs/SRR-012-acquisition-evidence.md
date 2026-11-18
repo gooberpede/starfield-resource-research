@@ -98,6 +98,47 @@ lower-bound and continuation are implemented across
 `0xFE0` accompany null leaf/block pointers. They are neither
 record offsets nor candidate row indices.
 
+### Separator meaning and packed records
+
+**PROVEN STATIC on the pinned retail image:** internal pivots fence routing
+keys, including leaf-advertised **block minima**, rather than every record
+inside those blocks. Comparisons are lexicographic on two unsigned u64
+words. Equality takes the left internal child. The leaf then selects an
+exact minimum or the predecessor block, including the previous leaf;
+record lower-bound and cursor continuation finish the search.
+
+The writer supplies the decisive distinction. In `FUN_1403835E0`, the
+left-insertion split copies original leaf entries 84 onward to the right,
+truncates the left, inserts the new left minimum, and promotes left key 84
+at `+0x558`. The other branch promotes left key 83 at `+0x548`. Both are
+the **last left block minimum**, not the last record key. Internal splits
+promote existing routing pivots; they do not derive record maxima.
+
+| Native locator | Established operation |
+| --- | --- |
+| `0x1403832EE–0x14038331E` | Unsigned two-word internal lower bound; equal pivot chooses its left child. |
+| `0x140383339–0x14038339C` | Exact leaf minimum or predecessor; previous leaf when needed. |
+| `0x14038340D–0x14038343C` | Unsigned lower bound within a packed block. |
+| `0x142410439–0x14241049F`, `0x1403A4250–0x1403A42CF` | Cursor continuation through record/block ends and leaf links. |
+| `0x140383D97–0x140383E2E`, `0x140383E64–0x140383F67` | Leaf split and promoted last-left-block minimum. |
+| `0x140383776–0x140383898`, `0x140383A14–0x140383A5E` | Internal pivot promotion and repartitioning. |
+| `0x140384499–0x1403844EF`, `0x140382E8D–0x140382EA1` | Parent key/right-child insertion and new-root installation. |
+
+A final left block can therefore contain records greater than its ancestor
+pivot. A query beyond that pivot can route right and select the preceding
+leaf's final block. This is intentional navigation, not evidence of a
+malformed tree. **SUPERSEDED:** the external reader's former assumption
+that every descendant record must lie within all ancestor routing fences.
+Apply those fences to pivots and block minima instead. Bound actual records
+against the next block's minimum and global record order. The promoted
+last-left minimum is a demonstrated static writer shape. **PROVEN on
+disposable fixtures:** the external inclusive routing contract also admits
+an interior pivot or equality with the next child's minimum while retaining
+correct lookup/iteration. Those alternative pivot shapes are navigation-
+derived fixture evidence, not observed retail writer states; exact pivot
+equality is not imposed as an additional external-reader assumption.
+[Current checked contract](SRR-016-native.md#separator-semantics)
+
 Check the encountered levels, counts and sorted keys before following
 children. Verify each visited leaf's advertised block minima against
 its decoded records. Verify predecessor and successor links and
@@ -192,6 +233,7 @@ python tools/srr011/inspect_pe.py $retailImage functions 14240a270 142404ef0 142
 python tools/srr011/inspect_pe.py $retailImage functions 14231d000 140779610 14077bce0
 python tools/srr011/inspect_pe.py $retailImage functions 140382700 140382800 1403832a0 140383570 1403833e0
 python tools/srr011/inspect_pe.py $retailImage functions 1424103e0 140772620 1405f7a80 140771f30
+python tools/srr011/inspect_pe.py $retailImage functions 1403835e0 140384200 1403842b0 140384410
 python tools/srr011/inspect_pe.py $retailImage window 1405f7b10 114
 python tools/srr011/inspect_pe.py $retailImage window 140771f98 88
 python tools/srr011/inspect_pe.py $retailImage window 1403a4250 80

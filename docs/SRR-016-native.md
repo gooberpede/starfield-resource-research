@@ -3,10 +3,10 @@
 **PROVEN on the owned disposable profile.** The complete rooted traversal
 reconciles the mixed header, physical descriptor positions and typed target
 denominator for the qualified fixture layouts. A paired result includes
-separate graph and seven-slot decisions. Retail activation requires a new
-admission binding and independently established bounds. This reader provides
-an owned-process qualification entry point and an offline replay command.
-[Proposed run card](SRR-016-title-census-run-card.md)
+separate graph and seven-slot decisions. The current retail operator entry
+point and separately requested live boundary are in the
+[SRR-017 run card](SRR-017-title-run-card.md). The original SRR-016 entry
+point remains an owned-process qualification and offline replay interface.
 
 ## Reachability and identity
 
@@ -38,7 +38,7 @@ require root/count consistency and admit the independent limits
 if root is a packed block, visit it as the entire tree
 otherwise walk every used root-derived child position in ascending order:
     require level decrement and separator order
-    require keys within inclusive bounds inherited from every ancestor
+    require routing pivots/block minima within inclusive ancestor bounds
     at a leaf, cross-check both directions of the root-derived leaf adjacency
     for every block position, validate layout and exact advertised minimum
 at every block:
@@ -62,6 +62,58 @@ count provide independent reconciliation. The cursor's terminal +0xFE0
 denotes an exclusive block boundary. No descriptor or payload starts there.
 [Native topology](SRR-012-acquisition-evidence.md#exact-mixed-index-model) ·
 [Census derivation](SRR-015-native-extraction.md#whole-tree-read-contract)
+
+## Separator semantics
+
+**PROVEN STATIC:** keys are unsigned `(u64 word0, u64 word1)` pairs ordered
+lexicographically. Internal lower-bound chooses the first pivot `>= query`,
+with equality on the left. Leaf keys advertise packed-block minima; exact
+match selects that block, otherwise lookup can choose a predecessor in the
+same or previous leaf. The record cursor continues through blocks and leaves.
+`FUN_1403835E0` promotes the final left block minimum during a leaf split;
+that block's subsequent records may exceed the pivot. See the
+[exact native locators](SRR-012-acquisition-evidence.md#separator-meaning-and-packed-records).
+
+```text
+for each ancestor (pivots S, child i):
+    lower = S[i-1] if i > 0 else -infinity
+    upper = S[i]   if i < len(S) else +infinity
+    require lower <= each routing pivot / block minimum <= upper
+for each packed block in complete root order:
+    require first_record_key == advertised_block_minimum
+    require every record key > the previously visited record key
+    # Its last record need not be <= an ancestor pivot.
+require complete count reconciliation, leaf links, consumed-window stability
+require independent second collection and identity/value/coverage agreement
+```
+
+The census still checks every node's pivots and every packed minimum against
+all ancestor fences; it has not disabled `index_fence`. Its global strict
+record ordering rejects overlap/duplicates across blocks, leaves and internal
+subtrees. **PROVEN on disposable fixtures:** inclusive routing bounds permit
+both endpoint equalities and a pivot between the last left-subtree block
+minimum and first right-subtree block minimum. This is a navigation-derived
+external admission contract, not a claim that the native writer was observed
+producing every such pivot. Exact equality to a child's extremum is not
+imposed as an additional reader assumption.
+
+The shared SRR-013 selected-key reader applies the same minimum-only fence,
+then bounds a block's final record by the **actual next block minimum**,
+including a next leaf derived from the root rather than trusted links alone.
+It preserves its nondecreasing boundary check and duplicate-component
+classification. Predecessor coverage checks, root-backed neighbors, native
+record/type checks and selected-range coverage remain. Selected-key
+qualification is distinct from whole-store completeness.
+
+The retail diagnostic counterexample has a 14-record block at path `[0, 83]`:
+its first key equals the level-one child-0 upper pivot; later keys exceed it.
+That boundary is native-supported. Its receipt still ends after only 1,202
+mixed descriptors and 1,165 raw targets, before closure, namespace resolution
+or the second collection. Frozen source `8a963710` reproduces `index_fence`.
+The corrected checked prefix passes that block but needs an uncaptured read
+at operation 4,252. Current strict replay refuses its old source identity.
+No altered seal, fabricated read or retrospective qualification is allowed.
+The historical observation remains `ACQUISITION_INDETERMINATE`.
 
 The decoder compares the wrapper to `image+0x4B3D258` and the low u32
 of key word 0 to `0x10000 | discriminator`. The owner is the high u32 of

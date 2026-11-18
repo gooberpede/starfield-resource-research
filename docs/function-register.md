@@ -57,7 +57,8 @@ and traversal anchors.
 | Retail entry | Bounded native role |
 | --- | --- |
 | `FUN_1423ff640`, `FUN_1424059f0` | **PROVEN STATIC** lazy accessor returning a fixed image object on both arms and initializer for its embedded context. Publication at `0x1418993E3` supplies the context consumed by the allocator at `0x140779676`. |
-| `FUN_1405f7a80`, `FUN_1403832a0`, `FUN_1403833e0`, `FUN_1403a4250` | **PROVEN STATIC** planet/type range construction, directory and record lookup, and successor iteration on the +0x300 index. |
+| `FUN_1405f7a80`, `FUN_1403832a0`, `FUN_1403833e0`, `FUN_1424103e0`, `FUN_1403a4250` | **PROVEN STATIC** planet/type range construction, unsigned two-word lower-bound, leaf exact/predecessor selection and record/block/leaf continuation on the +0x300 index. Ancestor pivots bound routing minima, not all packed records. |
+| `FUN_1403835e0`, `FUN_140384200`, `FUN_1403842b0`, `FUN_140384410` | **PROVEN STATIC** leaf split promotes the final left block minimum; internal promotion, truncation and parent insertion preserve routing pivots. Exact instruction locators and scope: [separator contract](SRR-012-acquisition-evidence.md#separator-meaning-and-packed-records). |
 | `FUN_1405de3b0` | **PROVEN STATIC** FormID lookup sourced from an image-relative locator for the form map. The map contents and per-form addresses require fresh resolution in a later observation. |
 
 [SRR-017 FormID map capacity evidence](SRR-017-title-admission.md)
