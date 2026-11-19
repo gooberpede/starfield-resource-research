@@ -1,29 +1,11 @@
-# Audit archive
+# Historical audit archive
 
-This directory contains the current audit index for 
-`starfield-resource-research`.
+The unchanged [audit archive](audits.zip) contains two historical audits:
+- `PUBLIC-RELEASE-READINESS-RECHECK.md`
+- `PUBLIC-RELEASE-READINESS.md`
 
-Completed historical audits are preserved in:
-
-```text
-audits.zip
-```
-
-Loose Markdown files in this directory should represent current or active 
-audit work only.
-
-Archived audits preserve the repository state, publication findings, 
-remediation decisions, and release-readiness evidence as they existed at the 
-time. They are retained for provenance and should not be treated as 
-substitutes for the repository's current research baseline or documentation.
-
-For the current research state, use `docs/v1-research-baseline.md`, 
-`docs/known-facts.md`, `docs/hypotheses.md`, `docs/function-register.md`, 
-`docs/PROVENANCE.md`, and the current root documentation.
-
-The v1.0 public-release audit cycle is complete and archived here for 
-provenance.
-The SRR-009 read-only publication audit and challenger remain in private
-custody with their start/end receipts and SHA-256 manifest. See the
-[publication dependency inventory](../SRR-009-publication-verification.md)
-for the resulting public verification routes and limits.
+These records preserve past repository/publication assessments. They are not
+current scientific authority, instructions or authorization. Use the
+[subject library](../README.md) for findings and [provenance](../PROVENANCE.md)
+for current verification routes and rights holds. The SRR-009 private audit
+and custody receipts remain historical; they are not clean-checkout inputs.

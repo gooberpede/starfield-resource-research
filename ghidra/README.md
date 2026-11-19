@@ -79,28 +79,7 @@ Alternatively, copy `ExportSelectedFunctionContext.java` into any script directo
 
 If the cursor is not inside a defined function, the script reports an error and writes nothing. It also rejects an export root located inside the current Ghidra project's storage directory. If decompilation fails or times out, the script still exports the remaining context, records the failure in `metadata.json`, and writes a failure comment to `decompiled.c`.
 
-### Running against FUN_1431bc320
 
-1. In CodeBrowser, press **G** (**Go To**).
-2. Enter `1431BC320` (or `0x1431BC320`, depending on the accepted address syntax for the loaded program) and go to that address.
-3. Confirm the Listing shows `FUN_1431bc320` and leave the cursor at the entry point or anywhere in its function body.
-4. Run `ExportSelectedFunctionContext.java` from Script Manager.
-5. Choose `<repository>/exports` as the export root.
-
-The expected output is:
-
-```text
-exports/functions/FUN_1431bc320/
-    metadata.json
-    decompiled.c
-    callers.json
-    callees.json
-    strings.json
-    globals.json
-    constants.json
-```
-
-Existing files with these names in the target function directory are replaced on a subsequent export. Generated exports are ignored by Git by default.
 
 ### Output notes
 
@@ -123,19 +102,7 @@ All JSON files are UTF-8 and deterministic by address where applicable. The scri
 
 It does not export callees of the depth-1 functions. Their direct caller and callee summaries are still included in each function bundle, just as they are for the single-function exporter.
 
-### Installation and usage
 
-If this repository's `ghidra/scripts` directory is already configured in Script Manager, refresh the manager and `ExportFunctionNeighbourhood.java` should appear under **Starfield Research**. Otherwise, follow the script-directory installation steps above or copy the new script into a configured Ghidra script directory.
-
-To run it:
-
-1. Open the analysed program in CodeBrowser and allow normal analysis to complete.
-2. Put the cursor anywhere inside the root function. For the first planned live test, go to `1431BC320` and confirm that the containing function is `FUN_1431bc320`.
-3. Run `ExportFunctionNeighbourhood.java` from Script Manager.
-4. Choose the repository's `exports` directory as the export root. Do not choose a directory inside Ghidra project storage.
-5. Review the console and the generated `manifest.json` for any per-function export failures.
-
-The script reports an error and writes nothing if the cursor is not inside a defined function. A decompilation failure does not stop the other context files from being generated. Failure to export one function bundle is recorded in the manifest and does not stop the remaining bundles.
 
 ### Focused virtual-call resolution
 
@@ -220,9 +187,8 @@ Stack-address provenance is deliberately narrower than alias analysis. It recogn
 
 For the current diagnostic target, navigate to `FUN_1431bc320` at `1431BC320`, run the exporter, and open:
 
-```text
-exports/neighbourhoods/FUN_1431bc320__1431BC320/pcode-diagnostics.json
-```
+Output paths/fields: `exports/neighbourhoods/FUN_1431bc320__1431BC320/pcode-diagnostics.json`.
+
 
 Locate `CALLIND` at `1431BC350`. Inspect `callTarget.definitionTree` for the fixed `0x50` addition and the stack-backed vptr source. Then inspect `arguments[0].definitionTree`, `arguments[0].stackAddressProvenance`, `callTarget.stackStorageNodes`, and `receiverStorageCorrelation`. The expected receiver result in `indirect-calls.json` is `receiverResolution.status: resolved-stack-object`, `resolutionBasis: stack-object-address-vptr-match`, equal argument and target offsets of `-168`, and `sameStackObject: true`. The call should then progress into initializer/vptr provenance rather than fail at `unresolved-receiver-provenance`.
 
@@ -250,26 +216,8 @@ Each character outside `A-Z`, `a-z`, `0-9`, `.`, `_`, and `-` is replaced with `
 
 For `FUN_1431bc320`, the output has this shape:
 
-```text
-exports/
-└─ neighbourhoods/
-   └─ FUN_1431bc320__1431BC320/
-      ├─ graph.json
-      ├─ manifest.json
-      ├─ indirect-calls.json
-      ├─ pcode-diagnostics.json
-      └─ functions/
-         ├─ FUN_1431bc320__1431BC320/
-         │  ├─ metadata.json
-         │  ├─ decompiled.c
-         │  ├─ callers.json
-         │  ├─ callees.json
-         │  ├─ strings.json
-         │  ├─ globals.json
-         │  └─ constants.json
-         └─ FUN_140e457b0__140E457B0/
-            └─ ...same seven context files...
-```
+Output paths/fields: `exports/`, `neighbourhoods/`, `FUN_1431bc320__1431BC320/`, `graph.json`, `manifest.json`, `indirect-calls.json`, `pcode-diagnostics.json`, `functions/`, `metadata.json`, `decompiled.c`, `callers.json`, `callees.json`, `strings.json`, `globals.json`, `constants.json`, `FUN_140e457b0__140E457B0/`, `...same seven context files...`.
+
 
 `manifest.json` identifies the root, fixed depth, program, timestamp, successful bundle count, indirect-call counts and analysis status, and any per-function failures. `graph.json` contains the root and one edge per distinct direct callee; each edge preserves the directly called function and the resolved implementation separately.
 
@@ -346,9 +294,8 @@ analyzeHeadless <project-directory> <project-name> \
 
 Output is written beneath:
 
-```text
-exports/call-signatures/FUN_1431bc320__1431BC320__call_1431BC350/
-```
+Output paths/fields: `exports/call-signatures/FUN_1431bc320__1431BC320__call_1431BC350/`.
+
 
 The script reads the current program's listing, symbols, references, function
 signatures, decompiler high p-code, and instruction low p-code. It writes only
@@ -434,41 +381,20 @@ Each ranked candidate also records its full symbol name, direct callers, direct 
 
 When a nested offset is supplied, the root trace follows uses of the loaded field value through copies, casts, fixed pointer arithmetic, and loads. It marks the exact nested-offset expression and downstream operations derived from it, including call arguments. Candidate writers that copy a function parameter into the field are also checked for same-function accesses at that parameter plus the nested offset. The script does not search a heap graph or infer aliases across arbitrary calls.
 
-### Usage and live test
+### Field analysis usage
 
-1. Open the analysed `CreationKit.exe` program in CodeBrowser and allow normal analysis to complete.
-2. Go to `1431BC320`, confirm the cursor is inside `FUN_1431bc320`, and run `AnalyzeFieldProvenance.java` from Script Manager.
-3. Enter base parameter index `0`, field offset `0xA0`, and nested offset `0x20`.
-4. Choose the repository's `exports` directory. Do not choose Ghidra project storage.
-5. Open `exports/field-provenance/FUN_1431bc320__1431BC320__field_A0/root-access.json` and confirm an exact field load is identified.
-6. Inspect its downstream uses for the `loaded + 0x20` expression and the call argument that consumes it.
-7. Review `candidate-writes.json` before `candidate-accesses.json`; high-confidence writer/initializer candidates should appear first. If no writer can be tied confidently, the files preserve that outcome rather than guessing.
-8. Inspect `provenance.json` and the bounded candidate bundles under `functions/`.
-9. Confirm the Ghidra undo/history state is unchanged; the script starts no transaction and intentionally changes no analysis state.
+With the cursor in the analyzed root, run AnalyzeFieldProvenance.java and
+enter parameter index 0, field 0xA0 and nested offset 0x20 (or the intended
+inputs). Select an external export root. Review root-access.json,
+candidate-writes.json, candidate-accesses.json and provenance.json before
+interpreting the bounded function bundles. No constructor/type attribution
+follows merely from ranking or a repeated offset.
 
-The minimum successful result is an exact root access, exported same-field candidates, and either a ranked writer/initializer or explicit evidence that no writer could be tied confidently. The best case identifies the installed object's initializer/type evidence, structurally explains the nested `+0x20` component, and exposes resource-specific upstream data. Those best-case interpretations must come from live evidence; they are not encoded in the script.
 
 ### Output structure
 
-```text
-exports/
-└─ field-provenance/
-   └─ FUN_1431bc320__1431BC320__field_A0/
-      ├─ manifest.json
-      ├─ root-access.json
-      ├─ candidate-accesses.json
-      ├─ candidate-writes.json
-      ├─ provenance.json
-      └─ functions/
-         └─ <candidate-name>__<address>/
-            ├─ metadata.json
-            ├─ decompiled.c
-            ├─ callers.json
-            ├─ callees.json
-            ├─ strings.json
-            ├─ globals.json
-            └─ constants.json
-```
+Output paths/fields: `exports/`, `field-provenance/`, `FUN_1431bc320__1431BC320__field_A0/`, `manifest.json`, `root-access.json`, `candidate-accesses.json`, `candidate-writes.json`, `provenance.json`, `functions/`, `<candidate-name>__<address>/`, `metadata.json`, `decompiled.c`, `callers.json`, `callees.json`, `strings.json`, `globals.json`, `constants.json`.
+
 
 Candidate bundles are deduplicated by function entry and limited to the strongest ten writer functions, or the strongest ten access functions when no writer exists. Files with the same names are replaced on a repeat run; unrelated old candidate directories are not deleted. Treat the current manifest and candidate arrays as authoritative membership for that run.
 
@@ -604,65 +530,14 @@ The receiver rule is deliberately conservative and exported as evidence. It does
 
 For the default target, the output is:
 
-```text
-exports/
-└─ class-provenance/
-   └─ ResourceViewWidget/
-      ├─ manifest.json
-      ├─ class-anchors.json
-      ├─ vtable-xrefs.json
-      ├─ lifecycle-candidates.json
-      ├─ class-methods.json
-      ├─ receiver-family.json
-      ├─ field-A0-accesses.json
-      ├─ field-A0-writes.json
-      ├─ provenance.json
-      ├─ member-A0-object-usage.json
-      ├─ callback-bindings.json
-      ├─ callback-family.json
-      ├─ callback-A0-accesses.json
-      ├─ object-mutations.json
-      ├─ object-plus20-usage.json
-      ├─ type-evidence.json
-      ├─ resource-signals.json
-      └─ functions/
-         └─ <function-name>__<entry-address>/
-            ├─ metadata.json
-            ├─ decompiled.c
-            ├─ callers.json
-            ├─ callees.json
-            ├─ strings.json
-            ├─ globals.json
-            └─ constants.json
-```
+Output paths/fields: `exports/`, `class-provenance/`, `ResourceViewWidget/`, `manifest.json`, `class-anchors.json`, `vtable-xrefs.json`, `lifecycle-candidates.json`, `class-methods.json`, `receiver-family.json`, `field-A0-accesses.json`, `field-A0-writes.json`, `provenance.json`, `member-A0-object-usage.json`, `callback-bindings.json`, `callback-family.json`, `callback-A0-accesses.json`, `object-mutations.json`, `object-plus20-usage.json`, `type-evidence.json`, `resource-signals.json`, `functions/`, `<function-name>__<entry-address>/`, `metadata.json`, `decompiled.c`, `callers.json`, `callees.json`, `strings.json`, `globals.json`, `constants.json`.
+
 
 `class-anchors.json` preserves all matching symbols, concrete vtable candidates and bounded slots, RTTI candidates, exact method-anchor status, the independent `FUN_1431bc320` status, and lifecycle summaries. `vtable-xrefs.json` contains per-vtable xrefs and explicit negative results. `lifecycle-candidates.json` contains structural stores and conservative role classifications. `class-methods.json` contains confidence and membership evidence; `receiver-family.json` isolates bounded nonvirtual helpers. The access file contains only strong/medium candidates. The writes file explicitly contains `negativeResult: no-class-scoped-writer-found` when appropriate. `provenance.json` collects detailed written-value traces. Every new focused report likewise preserves an explicit negative result rather than silently omitting an empty discovery.
 
 Every internal function that directly references a discovered concrete class-vtable address is exported first. The ordinary class-family selection is capped at 30 functions. Focused member-object readers, constructor callbacks, callback-family functions, internal loaded-object callees, and the structurally rediscovered acceptance target `FUN_1431ef760` plus its resolved internal thunk target are then forced and deduplicated, so the actual total can exceed 30. `manifest.json` records both the configured ordinary cap and actual total. External/inherited Qt functions are not exported. Their call metadata remains in the JSON reports.
 
-### Exact live test
 
-1. Open the normally analysed `CreationKit.exe` program in CodeBrowser.
-2. Go to `ResourceViewWidget::OnApplySeed` if its exact symbol is available. Otherwise go to `FUN_1431bc320` at `1431BC320`, which is the known direct downstream context; the script still requires and separately verifies the exact named anchor.
-3. Run `AnalyzeClassFieldProvenance.java` from Script Manager.
-4. Enter `ResourceViewWidget`, `0xA0`, and `0x20` at the three prompts.
-5. Choose the repository's `exports` directory. Do not choose Ghidra project storage.
-6. Inspect `exports/class-provenance/ResourceViewWidget/class-anchors.json`. Confirm that the discovered anchors include `0x148B7CFB0` and `0x148B7D170`, then review their slot counts, stop reasons, internal/external flags, thunks, and duplicates.
-7. Inspect `vtable-xrefs.json`; record the xref and structural-vptr-store count for each vtable. A zero count must appear as an explicit negative result.
-8. Confirm `FUN_1431e7d20` has recovered stores for the two concrete vtables at receiver offsets `0x0` and `0x10`. Verify that each record retains its xref address, resolved store address, and value-definition path.
-9. Inspect `lifecycle-candidates.json`; verify every classification against its vptr-store order, receiver offsets, callers, callees, allocation evidence, and limitations. `FUN_1431e7d20` is expected to become destructor-like from structural teardown evidence, but this result is not hard-coded. Treat offset `0x10` only as secondary-subobject evidence.
-10. Confirm both direct internal xref functions, `FUN_1431e7d20` and `FUN_1431e29f0`, are listed in the manifest's forced-xref export fields and have function bundles.
-11. Inspect `class-methods.json` and `receiver-family.json`; confirm that searched functions are `strong` or `medium`, receiver helpers have depth at most 2, and `FUN_1431bc320` is either structurally connected or explicitly preserved as unconnected.
-12. Inspect `field-A0-writes.json` before `field-A0-accesses.json`, then review `provenance.json`. The `+0xA0` matcher is unchanged; a negative result remains valid.
-13. Inspect `member-A0-object-usage.json`. Locate the structurally rediscovered `FUN_1431ef760` entry, verify each load address/HighVariable/datatype, and follow the depth-bounded uses. Confirm `manifest.json.memberUsageAcceptance` reports whether the known acceptance name was rediscovered without using it for discovery. Confirm its function bundle and any internal thunk target bundle exist.
-14. Inspect `callback-bindings.json`. Verify the constructor is `FUN_1431e29f0` from lifecycle evidence, then check source-object, receiver/context, connection call, raw callback, resolved callback, and evidence. Confirm the observed callback family around `thunk_FUN_1431f10b0`, `thunk_FUN_1431f0fe0`, and any text-change callback is either rediscovered structurally or absent with an explicit negative result; those names are not discovery seeds.
-15. Inspect `callback-family.json`; verify depth never exceeds 2 and every helper has unchanged receiver evidence. Then inspect `callback-A0-accesses.json`, explicitly separating pointer assignment/clear from loaded-object calls and field mutations.
-16. Inspect `object-mutations.json`. Treat stores as observed mutations and calls only as candidates. Inspect `object-plus20-usage.json` for `obj+0x20` reads/writes/calls, receiver adjustments, vptr loads, and recovered slots.
-17. Inspect `type-evidence.json`. Do not promote `QTreeWidget *` beyond weak unless an independent concrete Qt API, constructor/destructor, RTTI, or vtable relationship is present. Inspect `resource-signals.json` and validate every resource-related match against its referenced symbol/string/callee; one generic TESContainer match is insufficient.
-18. Confirm `manifest.json` reports schema version 3, `readOnly: true`, the 256-slot vtable limit, receiver/callback depth 2, the 30-function configured cap plus documented forced-export exceptions, report counts, and explicit negative results where applicable.
-19. Confirm the Ghidra undo/history state is unchanged. The script starts no transaction and intentionally changes no analysis state.
-
-The minimum successful live outcome for this iteration is: `FUN_1431ef760` is structurally rediscovered and exported with a recorded `+0xA0` use tree; constructor-wired internal callbacks are enumerated; callback-family expansion completes to depth two; callback-family `+0xA0` accesses are reported; concrete type evidence is separated from the weak Ghidra datatype; and `obj+0x20` use is recorded when observed. The best case is independent identification of the member-object type, a constructor callback that mutates or populates it, structural identification of the `+0x20` component, and a multi-signal path into resource-specific container/list generation.
 
 ### Known limitations
 

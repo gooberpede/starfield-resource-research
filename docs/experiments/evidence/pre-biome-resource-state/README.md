@@ -1,7 +1,7 @@
 # Pre-biome resource-state static evidence
 
 This directory preserves the focused Ghidra evidence used by
-the [pre-biome resource-state investigation](../../pre-biome-resource-state-investigation.md).
+the [pre-biome resource-state investigation](../../../v1-research-baseline.md).
 
 ## Source
 

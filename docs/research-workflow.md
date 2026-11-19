@@ -1,15 +1,16 @@
 # Research Workflow
 
-Use one principal dossier under `docs/` per bounded investigation and link it
-from the [documentation index](README.md). Freeze the objective, scope, and
-acceptance criteria in the brief. Record the starting HEAD, index and worktree
-state, including pre-existing changes. In the dossier record the baseline,
-method, observations, interpretation, limitations, evidence, verification and
-review disposition. Link to the baseline and evidence in place. Preserve
-historical reports and qualify them in the navigation and provenance layer.
-Lead the dossier with the established finding, observation boundary,
-applicability and limitations. Keep operational and engineering history as
-supporting provenance.
+Maintain the small subject library listed in the [documentation index](README.md).
+Put generation, retail lifecycle, database and validation findings in their
+authoritative subject; keep unresolved current questions only in
+[hypotheses](hypotheses.md). Freeze the objective, scope and acceptance criteria
+for bounded work in its brief. Record the starting HEAD, index/worktree and
+pre-existing changes in private task receipts. Transfer durable observations,
+methods, qualifications and evidence identities into the appropriate subject,
+without creating a numbered dossier, duplicate register or consolidation diary.
+Preserve superseded mechanisms with concise qualifications; Git retains full
+historical discussion. Archive completed briefs only under an explicit task,
+after verifying byte preservation and transfer of unique scientific content.
 
 Use [provenance](PROVENANCE.md) for executable identities and claim
 applicability. Capture executable product version and SHA-256, tool version,
@@ -22,7 +23,7 @@ baseline before retail native research begins.
 
 Tracked documentation must be self-contained. Cite tracked methods,
 declared lawful inputs and durable evidence identities. Describe the
-substantive findings, review disposition and limits in the dossier.
+substantive findings, review disposition and limits in the authoritative subject.
 Treat prior review manifests as identities of their historical snapshots.
 Private scratch areas can hold new outputs and custody records.
 
@@ -64,7 +65,7 @@ to available space on the drives. There is no fixed size cap on `.local-work/`.
 
 ## Pseudocode, diagrams and structure records
 
-- Keep optional pseudocode in its dossier. Use original prose and research
+- Keep optional pseudocode in its authoritative subject. Use original prose and research
   aliases to express control or data semantics. Cite native locators for
   branches, ordering, exits, effects and fallbacks, and mark unknowns. Use
   the reproducer only as a qualified comparison where retail evidence leaves
@@ -127,7 +128,7 @@ Label the verification route separately from epistemic confidence:
 can rerun the method. **Custody-backed historical observation** means
 retained, hash-identified evidence supports a particular past result.
 **Provisional/unresolved claim** identifies the missing evidence and what
-could resolve it. These routes can coexist in one dossier.
+could resolve it. These routes can coexist in one subject.
 
 ## Independent review and handoff
 
@@ -148,38 +149,15 @@ available authority or resources. Record attempted checks and the minimum
 action needed to resume. Self-review cannot satisfy this gate.
 
 Record the disposition, reviewer role, material limits and reviewed commit or
-deterministic SHA-256 manifest in the dossier. For an uncommitted handoff
-exclude only the dossier's review-status block from its own manifest and have
+deterministic SHA-256 manifest in the authoritative subject. For an uncommitted handoff
+exclude only the subject's review-status block from its own manifest and have
 the reviewer verify the populated block and covered content. Renew review
 after substantive changes. Describe the review as an internal challenge
 against the brief and ground scientific confidence in the evidence.
 
 Record ending HEAD, index and status. Produce a task-only patch with Git's
 native output as specified in [AGENTS.md](../AGENTS.md#diff-export-encoding).
-Include new task files and the completed review block. Check and apply the
+Include new task files and the completed review disposition. Check and apply the
 patch against the starting content in an isolated context, then compare the
 result byte-for-byte against the delivered files. Account for pre-existing
 changes separately.
-
-<!-- srr-004-review:start -->
-## SRR-004 editorial review
-
-**COMPLETE.** Independent internal challenger `srr004_reviewer` accepted
-AC1–AC7 for this editorial revision after rework on adapter cleanup and
-allocation state timing. The challenger checked original static evidence,
-inspected both Mermaid renders, and verified the final patch replay.
-
-Reviewed manifest SHA-256 `67bdb5b299e55da81595ab11f89280a357f9a14fb0fa74a619ff3bb2b471d77c`.
-It records each file's SHA-256, two spaces, repository-relative path and LF
-in sorted path order. The seven paths are the documentation index, function
-register, glossary, research workflow, structure register and the SRR-002
-and SRR-003 dossiers. Only this marked SRR-004 review block is excluded from
-the workflow digest. The historical SRR-002 and SRR-003 review blocks remain
-part of their dossier bytes in this new manifest.
-
-Both Mermaid diagrams passed parsing and visual inspection after rendering
-locally with VS Code's bundled Mermaid engine in headless Chrome. Retail
-gameplay association, actual
-invocation, cache lifecycle, descendant multiplicity and full runtime
-equivalence remain open under the existing publication holds.
-<!-- srr-004-review:end -->

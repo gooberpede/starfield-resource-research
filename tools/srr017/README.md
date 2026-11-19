@@ -1,7 +1,6 @@
-# SRR-017 operator title-card extraction
+# Current allocation extraction
 
-Implementation and offline qualification do not authorize live access. After
-accepting and committing the candidate, the maintainer launches Starfield
+Implementation and offline qualification do not authorize live access. The operator launches Starfield
 normally, holds at the responsive title card before menu/save navigation,
 and explicitly tells Codex to extract in the current conversation.
 
@@ -46,8 +45,7 @@ The operator v2 reader has no separate descriptor/population ceiling. It
 retains native count reconciliation, structure and identity checks, with
 finite limits of 4,000,000 pair operations, 512 MiB requested memory,
 1 GiB journal and 512 MiB per portable output. Tree depth 64 protects the
-reader stack; long cached FormID chains remain bounded. See the dossier
-for the combined limit audit and large-population qualification. These
+reader stack; long cached FormID chains remain bounded. See [validation](../../docs/allocation-validation.md) for the actual retail census and fixture boundary. These
 are resource limits, not a prediction of the retail population.
 
 ## Read the result and Quit
@@ -83,7 +81,25 @@ python -E -B -m tools.srr017.qualify_extract .local-work/srr017-owned-qualificat
 
 The qualification controller starts and retires only its own disposable
 fixtures; the extraction command itself never starts or retires a target.
-The [existing dossier](SRR-017-identity-correction.md) records reviewed
+The [validation record](../../docs/allocation-validation.md) records reviewed
 source/work identities, tests and independent review conclusions. Its
 historical refused Steam-admission attempt remains a no-observation result;
 the earlier admission procedure is superseded for new extraction.
+
+## Inputs, writes and interpretation
+
+Requires AMD64 Windows, x64 Python 3.14 and the compatible already-running
+operator-selected retail image. The extractor uses query/read access only;
+it does not write target memory, invoke native methods, suspend threads,
+install breakpoints or modify a Ghidra project. It reads executable identity,
+the published rooted store, native forms and namespace. Its only writes are
+new receipt/dataset/projection/result/manifest files in the selected output.
+The owned qualifier additionally builds, starts and retires its own fixtures
+using local MSVC x64 Build Tools; those are synthetic evidence.
+
+Paired opening/closing identities and consumed-window checks establish the
+admitted complete rooted pair. They cannot prove atomicity, continuous lifetime,
+absence of ABA or unchanged intervening clears. Zero lanes and all-zero typed
+components remain explicit. Missing input is distinct from zero. The
+[interchange contract](interchange.md) defines normalized identity, conservation
+and diagnostic refusals. No ledger/oracle is read during acquisition.

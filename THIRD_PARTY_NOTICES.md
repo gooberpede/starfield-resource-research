@@ -34,7 +34,7 @@ Inspection and credit establish provenance. Redistribution clearance for the
 About image and additional executable-derived material was not established in
 SRR-001. The capture stays local. Any future disclosure involving such material
 requires a documented basis specific to its scope and purpose. See the
-[SRR-001 release scope](docs/SRR-001-executable-identity.md#release-scope)
+[SRR-001 release scope](docs/PROVENANCE.md)
 for claim-specific holds.
 
 ## SRR-003 analysis tools
@@ -42,7 +42,7 @@ for claim-specific holds.
 SRR-003 used the maintainer-authored `OutpostRecon.java` from
 `starfield-outpost-research` in place for read-only reference and
 data queries. Ghidra and Capstone contributors provided the analysis and
-decoding tools. The [dossier](docs/SRR-003-retail-allocator-invocation-and-dispatch.md#reproduction-publication-and-next-experiment)
+decoding tools. The [dossier](docs/retail-execution-lifecycle.md)
 records the tool revisions, local inspection scope and publication holds.
 
 ## SRR-008 save policy and inventory tooling

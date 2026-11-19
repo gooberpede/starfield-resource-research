@@ -1,107 +1,49 @@
-# Hypotheses and Open Models
+# Current research questions
 
-This file contains only interpretations not directly settled by decisive evidence. Labels follow `AGENTS.md`. Resolved rules are in `known-facts.md`; displaced interpretations remain below as research history.
+This is the sole authoritative lead register. **OPEN** means a warranted
+unresolved question; **DEFERRED** means unresolved without current priority.
+P1–P3 rank relative priority, not authorization to start live work. The
+recovered v1.0 rules stay fixed absent a reproducible falsification.
 
-## H1 — Zero-count reflected LIST explicitly clears atmosphere
+Evidence domains and executable identities are qualified in
+[provenance](PROVENANCE.md); mechanism, database and observation details live
+in the [baseline](v1-research-baseline.md), [lifecycle](retail-execution-lifecycle.md),
+[database](component-database.md) and [validation](allocation-validation.md).
 
-**PROVISIONAL**
+| Stable ID; status / priority | Evidence-grounded question | Exact uncertainty | Discriminating evidence |
+| --- | --- | --- | --- |
+| ORACLE-INPUTS; OPEN / P1 | Can more retained rows qualify for strict native seven-lane comparison? SRR-018 diagnostically agrees on all 22,470 shared lanes but strict admission is zero. Consolidates SRR-012 B05, SRR-013 effective-input rows, SRR-015 authoritative ledger/universal projection, SRR-017 winner/alternate-source rows. | Independent winning load-order/remap/content, admitted ordered PPBD/ENAM/CSV operations, whole-owner closure; 122-owner guard-cache ordering/multiplicity gap. Defining identity is insufficient. | A qualified input/operation attestation for a concrete owner, reconciled with native list order, binary32 selector/retry and descendant multiplicity, plus fallback order where applicable; rerun unchanged strict comparator. Do not use observed keys to manufacture the expected ledger. |
+| SRR014-A8; OPEN / P2 | Which startup invocation wrote the retained title contents, and when/how often? Static startup route and populated SRR-013/017 contents motivate association. | No identity-joined instruction-to-payload witness; title state is not completed allocator execution. Includes SRR-011 U02's runtime remainder, SRR-012 C02, SRR-014 B7's write timing. | A separately authorized pre-title qualified write at `0x1407779FC` with target identity and late-sweep ancestry, or an identity-qualified late return at `0x14094EF5C` plus retained sample. Negative at one store excludes only that store path. |
+| SRR014-A9; OPEN / P2 | Were all relevant typed input commands visible at a startup sweep? | Host owner +0x40 schedule/service completion and outstanding work at sweep entry remain unjoined. Nearby reset/image drains have different receivers. | Epoch-qualified selected command/host identities, direct-versus-deferred schedule choice and outstanding-work/completion at sweep entry. Pair agreement does not provide this. |
+| SRR011-U05b; DEFERRED / P3 | Does ordinary Save2 loading select reset/reallocation? | Four aborted SRR-010 loads are incomplete; conditional load-order callbacks do not identify ordinary Save2's request/mode. | A new concrete trigger/window and separately qualified joined request → callback/mode → allocator observation with responsive endpoint and scientific seal. Retain closed-inconclusive status of SRR-010; do not silently reactivate it. |
+| SRR011-D07b; DEFERRED / P3 | Do these seven words survive saves or process restart through serialization rather than replay? | Inspected direct PNDT/save-unit paths excluded; no matching typed stream write/read; original historical component capture unavailable. | A payload-key-attributable serializer/restore join, or qualified before/after experiment that discriminates serialization from reconstruction. Same address/value or two title samples is insufficient. Includes SRR-014 B10. |
+| SRR014-B8; DEFERRED / P3 | Can an actual notification subscriber mirror computed +0x300 slots into same-key +0x268? | SRR-015 resolved direct key-only dispatch and separate factory capability, not the subscriber/source/destination join. | Concrete installation/receiver ancestry and matching generated source/destination accesses; runtime attribution separately needs epoch-qualified execution. Reopen for a specific cross-store consumer/mismatch, not arbitrary subscriber speculation. |
+| SRR011-U04; DEFERRED / P3 | What was `bImportCSVBiomeData:Data`'s effective value in the measured title epoch? | SRR-014 resolved setting name/default/writer; historical epoch value remains unmeasured. | Effective-setting or attributable runtime write/read witness for a concrete relevant epoch. No reason to rediscover writer origin. |
+| H1; OPEN / P3 | Does zero-count reflected ATMO LIST generically clear the property? | Vectera and effective export fit explicit clear; property/override contract incomplete. | Decode generic reflected property identifier and override reducer against a controlled multi-layer case. Non-blocking current corpus. |
+| SurveyAggregator; DEFERRED / P3 | What upstream state/channel does RE ID 1016657 expose? | Known validator excludes some atmosphere membership; exact contract unresolved. | Trace concrete upstream population/filter boundaries on a pinned applicable source. No generation dependence, no restored snapshot publication. |
 
-Vectera has no atmospheric resources and a zero-count reflected `LIST`. Treating a sole zero-count list as an explicit Inorganic Resources clear fits current evidence, but the generic property identifier and override semantics have not been fully decoded.
+## Reconciled dispositions
 
-This question does not block v1.0 because the authoritative effective-atmosphere export already resolves the current corpus.
+SRR-014 A8 (write timing) and A9 (host completion) remain separate. The
+SRR-014 B8 above is the subscriber question, not an unqualified bare B8 from
+another register. Direct notification/key maintenance and source-copy factory
+capability are established; computed source→subscriber→destination remains
+unjoined. SRR-011 U04 retains only the historical effective setting value:
+its default and writer origin are resolved statically. U05b retains the
+scientific load question without reopening the closed-inconclusive Save2 run.
 
-## H2 — Planner co-location shorthand
+Successful SRR-017 extraction supersedes old access, namespace, descriptor-cap
+and separator implementation blockers. Complete admitted rooted coverage
+does not establish all-galaxy eligibility. SRR-018 resolved the retained
+checkpoint comparison with no diagnostic discrepancy; strict qualification
+remains open under ORACLE-INPUTS. Four samples and a whole rooted census have
+different coverage. Old per-task implementation/readiness rows are retired.
 
-**PROVISIONAL as planner guidance; not an engine rule**
-
-The recovered per-biome mechanism assigns at most one Common-family configuration during each processed biome invocation. This exact control-flow statement is **PROVEN** and belongs in `known-facts.md`.
-
-It must not be shortened to “one resource family per biome” without qualification:
-
-- atmosphere, Everywhere, and Special occurrences can coexist with Common resources;
-- guard fallback can assign a family whose root is absent from that biome's effective RSGD;
-- qualified planet-level `FamilyCount <= BiomeCount` evidence does not itself prove physical co-location.
-
-A planner may conservatively avoid assuming that resources from different Common families co-occur in one normal biome, but that remains derived guidance rather than a universal allocation rule.
-
-## Genuine Non-Blocking Open Questions
-
-### SurveyAggregator semantic contract
-
-The exact upstream state represented by `SurveyAggregator` and the historical `planet-all-resources.csv` snapshot remains unresolved. The dataset is a useful canonical validator for the CK/RSGD-visible channel and is proven incomplete for atmosphere-derived final membership. The snapshot is no longer distributed from this research repository; maintained canonical data lives in the sibling reproducer. Reversing its exact contract is not required for v1.0.
-
-### Retail dispatch and descendant multiplicity
-
-[SRR-003](SRR-003-retail-allocator-invocation-and-dispatch.md) resolves
-the candidate wrapper references from SRR-002 and establishes a conditional
-module-state construction route. [SRR-011](SRR-011-planetary-allocation-execution-and-result-lifecycle.md)
-resolves static startup and reset ancestry, a conditional load-order
-route and a retained component lookup. [SRR-014](SRR-014-startup-allocation-component-database-lifecycle.md)
-identifies the early sweep setting and orders the writer within a normal
-late visitor return. The setting's effective value in the SRR-013 title
-run, actual qualifying allocation at startup or during ordinary Save2
-selection, additional demand triggers and slot persistence remain open.
-The four populated title-card samples support a **STRONG** startup
-association within their measured scope. The retail descendant
-append loop could preserve overlapping child pointers. Actual candidate
-multiplicity depends on the upstream lists and remains unverified.
-
-### Defensive empty-cache fallback state
-
-**OPEN, apparently unreachable:** if a Common guard were entered with Common entries present but no generated family configurations available, current evidence does not define the engine's behavior. Recovered control flow appears to prevent this during normal execution, so it does not block v1.0.
-
-## Resolved and Superseded Interpretations
-
-### Atmosphere sharing the eight-entry state
-
-**SUPERSEDED AS A HYPOTHESIS → PROVEN LIVE**
-
-Maal VIII live tracing observed atmospheric Chlorine `000057D5` entering shared planet-wide resource-ID state before Everywhere and shuffled per-biome generation. The old proposed trace is complete and is not a current next investigation.
-
-### Five-family check semantics
-
-**SUPERSEDED AS PROVISIONAL → PROVEN LIVE FOR THIS GENERATION PATH**
-
-Bara VII-d progression `0, 1, 1, 2, 2, 3, 4, 5` and the branch at five establish that the guarded structure contains five distinct generated/cached Common-family configurations. Normal cache reuse does not increment it.
-
-### Shared-eight means no biome Common family
-
-**SUPERSEDED**
-
-The guard suppresses the normal Common selector but enters fallback near `0x1415DD255`, which can assign an existing family configuration.
-
-### Everywhere uses chance or ordinary weighted selection
-
-**SUPERSEDED**
-
-`FUN_141548920` performs a pre-biome category-6 scan without consulting DNAM Everywhere chance or consuming RNG.
-
-### Creation Kit leveled-list trail as primary allocation path
-
-**SUPERSEDED / DEPRIORITISED AS PRIMARY ALLOCATION PATH**
-
-The earlier `ResourceViewWidget::OnApplySeed → FUN_1431bc320 → FUN_140e457b0` trail retains valid calling-convention, `TESContainer`, and generic resolver evidence. Live Galaxy View Apply tracing instead establishes `FUN_1415DCFB0` as the primary per-biome generator in that operation.
-
-### Direct RSCS seeding unresolved
-
-**SUPERSEDED**
-
-Live tracing proves that nonzero unsigned 32-bit RSCS directly seeds MT19937 and that the evolving state drives shuffle and generation.
-
-### Root insertion mechanism unresolved
-
-**SUPERSEDED**
-
-A newly selected Common root is emitted unconditionally before descendant processing.
-
-### Leveled lists encode the resource-family graph
-
-**SUPERSEDED**
-
-IRES rarity and Child Resources directly encode the recovered inorganic family graph.
-
-### SurveyAggregator as complete final oracle
-
-**SUPERSEDED**
-
-The derived dataset omits at least some atmosphere-derived inorganic resources and cannot be treated as a complete final planetary-resource oracle.
+The ordinary known reader miss returns false without generating. No concrete
+new event-to-PNDT route warrants an on-demand/exclusivity lead. The empty-cache
+defensive branch and CK UI/container layout retain their bounded unknowns in
+the subjects/references; neither is an allocation blocker without new linkage.
+The Maal VIII atmosphere trace is complete. Output agreement does not fill
+missing CK live-build provenance or establish retail-live instruction identity.
+Physical co-location remains a limitation of biome resource occurrences, not
+an additional active research or product lead.

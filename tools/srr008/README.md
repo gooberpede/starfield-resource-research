@@ -106,4 +106,4 @@ historical custody.
 
 The policy classifier and inventory pattern provenance are given in the
 [third-party notices](../../THIRD_PARTY_NOTICES.md) and
-[dependency inventory](../../docs/SRR-009-publication-verification.md).
+[dependency inventory](../../docs/PROVENANCE.md).

@@ -16,7 +16,7 @@ The project uses Ghidra for static analysis, small scripts for repeatable extrac
 
 Do not treat an inference, working theory, or pattern as an established fact.
 
-- Confirmed observations belong in `docs/known-facts.md`.
+- Confirmed observations belong in the appropriate subject: `docs/v1-research-baseline.md`, `docs/retail-execution-lifecycle.md`, `docs/component-database.md` or `docs/allocation-validation.md`.
 - Unproven explanations and models belong in `docs/hypotheses.md`.
 - If evidence changes, update the relevant file rather than silently rewriting history.
 
@@ -119,7 +119,7 @@ The older Creation Kit trail through `ResourceViewWidget::OnApplySeed`, `FUN_143
 
 The earlier Maal VIII atmosphere trace is complete: atmospheric Chlorine `000057D5` was observed entering shared resource-ID state before Everywhere and shuffled per-biome generation. Do not preserve that resolved trace as an active next investigation.
 
-Current posture is to preserve evidence, investigate new falsifications or executable/version drift, and support downstream planner/data tooling. Do not silently reopen settled rules merely because a non-blocking semantic detail remains unknown.
+Current posture is to preserve evidence, investigate new falsifications or executable/version drift, and support resource data tooling. Do not silently reopen settled rules merely because a non-blocking semantic detail remains unknown.
 
 ## Protected v1.0 Baseline
 
@@ -195,8 +195,7 @@ The design should be easy to extend later to recursive neighbourhood export.
 
 ### Investigation workflow
 
-Use the [research workflow](docs/research-workflow.md) for investigation
-dossiers, executable provenance, local retention, dependency checks, disk
+Use the [research workflow](docs/research-workflow.md) for subject-based evidence, executable provenance, local retention, dependency checks, disk
 space, publication scope, and independent review.
 
 ### Preserve text encoding
@@ -215,7 +214,7 @@ When adding or changing analysis tooling:
 
 When making a research claim:
 1. update `docs/function-register.md` if a specific function is involved;
-2. update `docs/known-facts.md` only when the result is established;
+2. update the authoritative subject only when the result is established;
 3. otherwise update `docs/hypotheses.md` or an experiment note.
 
 ### Diff export encoding

@@ -1,31 +1,64 @@
 # Historical implementation briefs
 
-This directory preserves historical engineering instructions and decision
-context. Individual briefs may contain superseded commands, old local paths,
-intermediate terminology, or implementation assumptions that were accurate at
-the time. They are retained for provenance rather than rewritten as current
-instructions.
+The [existing archive](implementation-briefs.zip) contains 53 byte-preserved
+historical briefs: 21 original members and 32 completed loose briefs under
+`completed/`. These are past work instructions, **not scientific authority or
+live authorization**. Their assumptions, links and authorizations are historical.
+Use the [subject library](../README.md) for current findings and methods.
+No future brief is automatically archived by this transaction.
 
-- completed historical briefs are stored in implementation-briefs.zip;
-- loose Markdown files in this directory represent current/active work;
-- the archive preserves task specifications and rationale from the 
-  reverse-engineering/tooling history;
-- archived documents may contain superseded interpretations, transient 
-  instructions, machine-local paths, or historical assumptions;
-- current authority is the v1 research baseline, known facts, hypotheses, 
-  function register, provenance, current experiment records, and current 
-  repository documentation.
-
-For authoritative current behavior, use the repository [README](../../README.md),
-current source, and tests.
-
-## SRR-009 Stage A
-
-The exact Stage A implementation, audit and subsequent authorization texts
-remain in local custody. The [SRR-009 dossier](../SRR-009-retail-debugger-admission-and-stage-a.md)
-records the scope and applicable revisions. Each live attempt required
-written maintainer authorization for one reviewed binary and one launch.
-Admission followed a responsive title card and required verified four-site
-arming. Scientific STOP was sealed before operator-controlled Quit.
-The authorized interval excluded save loading, gameplay and Stage B.
-The historical brief and this summary grant no new authority.
+| Exact member name | Investigation / purpose |
+| --- | --- |
+| `Brief-research-repo-public-release-readiness-audit.md` | Brief research repo public release readiness audit |
+| `Brief-research-repo-public-release-remediation.md` | Brief research repo public release remediation |
+| `codex-brief-ghidra-special-common-selector.md` | codex brief ghidra special common selector |
+| `codex-brief-pre-biome-resource-state-investigation.md` | codex brief pre biome resource state investigation |
+| `codex-brief-research-state-reconciliation.md` | codex brief research state reconciliation |
+| `codex-brief-research-v1-state-reconciliation.md` | codex brief research v1 state reconciliation |
+| `codex-mini-brief-reconciliation-precision-corrections.md` | codex mini brief reconciliation precision corrections |
+| `Codex_Brief_Ghidra_CALLIND_Argument_Provenance.md` | Codex_Brief_Ghidra_CALLIND_Argument_Provenance |
+| `Codex_Brief_Ghidra_CALLIND_Pcode_Diagnostics.md` | Codex_Brief_Ghidra_CALLIND_Pcode_Diagnostics |
+| `Codex_Brief_Ghidra_Call_Signature_Reconciliation.md` | Codex_Brief_Ghidra_Call_Signature_Reconciliation |
+| `Codex_Brief_Ghidra_Constructor_Vptr_Provenance.md` | Codex_Brief_Ghidra_Constructor_Vptr_Provenance |
+| `Codex_Brief_Ghidra_Field_Provenance_ResourceViewWidget_A0.md` | Codex_Brief_Ghidra_Field_Provenance_ResourceViewWidget_A0 |
+| `Codex_Brief_Ghidra_Final_Vptr_Selection.md` | Codex_Brief_Ghidra_Final_Vptr_Selection |
+| `Codex_Brief_Ghidra_Neighbourhood_Export.md` | Codex_Brief_Ghidra_Neighbourhood_Export |
+| `Codex_Brief_Ghidra_PreResolution_Resource_Family_Container_Capture.md` | Codex_Brief_Ghidra_PreResolution_Resource_Family_Container_Capture |
+| `Codex_Brief_Ghidra_Receiver_Resolver_Stack_Object_Match.md` | Codex_Brief_Ghidra_Receiver_Resolver_Stack_Object_Match |
+| `Codex_Brief_Ghidra_ResourceViewWidget_A0_Object_Usage_Callbacks.md` | Codex_Brief_Ghidra_ResourceViewWidget_A0_Object_Usage_Callbacks |
+| `Codex_Brief_Ghidra_ResourceViewWidget_Class_Scoped_A0_Provenance.md` | Codex_Brief_Ghidra_ResourceViewWidget_Class_Scoped_A0_Provenance |
+| `Codex_Brief_Ghidra_ResourceViewWidget_Vtable_Xrefs_Constructor_A0.md` | Codex_Brief_Ghidra_ResourceViewWidget_Vtable_Xrefs_Constructor_A0 |
+| `Codex_Brief_Ghidra_Virtual_Call_Resolution.md` | Codex_Brief_Ghidra_Virtual_Call_Resolution |
+| `Codex_Brief_Ghidra_Vptr_Store_Propagation_Fix.md` | Codex_Brief_Ghidra_Vptr_Store_Propagation_Fix |
+| `completed/SRR-001-executable-identity-and-research-foundations-brief.md` | Separate CK/retail image identity and evidence/reproducibility contracts |
+| `completed/SRR-002-retail-static-reconnaissance-brief.md` | Bounded retail static mapping and non-invocation qualification |
+| `completed/SRR-003-retail-allocator-invocation-and-dispatch-brief.md` | Guarded dispatcher, iterator/adapter/callback and static-vs-observed distinction |
+| `completed/SRR-004-research-documentation-and-native-modeling-foundations-brief.md` | Evidence labels, read/write/width/build/locator fields, original pseudocode and syntax/render checks |
+| `completed/SRR-005-retail-live-observation-preparation-brief.md` | Read-only preparation scope, four sites and scientific sensitivity |
+| `completed/SRR-006-four-site-hardware-observer-engineering-brief.md` | Exact disposable build/qualification commands, code-window pinning, journal seal/coverage/retirement distinction |
+| `completed/SRR-007-retail-launch-integration-and-stage-a-qualification-brief.md` | Qualified launch/attach method and exclusions |
+| `completed/SRR-008-retail-title-time-environment-survey-brief.md` | Config/policy schema, synthetic/public route and private evidence split |
+| `completed/SRR-009-publication-readiness-and-workflow-remediation-brief.md` | Stage A post-title interval non-observation and custody scope |
+| `completed/SRR-009-read-only-publication-and-readiness-audit-brief.md` | Stage A post-title interval non-observation and custody scope |
+| `completed/SRR-009-retail-debugger-admission-and-stage-a-brief.md` | Stage A post-title interval non-observation and custody scope |
+| `completed/SRR-010-closure-and-resumption-brief.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-010-Control-B-debugger-only-load-qualification-brief.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-010-D5B-hardware-observer-recovery-brief.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-010-stage-b-instrumentation-strategy-recovery-brief.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-010-stage-b-observer-recovery-continuation.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-010-stage-b-save-load-observation-implementation-brief.md` | Save2 Control B and D5B failures constrain observation method |
+| `completed/SRR-011-documentation-continuation-brief.md` | Execution/write/keyed-read/reset pseudocode, call sites and non-persistence limits |
+| `completed/SRR-011-planetary-allocation-execution-and-result-lifecycle-brief.md` | Execution/write/keyed-read/reset pseudocode, call sites and non-persistence limits |
+| `completed/SRR-012-retained-planetary-allocation-state-observation-feasibility-brief.md` | Sampling and typed lookup/measurement contract |
+| `completed/SRR-013-live-observation-budget-recovery-brief.md` | Selected-key four-sample structural observation, paired evidence/budget and strict-input gate qualification |
+| `completed/SRR-013-read-only-allocation-state-inspector-implementation-brief.md` | Selected-key four-sample structural observation, paired evidence/budget and strict-input gate qualification |
+| `completed/SRR-013-retail-readiness-continuation-brief.md` | Selected-key four-sample structural observation, paired evidence/budget and strict-input gate qualification |
+| `completed/SRR-013-structural-state-observation-mode-brief.md` | Selected-key four-sample structural observation, paired evidence/budget and strict-input gate qualification |
+| `completed/SRR-014-startup-allocation-component-database-lifecycle-brief.md` | Startup dispatch and DB lifecycle split |
+| `completed/SRR-015-complete-retained-allocation-extraction-feasibility-brief.md` | Full rooted extraction feasibility, seven retained lanes vs model occurrences, Special-at-eight discrepancy and identity/owner-wide applicability screens. |
+| `completed/SRR-016-whole-store-census-oracle-implementation-brief.md` | Whole-store count conservation, paired independently rooted census, expected-key ledger and conditional native-slot oracle |
+| `completed/SRR-017-native-separator-semantics-correction-brief.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
+| `completed/SRR-017-operator-initiated-live-extraction-correction.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
+| `completed/SRR-017-retail-readiness-completion-continuation-brief.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
+| `completed/SRR-017-retail-ready-complete-allocation-extractor-brief.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
+| `completed/SRR-018-retail-allocation-oracle-comparison-and-evidence-preservation-brief.md` | 3210 shared keys/22470 diagnostic slot agreements/1445 derived membership matches, strict oracle 0/3,211 admitted rows and 0 owners |
