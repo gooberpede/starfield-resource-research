@@ -370,6 +370,116 @@ not identify the dispatch into that slot. The actor-value path supplies a stored
 used in presentation. The chain from a particular perk rank or orbital input
 to an individual resource write remains unresolved.
 
+### Resource displays across interfaces
+
+**PROVEN, retail static and installed UI bytecode.** The three interfaces
+start from the body resource snapshot. They diverge where they choose a body,
+build display rows and decide what earns color. All VAs below belong to the
+[pinned retail executable](PROVENANCE.md#current-retail-identity). The
+[movie identities and method indexes](PROVENANCE.md#scanner-and-starmap-interface-inputs)
+qualify the UI findings independently of the gameplay captures.
+
+| Display | Which items, and in what order? | What supplies x/y? | Appearance, target and missing state |
+| --- | --- | --- | --- |
+| Locations body card | Selected body's normalized spans. Knowledge lookup must succeed and either effective level differs from −1 or the two resolved body keys compare equal. FormID deduplication admits atmosphere first. Groups appear in class order 6, 5, 0, 1, 2, 3, 4. | Non-disabled nonnull rows within the eight icon positions / full supplied array length. Atmospheric rows use visit bit 1, terrestrial rows use positive item progress. | Level/class selects color eligibility. Disabled selects the icon frame. Full names use sibling text fields. Empty rows display UNKNOWN below level 0, otherwise NONE. No scanner target is an input to this counter. |
+| Handheld survey line and expanded resource wheel | Current snapshot. Wheel walks normalized biome pointers first, atmosphere second, skipping nulls. Five native arrays group rows by class, preserving insertion order within each. No second FormID deduplication in this append path. | Survey line formats the two snapshot scalars regardless of how many wheel slots are occupied. Bit 1 credits residual atmosphere, terrestrial credit requires positive item progress. | Wheel uses its own disabled predicate below. The SHOW RESOURCES control displays the resource arc. Picked-object data drives the large target tile separately. Missing wheel positions do not produce a card-style UNKNOWN counter. |
+| Orbital/starmap body card | Body-inspect selection goes through the same detail builder, knowledge gate, FormID deduplication, class groups and row binder as Locations. The equality override depends on the keys resolved for this selection. | Its own movie counts non-disabled rows in up to eight slots / supplied array length. Its survey meter reads the separate aggregate fraction. | Same level/class color, disabled frame, rarity and tag rules as Locations. Empty rows select NONE/UNKNOWN by effective level. Map hover data has its own one-row nameplate. Selecting a landing site provides no evidence of a new survey credit. |
+
+**Handheld wheel.** `FUN_141599EC0` rebuilds the known-resource arrays from
+snapshot+0x1E8 and +0x1D0. For an atmospheric entry it supplies true at
+`0x14159A00C`, even though the scalar numerator needs the visit bit. For a
+terrestrial entry `FUN_141597A50` first queries the current body and FormID
+through `FUN_1407B7D60`. A successful item lookup returns the byte at
++0x21 (`0x1407B7E52`). Missing body context, component or item returns zero.
+If the result is zero, `FUN_1407BB5B0` and its callback collect nonzero
+resource IDs from the body's seven biome slots. At `0x141597B43–B46`
+equality with the **end** of that search grants known status to a FormID
+*absent* from the list. An empty list can therefore make a row known.
+The scalar numerator has no such exception. An atmospheric/terrestrial
+pointer overlap survives on the terrestrial side of normalization and takes
+that side's test.
+
+`FUN_14159A0B0` inverts known into the Monocle row's disabled flag at
+`0x14159A1E5`. Its class switch (`0x14159A328`) sends classes 0, 5 and 6
+to Common, 1…4 to their respective arrays, and skips classes above 6.
+`FUN_1415A6D20` appends the row. The source RGB uses the form triplet or
+class fallback through `FUN_1409E7890`. The wheel UI uses disabled to
+select **both** Unknown/Known and muted `0x394253`/row RGB. It assigns
+symbol and name independently. The UI has 7 Common, 7 Uncommon, 6 Rare,
+5 Exotic and 5 Unique positions. Its five Special references reuse positions
+from the first three arrays. The native path above fills five arrays.
+A colored tile can thus coexist with zero scalar credit. Counting colored
+wheel positions is an unreliable substitute for the survey fraction.
+
+Three Monocle subscriptions distinguish these presentations. `MonocleMenuData` formats
+`uResourcesCurrent/Max` on the ordinary survey line. An explicitly false
+`bShowPlanetInfo` hides the panel and skips that text update. `MonocleKnownResourcesData`
+updates the arc. SHOW RESOURCES opens that arc when hidden, and an update can
+request that it open. On the static reason-7 resource-scan path the call at
+`0x141599708` submits the knowledge mutation. `0x141599714` requests the
+wheel update with a true flag and `0x14159971C` requests snapshot refresh.
+The queued callback reaches the wheel builder on owner resolution
+(`0x1415ABD1A`), passing the flag exposed as `bShowArcOnUpdate`.
+
+`MonoclePickRefData` updates the right-hand target tile. In the resource
+branch `FUN_14159AE80` calls the same discovery predicate at `0x14159B439`
+and sets `bIsDiscovered` separately from the intrinsic/fallback `uColor`
+(`0x14159B31B–B385`). When the form or pick type changes, the HUD uses
+that RGB for the target tile. Scarcity selects its rarity frame. Discovery
+participates in the scan/SHOW RESOURCES prompt. A separate scene path in
+`FUN_14159ED90` tests the same discovery helper at `0x14159F54E` and can
+select effects 4/5. Later branches can replace the selection before dispatch
+at `0x14159F654`. This bounds the highlighting evidence at an effect choice.
+The mapping to a particular terrain pixel in a capture remains unresolved.
+
+**Orbital card.** The selection at `0x141681686–6E3` takes input+0x6F0,
+stores it at state+0xC90 and passes it to `FUN_141685AB0`. Calls at
+`0x141685AD9/0x141685B3A` construct the detail and pass it to
+`FUN_1416CF0F0`. The detail key at +0x184 participates in the resolved-key
+comparison at `0x1416CF174–19B`. On the queued path `0x141685D57` supplies
+callback `FUN_141698650`, which calls `FUN_141685E30` on owner resolution.
+State+0x6B0 holds the registered `StarmapInspectBodyInfoProvider` object.
+Its embedded +0x20 model interface supplies virtual +0x58 at the bind site
+(`0x14168FC7F–FCFB`, `0x141685E45–E72`). The resulting
+`FUN_1416B6310` bind and the movie's `PlanetData_mc.SetBodyInfo` callback
+join the row fields to the orbital card. The card hides and skips its
+update for a zero body ID or `BT_SATELLITE`. In the separate hover path,
+`FUN_14168A8D0` starts the disabled/show-color bytes at 1/1 and clears
+disabled on a populated positional lookup (`0x14168AABC`). The bind at
+`0x14168AF0D` supplies one row. The `StarMapMenuPlanetInspectData`
+subscriber uses `bShowResourceName` and `HoveredResourceA[0]` for its
+nameplate. A colored hover icon can therefore appear without item credit.
+
+System view has its own body-card subscription. At `0x1416E8572–857F`
+state+0xA14 supplies the body key. The call at `0x1416E85E0` projects its
+rows. Callback `FUN_1416ED390` reaches `FUN_1416E87C0`, which binds
+through state+0x238 at `0x1416E8802`. The enclosing provider at state+0x218
+is registered as `StarmapSystemBodyInfoProvider` at `0x1416E3FAF–3FC4`.
+The movie subscribes a second callback for `SystemPlanetInfoCard_mc` and
+uses the same resource renderer. The two routes establish the displayed
+card rules without identifying a historical frame's active callback.
+
+**PROVEN, user-observed displays.** In the [Save2 corpus](PROVENANCE.md#save2-screenshot-evidence),
+Kreet's two orbital cards (S21-10/11) both show 4/8. The latter includes a
+landing target. S21-12 shows the ordinary scanner at 4/8. S21-13 shows
+Locations at 4/8. After the maintainer-reported Neon scan, S21-14 shows
+5/8, a cyan Ne wheel tile and a separate cyan Neon target tile. S21-15
+shows Locations at 5/8 with the Neon background still muted. The earlier
+wheel S21-06 showed Ne muted and He-3, Pb, Fe and Ag colored. These two
+wheel captures belong to different Steam timelines. The post-scan orbital
+counter and Neon tile are unobserved.
+
+**STRONG interpretation.** Kreet's measured biome slots include Neon
+(`000057E9`), so the absent-ID exception would fail for this resource under
+matched inputs. An explicit scanner mutation that raises its item byte from
+zero to positive would enable and color its wheel tile and increment the
+two observed counters. Locations can still supply muted RGB for an Exotic
+resource below threshold 3. This gives a native and UI mechanism for the
+observed divergence. The frames do not measure the byte, the scan level,
+or the execution of that branch. For Volii Alpha the landed-aboard reading
+already includes both resources. The [control and remaining tests](hypotheses.md#locations-and-survey-observations)
+bound the interval and distinguish body visit credit from per-item writes.
+
 ### PlayerKnowledge in the global save and load paths
 
 **PROVEN, retail static.** The body-keyed stored wrapper contains the u64 key
@@ -413,6 +523,21 @@ python -B tools/srr011/inspect_pe.py $image window 142337790 170
 python -B tools/srr011/inspect_pe.py $image window 142337DB2 136
 python -B tools/srr011/inspect_pe.py $image window 1423380C5 68
 ```
+
+<!-- SRR-021 review -->
+**SRR-021 internal challenge — COMPLETE.** An independent reviewer checked
+the retail executable, both scanner and map layouts, Steam capture chronology,
+original and handoff identities, and the task patch. The absent-ID exception
+limits a simple wheel-color/credit equivalence. Both orbital Kreet captures
+precede the reported scan, and Volii Alpha bounds the visible increase to
+the orbit-to-landed-aboard interval. Capture-epoch configuration, actual
+knowledge writes and exact scene effects remain unmeasured. Covered
+five-subject SHA-256 manifest
+`b0d813879aa35a5638db91f7794f2855791631a8d529b55e8b3df376df7ca3dd`.
+The manifest hashes UTF-8 lines of lowercase file SHA-256, two spaces,
+repository path and LF in lexical order, excluding this block and its
+following blank line.
+<!-- /SRR-021 review -->
 
 <!-- SRR-020 review -->
 **SRR-020 internal challenge — COMPLETE.** A separate reviewer challenged the

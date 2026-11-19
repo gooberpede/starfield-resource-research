@@ -21,12 +21,14 @@ in the [baseline](v1-research-baseline.md), [lifecycle](retail-execution-lifecyc
 | SRR011-U04; DEFERRED / P3 | What was `bImportCSVBiomeData:Data`'s effective value in the measured title epoch? | SRR-014 resolved setting name/default/writer; historical epoch value remains unmeasured. | Effective-setting or attributable runtime write/read witness for a concrete relevant epoch. No reason to rediscover writer origin. |
 | H1; OPEN / P3 | Does zero-count reflected ATMO LIST generically clear the property? | Vectera and effective export fit explicit clear; property/override contract incomplete. | Decode generic reflected property identifier and override reducer against a controlled multi-layer case. Non-blocking current corpus. |
 | SurveyAggregator; DEFERRED / P3 | What upstream state/channel does RE ID 1016657 expose? | The pinned native aggregator reads separate atmosphere and retained-biome spans. The historical exporter/build filter responsible for omissions remains unresolved. | Trace concrete upstream population/filter boundaries on a pinned applicable source. No generation dependence, no restored snapshot publication. |
-| SURVEY-UI; OPEN / P2 | When does the body visit bit change, and which state produced the Kreet capture? | The [pinned counter and icon bindings](component-database.md#how-locations-gets-its-resource-counter) are established statically. The screenshot epoch, actual scan level, positive items and first gameplay transition remain unknown. | Compare first disclosure, icon background/frame and single-item credit under matched conditions below. |
+| SURVEY-UI; OPEN / P2 | When within the orbit-to-landed interval does atmospheric credit appear, and how does the orbital card present newly credited Neon? | Volii Alpha already shows full resource credit aboard. Both Kreet orbital frames precede the documented Neon scan. The captures establish neither the visit-bit write nor the effective scan level. | Compare the remaining matched cases below against the [display bindings](component-database.md#resource-displays-across-interfaces). |
 
 ## Locations and survey observations
 
-**User observations.** Sumati shows 17% and UNKNOWN, Vectera 80% and 0/5 with
-all five names, and Kreet 60% and 4/8 with eight names. The numerator and
+**User observations.** In Locations, Sumati shows 17% and UNKNOWN, Vectera 80% and 0/5 with
+all five names, and Kreet 60% and 4/8 with eight names (S21-04, 03 and 02).
+An earlier Sumati orbital card shows seven symbols and 0/7 at 17% (S21-01).
+These two Sumati captures have different Steam creation records. The numerator and
 survey percentage measure different things. The captures do not identify
 the winning UI assets, plugins, settings, prior actions or effective scan
 level. The smaller diamonds are consistent with the separate rarity frames.
@@ -42,12 +44,14 @@ are the five color-eligible icons. Alkanes and Silver (1) join at level 1,
 and Neon (3) at level 3. Color eligibility controls the tile input; full-name
 text has its own field. The four actual credited identities and any claimed
 brightness division among the names cannot be inferred from this example.
-A spot check of the supplied 1920×1080 Kreet JPEG also distinguishes the
-tiles. Sampling x=1140 and y=343 + 66×i (zero-based displayed row i) gives
+A check of all three 1920×1080 Kreet Locations JPEGs (S21-02, 13 and 15)
+distinguishes the tiles. Sampling x=1140 and y=343 + 66×i (zero-based displayed row i) gives
 five different RGBs, followed by exactly 0x394253 for Alkanes, Silver and
 Neon. This matches the fallback color in the pinned interface. A sampled
 background pixel does not identify a credited item or measure name styling.
-No discrepancy in counting is required.
+The sampled RGBs are identical across all three frames, including the Neon
+background before and after the increment. The expanded scanner wheel
+independently shows four colored symbols in S21-06 and adds Neon in S21-14.
 
 **Volii Alpha — conditional control.** The [retail title record](allocation-validation.md)
 has seven zeros in its single biome. The independent atmospheric set is
@@ -55,7 +59,11 @@ Benzene and Water. If both pointers resolve and the snapshot reaches the
 atmosphere callback, the raw maximum is two. With a knowledge hit, changing
 only the visit bit would credit both at once. With the gate open and two
 rows, both disabled flags would clear together. At level zero only Water is
-color-eligible. No displayed Volii fraction has been observed here.
+color-eligible. The Save2 sequence now bounds the visible transition
+from 0/2 (31%) on the orbital card to 2/2 (88%) on the handheld scanner
+while still aboard. The scanner remains at 2/2 (88%) outside (S21-07…09).
+The interval spans a landing and an interface change. It does not identify
+the first credited frame, the writer or the value of a native bit.
 
 Membership and class inputs for these comparisons come from sibling
 `starfield-resource-reproducer` commit
@@ -74,8 +82,8 @@ authorized. UNKNOWN supplies no prior numeric value.
 
 | Rank and fixture | Controlled comparison | Observation that separates the explanations |
 | --- | --- | --- |
-| 1 · Kreet, Save2 if the starting state matches | Hold visit/level fixed. Scan one previously uncredited terrestrial resource vs no action. From the same checkpoint, separately harvest it once without a scan. Compare an untouched row. In another matched pair vary only effective scan level 0→1, holding item knowledge fixed. | A new positive item predicts one additional enabled row and +1 to x, unchanged y. A level-only change predicts new color eligibility for Alkanes and Silver with unchanged x. Compare full-name text with tile and rarity separately. A mismatched scan level or initially credited item defeats the comparison. |
-| 2 · Volii Alpha, Save2 | From a common reachable checkpoint record arrival in orbit. Branch to orbital scan or no scan. On a no-scan branch record touchdown while aboard, then disembark without scanning or gathering. Retain matched no-action observations at each accessible point. | List disclosure alone can reveal names with zero credit. With both rows disclosed, simultaneous credit for both at one transition fits visit-bit credit; separate transitions with a single positive item would challenge the atmosphere-only explanation for that epoch. Record the first numeric display and compare it across branches. An inaccessible aboard screen bounds the interval only. |
+| 1 · Kreet, Save2 | With the same body, visit and scan level, record the orbital card and expanded scanner wheel on either side of one explicit Neon scan. Keep landing-site selection and map resource overlay fixed. | S21-13…15 already settle the observed increment and the radial/Locations color difference. The missing post-scan orbital frame would test whether its Neon tile retains its scan-level appearance as its counter rises. |
+| 2 · Volii Alpha, Save2 | Compare the same orbital card before landing and after landing while still aboard, with no intervening resource scan. Retain the no-landing orbital control. | This isolates display choice from the orbit-to-aboard change in S21-07…08. An aboard card at 2/2 would establish the increase within that interface. The exterior scanner reading is already known. |
 | 3 · Same-save reload, then Save52 as comparison | After a measured single-item change, compare a fresh-process reload of that checkpoint with reload of a pre-action control on the same profile. Use Save52 only to compare a separately documented richer/completed state. | Divergence by branch after reload supports continuity of the changed visible state; convergence after a confirmed pre-save difference challenges it. Equality alone cannot identify the on-disk fields. Different Save2/Save52 histories cannot isolate the restore mechanism. |
 
 ## Reconciled dispositions

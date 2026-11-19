@@ -135,6 +135,92 @@ also be checked in DefineSprite 18 (standard) or 16 (large) by following
 the labeled frames and depth-1 color transform. No game process, UI dump
 or save is an input to this check.
 
+## Scanner and starmap interface inputs
+
+The same hash-verified BTDX archive supplies four more uncompressed archive
+entries, each containing a compressed SWF. The member hash covers the
+complete SWF as stored in the archive. The evidence concerns these shipped
+layouts. The effective UI and load order in the captures remain unknown.
+
+| Member under `interface/` | Index | SHA-256 |
+| --- | ---: | --- |
+| `galaxystarmapmenu.swf` | 79 | `d7c2a2c437e1342b88a744cb331e7e4aefeccd46e5ba13f2f6987a39e2764559` |
+| `galaxystarmapmenu_lrg.swf` | 80 | `ad56e480fadd237cb6b357b87c1a938994a46b46a3a14948a90cd306669118bb` |
+| `monoclemenu.swf` | 162 | `1d7867d12e65356aaebffe73e74e186e9f6fd94e700c9423c0c0d4d7d5a2df2d` |
+| `monoclemenu_lrg.swf` | 163 | `7ece68d18f44604a145475266cbe2947c4f70956e4e9f5efc3067aaaddcaca53` |
+
+**Reproducible method.** In the [archive check above](#locations-interface-input)
+use the entries `[(79, 0x38E06), (80, 0x381EC), (162, None), (163, None)]`
+to verify all four identities and the orbital counter increment in both
+layouts. For a direct wheel check, inflate member[8:] and inspect its 245-byte
+slot setter at offset 0x2A723 (162) or 0x2A58E (163). In both layouts the
+conditional branch at setter+0x9C selects the row-color path at +0xA8 when
+disabled is false. For the named methods, read the DoABC tag, match method-body
+indexes to class traits and resolve property operands in the ABC multiname
+pool. Index pairs below refer to standard/large layouts.
+
+| Movie | What to follow in the ABC |
+| --- | --- |
+| Monocle | Survey update 966/972, offsets +0x320…+0x332, assembles the two resource scalars with a slash. Known-resource update 967/973 passes arrays to 742/748 and slot setter 740/746. Inspect the disabled test and frame at +0x4F and RGB selection at +0x99…+0xBB in the setter. SHOW RESOURCES 941/947 calls the arc animation. Pick update 959/965 handles the selected tile. |
+| GalaxyStarmapMenu | Subscribe 1338/1288 → callback 1337/1287 → Planet.SetBodyInfo 1389/1402 → BodyDataInfo.SetBodyInfo 1438 in both. System view subscribes in 1648 and calls its card in 1647. Method 1437 initializes up to eight icons. Method 1450 counts them and handles empty arrays. Method 866 projects each resource icon. The imported PlanetInfoCard supplies eight authored positions and the Known/Unknown timeline detailed above. A separate callback 1336/1286 leads to hover nameplate update 1342/1292. |
+
+For native verification run the [pinned PE decoder](component-database.md#offline-reproduction)
+from the repository root with the same lawful executable as `$image`.
+The commands read disk bytes and print bounded disassembly.
+
+```powershell
+python -B tools/srr011/inspect_pe.py $image functions 141599EC0 141597A50 1407B7D60 1407BB5B0 14159A0B0
+python -B tools/srr011/inspect_pe.py $image window 1415996DA 48
+python -B tools/srr011/inspect_pe.py $image window 14159B439 38
+python -B tools/srr011/inspect_pe.py $image window 141681680 70
+python -B tools/srr011/inspect_pe.py $image window 141685AD2 70
+python -B tools/srr011/inspect_pe.py $image window 141685D1B 7E
+python -B tools/srr011/inspect_pe.py $image functions 14168FC50 141698650 141685E30 14168A8D0 14168AE30
+python -B tools/srr011/inspect_pe.py $image window 1416E8572 72
+python -B tools/srr011/inspect_pe.py $image functions 1416ED390 1416E87C0
+```
+
+## Save2 screenshot evidence
+
+**Custody-backed historical observations.** All 15 gameplay captures began
+from Save2 according to the maintainer. Each retained original was copied
+from Steam and compared byte-for-byte with its scratch counterpart. Fourteen
+also match the JPEGs and supplied manifest in the handoff ZIP (SHA-256
+`4ecd292c8fa6cffdb20f61f4ff8232665c6a20417f5a43b4182bfeee0a12ce29`).
+S21-01 is the additional original corresponding to scratch alias
+`1716740_173.jpg`. The CK About screenshot has separate provenance above.
+The private custody manifest (SHA-256
+`98ee59595ab0e15c21246188101e50e6ebc1ae6edb7903be5ee26f23abd19874`)
+records filenames, sizes, capture metadata and limits. A second reader
+verified the original, scratch, retained and archive bytes. Redistribution
+is the maintainer's decision.
+
+Steam creation records establish the order below. The groups 01, 02–04,
+05–09 and 10–15 belong to four different Steam timelines. Within each
+multi-frame group the timeline offsets also increase. The reported scan
+action between 13 and 14 comes from the maintainer. The sequence measures
+display states, with no input log, executable fingerprint or memory read
+for those particular frames. Percentages refer to the displayed survey
+percentage unless qualified.
+
+| Evidence ID | Displayed observation | SHA-256 of original JPEG |
+| --- | --- | --- |
+| S21-01 | Sumati, Starmap, seven muted symbol tiles and SCAN prompt. 0/7, survey 17%. | `ab172d19d644ef84937ecb9bc81e490562ba0116c265232b3790a21417a4f3f0` |
+| S21-02 | Kreet, Locations, five resource-colored and three muted tiles. 4/8, survey 60%. | `5cc2d3559d55ca5c0af84e4ccd3e9d0663060414789c5a50124a0170cf811c12` |
+| S21-03 | Vectera, Locations, five colored tiles. 0/5, survey 80%. | `4ba7eb186874ca0f75d9e49a7b251091ad907582e9879ac843289d4e0bcc23bd` |
+| S21-04 | Sumati, Locations, RESOURCES UNKNOWN with no resource rows. UNKNOWN, survey 17%. | `182957c9b9a7d18676d0cd83cbedfc6e4679834c99af9770e0b597f493a03f1b` |
+| S21-05 | Kreet, Scanner, green-outlined target at 9 m, single large Pb/Lead wedge, SHOW RESOURCES prompt. 4/8, survey 61%. | `85c9a13af7e0ef5b779704d36f69291fe7ed31eaa6e210f1eab257b2d9629cfd` |
+| S21-06 | Kreet, Scanner, same Pb target; expanded resource wheel above large Pb wedge. 4/8, survey 61%. | `478b6cd7565cc488b0afe7a743828ba3ec8fde5af5e7c2a0aef25c77ab404bc5` |
+| S21-07 | Volii Alpha, Starmap, Neon settlement marker; two muted tiles H2O and C6Hn. 0/2, survey 31%. | `0690298d7ae65c974274ef7c8afeee722bddbac1be1c57e87c0ffac4264c88a9` |
+| S21-08 | Volii Alpha, Ordinary handheld scanner, cockpit looking toward Neon. 2/2, survey 88%, fauna 0/2. | `89a957ba4fe1d63dbef4685ff358e40da66f41f8d6e6af1fad184016fc29dafd` |
+| S21-09 | Volii Alpha, Ordinary handheld scanner, exterior landing pad below ship, NEON banner. 2/2, survey 88%, fauna 0/2. | `d3cd6e043104474936ab6d852ad82987a80348167e027371c7402ad325612623` |
+| S21-10 | Kreet, Starmap, body selected; 8 square tiles in left panel. 4/8, survey 60%. | `f5a607daa3c1b9ef54b2380f698c62069cde3b6d45a9cfcd1ab728d2382bb2aa` |
+| S21-11 | Kreet, Starmap, same left inventory, travel data Jemison to Kreet, Frozen Volcanic, LAND prompt. 4/8, survey 60%; destination Frozen Volcanic 0%. | `7a8f98aabb594291bd8fa04f917c12230789af8d41560527a67afe0f0fe6c7d9` |
+| S21-12 | Kreet, Landing Area handheld scanner, cyan terrain beyond reticle, no named target or wheel. 4/8, survey 61%. | `39c53b3998b5e67541965795780cd98a713c35dcbdefa4c5cdf44433fa3328cc` |
+| S21-13 | Kreet, Locations, eight named rows; muted Ne tile with three diamonds. 4/8, survey 60%. | `afa0faaa5c0a3983c1aae95b83c920781b72754c884f2b0178b0107a56d06990` |
+| S21-14 | Kreet, Landing Area scanner, expanded wheel; small cyan Ne tile and separate large cyan Ne/Neon wedge, reticle over cyan terrain. 5/8, survey 63%. | `d08e77ae602e6bf98430713e86be554f9d2bc92b98ecb82ca233aa382241e20b` |
+| S21-15 | Kreet, Locations, eight named rows; muted Ne tile still has three diamonds. 5/8, survey 63%. | `58e838822fe93a030c304a148b8ee428fb4674725a2c8de464c737277c19738a` |
+
 ## Applicability register
 
 | Evidence or claim | Executable/build reference | Claim type | Qualification and limit |

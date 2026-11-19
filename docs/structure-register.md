@@ -76,6 +76,8 @@ includes a 0x20-byte prefix. The snapshot is a separate caller-owned object.
 | Locations body detail | +0x168 vector of 0x28-byte resource rows, +0x188 embedded snapshot. The copy preserves its u32 counts at detail+0x24C/+0x250. The exposed array and its disabled bytes supply the Locations counter. | `0x1416D04E0–0527`, `0x141360436/0x14136043E`, `0x1416B69B8–6AAF`. |
 | Survey snapshot | +0xC4 and +0xC8 u32 computed resource credit and span length sum, +0x1B0 visit byte, +0x1B8 resolved atmosphere form pointer, +0x1C8 body ID, +0x1CC binary32 aggregate survey fraction, +0x1D0/+0x1E8 pointer vectors. | `FUN_1417D6520/1417D7540/1417D7EB0` and [matrix](component-database.md#resource-membership-player-knowledge-and-the-locations-page). |
 | Resource row input to UI setter | Stride 0x28, string values at +0/+0x10, +0x20 packed u32 color, +0x24 rarity byte, +0x25 disabled, +0x26 show-color, +0x27 tagged. | `0x1416D194A–19D1`, `FUN_1416B6180`, `FUN_14136CFD0`. |
+| Monocle wheel row schema | UI wrappers at +0x08 name, +0x28 symbol, +0x48 color, +0x68 disabled, +0x88 tracking. Disabled controls both the wheel icon frame and its color transform. Picked-resource color and discovery have separate wrappers at +0xC8 and +0x328 on the pick model. | `FUN_1415971C0`, `FUN_141597680`, `FUN_14159A0B0`, `FUN_14159AE80`. |
+| Body-inspect state | Selection key at +0xC90, body-info provider at +0x6B0, embedded interface at +0x6D0. The common projected detail carries its selected key at +0x184. | `0x141681686–6E3`, `0x14168FC7F–FCFB`, `0x1416CD553`, `FUN_141685E30`. |
 
 ## Creation Kit reference
 
