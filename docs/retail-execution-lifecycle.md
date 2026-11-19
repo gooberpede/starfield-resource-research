@@ -198,6 +198,30 @@ initial module entry at `0x141894CBD`. The signed reset path instead clears it
 at `0x1418975FF` and sets it after re-entry at `0x141897C01`. A set byte
 cannot distinguish those orders.
 
+### Attributing one retained Common root (SRR014-A8)
+
+**Partly resolved.** The following sequence is **PROVEN retail static** on
+the pinned image. Which visits occurred, and which write survived to title,
+remain **observation-required** for each row.
+
+| Stage | Identity, guard and next transition |
+| --- | --- |
+| Enter a construction epoch | The initial loader and signed reset replay call module entry at `0x141894CC3` and `0x141897B59`. A populated module guard bypasses the constructor. On construction, the import flag admits an early visit at `0x14094E577`. The later visit at `0x14094EF57` follows either flag arm on normal continuation. Reset can clear indexes and permit another construction with the same published DB address. |
+| Select the body and row | The visits construct distinct stack-local visitors with vptr `0x144B3D9E8` (early setup at `0x14094E53B`, late at `0x14094EF37`). Their common +0x10 callback admits PNDT and passes the form to the adapter. The collector uses PNDT +0x54 as owner and the registered type to bound the +0x300 mixed index. In each admitted block, the u16 at block +0x12 + 4 × slot locates the edge. Its two key words are at +0x10/+0x18. The inline payload starts at edge +0x20 (`0x14077BDA5–0x14077BDB1`). A full work vector whose growth fails skips the append at `0x14077BE39` and advances the cursor. |
+| Pass the target to the writer | The shuffle exchanges work pointers at `0x1407798F8–0x140779902`. The second pass takes the selected pointer into RCX at `0x140779C83`, calls the helper at `0x140779C86` and saves the payload in RDI at `0x14077789D`. For a valid BIOM, the post-Special path requires fewer than five cached families and fewer than eight shared IDs, a selected Common pair and a root absent from the cache. At `0x1407779FC`, EAX from the selected form's +0x28 becomes the u32 at payload +0x50. |
+| Reuse or supersede | The cache can retain a pointer into that row's Common slots at `0x140777A88–0x140777A97`. A later row can receive its root by copying the family. Each visit first clears collected slots. Owner erase, duplicate insertion, page movement and reset can also break a simple address-to-title association. [Index and lifetime](component-database.md#ownership-and-cursor-lifetime) |
+
+**Minimal observation for one row.** Within one identified process and
+construction/reset epoch, number entries and returns at both sweep callsites.
+Join a completed store to the active visit and PNDT, published DB, full edge
+key, payload BIOM and destination, recording the written ID. At title,
+require a unique matching edge and continuity of its +0x50 value through
+subsequent writes, clears, moves or replacement. A later same-value write
+still changes last-writer attribution. A qualified store and late return
+establish that visit's contribution even if continuity to title is lost.
+Counting all generating visits requires coverage from before the first
+candidate entry. A future run could establish attribution for its own epoch.
+
 ## Startup setting and CSV input
 
 **PROVEN STATIC.** The early comparison at `0x14094E542` reads
@@ -245,6 +269,78 @@ lookup. These paths alone leave global queue quiescence and complete
 visibility of every accepted row before the later sweep open.
 [Database command and guards](component-database.md) ·
 [follow-up consumers](component-database.md#slot-storage-and-copied-consumers)
+
+### Typed input readiness at sweep entry (SRR014-A9)
+
+**Partly resolved.** The submission, scheduling and consumption paths below
+are **PROVEN retail static**. Their order relative to a particular sweep
+is **runtime-conditional**. The image owner is `0x1482EE300`. Its +0x40
+attachment contains the typed queue at attachment +0x40. A separate
+scheduler receiver, returned as `[0x1461FABE8] + 0x40` at
+`0x1428D1870–0x1428D187B`, dispatches work on behalf of this owner.
+
+| Stage | Receiver, predicate and effect |
+| --- | --- |
+| Submit an operation | PPBD, ENAM replacement and accepted CSV rows submit owned payload copies at `0x14076F360`, `0x14076FCEA` and `0x14234103A`. Insert commands carry the two-word key, callback `0x140777290` at +8 and DB at +0x98. ENAM first submits owner-range erase at `0x14076F751`. Its command holds callback `0x140776680`, owner ID at +0x18 and DB at +0x20. The submitters publish queue bytes before testing the nullable notifier. [Command layout and commit sites](component-database.md#operation-catalogue) |
+| Request service | On the configured path, notifier +0x10 reaches `FUN_1428D96C0`. At `0x1428D96F0–0x1428D972A` it atomically sets bit 0x10 in owner +0x296. Old bit 4 or 8 skips a new dispatch. Otherwise a successful compare/exchange adds bit 8 and admits scheduling. Multiple submissions can therefore share a service request. |
+| Choose a route | `FUN_1428D8FE0` reads scheduler +0xE0. A matching TLS record (+0x88 equals the scheduler receiver) with a worker count of one reaches the inline service call at `0x1428D926D`. On the queued arm, `0x1428D9101–0x1428D911B` sets outer command +8 to `0x1428D9560` and copies owner/float at +0x10/+0x18. The ring store and index exchange at `0x1428D2C86–0x1428D2C8F` publish this service command. A worker that selects it via `0x1428D3D16` strips the tag and calls +8 at `0x1428D3D38`. The thunk loads the original owner and jumps to the same service. |
+| Consume a typed command | With state bit 1 set and 0x20 clear, the service clears 0x10, marks the servicing thread at owner +0x284 and calls `FUN_1428D8060(owner+0x40)` at `0x1428D8A49`. The pop loops call the selected **inner** command's +8 slot. Insertion copies into the indexed edge at `0x1407767A4` under mutation admission. Erase reaches the owner-range operation at `0x1407749BF`. Normal return to `0x1428D7BA6` or `0x1428D7C1E` completes that callback, including work after typed construction. [Queue bounds and guards](component-database.md#command-order-and-visibility) |
+| Check outstanding work | Ordinary service checks its pass result and request bit and can retry before atomically dropping bit 8 at `0x1428D8A78–0x1428D8AB6`. A stop request (bit 2) leads to state 0x20 and a wake at `0x1428D8B27–0x1428D8B34`. The **same-owner** shutdown path calls `FUN_1428D88B0` at `0x141882F3D` and waits for that state. Reset's receiver +0x200 drain and the initial loader's image queue have different identities. The PNDT iterator admits the form bucket, and the planet adapter enters shared DB mode at `0x1407796A6`. Neither admission tests the completion of the submitted typed commands. |
+
+On cold scheduler construction, startup passes the sizing input at
+`0x145F43580` to `FUN_1428D1550` at `0x14189934F–0x14189935A`.
+This is the u32 value of `uMaxPrimaryJobThreads:General`. Its initializer
+passes zero at `0x1401BADB4–0x1401BADC5` and the constructor stores that
+default at setting +8 at `0x140335FEF`. Zero selects automatic sizing,
+with a floor of two and a possible
+subsequent increment at `0x1428D15EB–0x1428D1609`. A nonzero value passes
+through. Startup passes the first result to initialization at `0x14189A5DD`.
+The first pool constructor at `0x1428D16BE` leads to the +0xE0 count
+store at `0x1428D3079` and 0xC0-byte worker records with pool backlink
++0x88. Thus automatic sizing excludes the inline arm on this path. An
+effective input of one still requires a matching worker TLS record. The
+historical input, caller thread and actual service route are unresolved.
+
+**Minimal observation for a selected owner.** Mark the exact sweep call
+(`0x14094E577` or `0x14094EF57`) and the later per-body collector in a
+single sequenced epoch. For each relevant submission, correlate operation,
+queue position and command incarnation, host, DB, owner and key with
+its service route, typed mutation and callback return. A callback return preceding
+entry establishes completion of that command. Visibility additionally
+requires the constructed edge to be indexed there, with the intended
+payload and no intervening effective erase, replacement or clear. An edge
+can already be constructed while its callback is still in flight. Count
+unmatched submissions, including dequeued callbacks still executing.
+A later callback return disproves completion of all callbacks at entry.
+A later effective insertion of a required missing row disproves visibility
+of all required inputs at entry.
+Completeness for that owner requires coverage of every admitted
+producer and its order. A queue-state sample alone cannot supply that set.
+
+| Rival account for the measured row | Observation that distinguishes it in a qualified run |
+| --- | --- |
+| The early visit or reset replay supplied the root attributed to the first late visit. | Match the completed store (after-state at `0x1407779FF`) or family copy to its enclosing visit. Follow the last write and logical row through title, including relocation and same-key reinsertion. |
+| The late visit returned without producing this root. | A joined productive store to that row falsifies this account for the visit. A miss at the focal instruction leaves the copy paths open. |
+| A submitted row became visible after sweep entry. | A surviving keyed edge already constructed at entry excludes late publication for that operation. Publication between entry and the body's collection could still affect that body. Publication after its range traversal cannot add a pointer to the completed work list. |
+| The row's insert callback was still executing at entry even though the title row matched the model. | Sequence the selected callback return and any destructive successor against entry. Identical seven-word values are compatible with either order. |
+
+SRR-017 observed 3,211 typed rows at title. SRR-018 found exact diagnostic
+agreement on 22,470 lanes from 3,210 matched rows. Neither provides the
+missing same-epoch writer or completion order. Strict native admission
+remains zero under [ORACLE-INPUTS](hypotheses.md).
+
+<!-- SRR-023 review -->
+**SRR-023 internal challenge — COMPLETE.** A separate reviewer checked
+the writer identity, both visitor instances, primary worker sizing, queue
+dispatch, bounded consumption and shutdown acknowledgement against the pinned
+retail image. Review distinguished an inner callback's return from outer
+service completion and from prior visibility of the row. Historical
+last-writer attribution and sweep-entry readiness remain open. Reviewed
+five-file manifest SHA-256
+`f4f7a5b35363d38fd02874ad00546036396d40fa89e063ad6973b3fecca0df4e`
+hashes UTF-8 lines of lowercase file SHA-256, two spaces, repository path
+and LF in lexical path order, excluding this block and its following blank line.
+<!-- /SRR-023 review -->
 
 ## Application dispatch and load-mode predicates
 
@@ -374,6 +470,15 @@ python -B tools/srr011/inspect_pe.py $image functions 141898870 141881660 14231D
 python -B tools/srr011/inspect_pe.py $image functions 141893EE0 141896280 141882BB0 1409518B0 14094E3D0 140593280 14077C470 140779610
 python -B tools/srr011/inspect_pe.py $image data 144B3D9F0 10
 python -B tools/srr011/inspect_pe.py $image data 1485F1500 C
+python -B tools/srr011/inspect_pe.py $image functions 14077BCE0 140779760 140777870 140772EE0 140776680
+python -B tools/srr011/inspect_pe.py $image window 1428D86C0 231
+python -B tools/srr011/inspect_pe.py $image window 1428D88B0 2B0
+python -B tools/srr011/inspect_pe.py $image functions 1428D96C0 1428D8FE0 1428D2B80 1428D3960 1428D7B60 1428D7BD0 1422CE200
+python -B tools/srr011/inspect_pe.py $image data 144CB4410 1E
+python -B tools/srr011/inspect_pe.py $image window 1401BADB4 16
+python -B tools/srr011/inspect_pe.py $image functions 140335FD0 1428D1550 1428D1420 1428D1650 1428D3530 1428D2FC0
+python -B tools/srr011/inspect_pe.py $image window 1428D3D16 25
+python -B tools/srr011/inspect_pe.py $image window 1428D9560 E
 python -B tools/srr011/inspect_pe.py $image functions 14008C050 140305FD0 1403061C0 140308070 140C80E60 140307FA0
 python -B tools/srr011/inspect_pe.py $image window 1428CDBE0 430
 python -B tools/srr011/inspect_pe.py $image functions 14233F2C0 142340990 142340AB0 1407873D0
@@ -395,8 +500,8 @@ checking decoded rel32 branches, supported RIP-relative operands and exact
 qwords in file-backed sections. It does not exclude computed references,
 unknown indirect targets, short branches or unrecognized decodes. Exception
 ranges can split a function; use checked `window` starts across those splits.
-The original dispatch census found the two direct constructor callers and
-the two receiver-vtable loads. Neighbor sweeps are distinct receivers:
+The bounded census found two direct callers of module entry, the constructor
+call at `0x1409519BE`, and two receiver-vtable loads. Neighbor sweeps are distinct receivers:
 `0x14094EEFD → FUN_140799490`, `0x14094EF26 → FUN_140AC7860`, and
 `0x14094EFBD → FUN_14077C4A0 → FUN_140778600`. They do not establish
 additional calls to the focal allocator merely by sharing a bucket.

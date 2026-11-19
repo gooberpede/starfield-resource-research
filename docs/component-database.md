@@ -661,17 +661,20 @@ Construction zeros the owner's attachment +0x238 notifier at
 at `0x1428D96CC–972A`. The callable gets the separate scheduler's
 +0x40 receiver through `FUN_1428D1870` and dispatches
 `FUN_1428D8FE0` at `0x1428D974A`. A matching scheduler
-TLS record (its +0x88 equals that receiver) with mode dword +0xE0
+TLS record (its +0x88 equals that receiver) with pool worker count at +0xE0
 equal to 1 can reach the direct call at `0x1428D926D`.
 The other admitted path builds a scheduler command whose callback
 `FUN_1428D9560` reaches the same service routine
 `FUN_1428D89B0` later. Both paths service the captured original owner,
 passing owner +0x40 to `FUN_1428D8060` at `0x1428D8A3E–8A49`.
-Its bounded and draining variants acquire receiver-local state and use
-`FUN_1422CE200` to consume available queue entries. The draining
-variant calls each returned command's +8 slot at `0x1428D7C1B` until
-the cursor yields no command. A null pop can also occur at its current
-segment/cursor limit (`0x1422CE284–2CC`). This is queue service state.
+Under receiver-local admission, the zero arm at `0x1428D8081` selects
+`FUN_1428D7B60`, which supplies a null segment ceiling and invokes each
+returned command's +8 slot at `0x1428D7BA3`. The nonzero arm selects
+`FUN_1428D7BD0`, which captures a segment ceiling from queue +0x148
+and dispatches at `0x1428D7C1B`. The bounded pop can stop at that
+ceiling with a successor present (`0x1422CE295–0x1422CE298`). Both loops
+report whether they processed any entries. Further service passes depend
+on caller state. [Service state and sweep-entry test](retail-execution-lifecycle.md#typed-input-readiness-at-sweep-entry-srr014-a9)
 
 **UNRESOLVED.** The positive ordering proves typed submission before
 that command's callback/store and file-loader return before normal
