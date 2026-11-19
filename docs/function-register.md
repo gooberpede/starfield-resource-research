@@ -121,6 +121,8 @@ typed FormID lookup and per-form source history in the pinned retail image.
 | `FUN_14168A8D0`, `FUN_14168AE30` | Build and bind the positional map hover row with independent disabled/show-color values. |
 | `FUN_1416ED390 → FUN_1416E87C0` | System-view body-card callback and common binder, paired with its own selected-body provider. |
 | `FUN_141411190 → FUN_142337790`, `FUN_141413570 → FUN_142337A50` | Global write/read pair for keyed PlayerKnowledge. Mask bit 3 gates item records. |
+| `FUN_141822570`, `FUN_14140C8C0` | Unit-6 component order. The PlayerKnowledge call at `0x141822732` follows 17 counted tables. Its successor `FUN_1414113F0` has ten bytes per entry. Load selects the paired component reader at `0x14140D814`. |
+| `FUN_14180AC10 / FUN_14180ADE0`, `FUN_14186BD40 / FUN_14186BC80` | Saved FormID array writer/reader and four-byte encoded-ID callbacks. The array reserves key zero. Base, dynamic and indexed forms take distinct paths. Saved full-plugin identity can depend on plugin flags. |
 | `FUN_140868B30 → FUN_14086A530 → FUN_14086A6D0` | Select from candidate forms built using copied biome slots. |
 
 For predicates, qualified endpoints and offline verification see the

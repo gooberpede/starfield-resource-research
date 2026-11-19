@@ -498,10 +498,93 @@ player’s save. A separate, paired global-data route does.
 | Read | LoadGlobalData unit 6 selects its callback at `0x1418243F5–0x141824449` and `0x141823172–3191`. The paired load path at `0x14182E43E` reaches `FUN_141413570` via `0x14140D814`. Its ID reader and raw u16 read supply the body and low word, then `0x14141362E–164A` rebuilds the typed key. `0x141413756` calls `FUN_142337A50` on the destination payload. Archive virtual +0x20 restores mask, version and level at `0x142337A81/7AA3/7AB6`. Bit 3 gates the item block here too. `0x142337E60–7EB8` reads the item ID and +0x21, and reads +0x20 for version ≥2. `0x1423380C5–812C` repopulates the item table. WriteUtil (`FUN_14186BD40`) maps/encodes IDs and writes the encoded value in the unit’s four-byte mode. ReadUtil (`FUN_14186BC80`) obtains a buffered or stream ID and translates it via `FUN_1418599A0`. The per-item nested ID list is read from version 1 and a trailing block from version 3. |
 
 This pair establishes a fieldwise save/load route on the pinned executable.
-It does not establish the payload present in either proposed save, whether a
-particular action dirtied the component, or serialization of the seven biome
-allocation words. Conservation of a displayed count across reload would test
-visible continuity only.
+The subsequent offline comparison below identifies its serialized population.
+The action that dirtied a component and persistence of the seven biome
+allocation words remain separate questions.
+
+#### PlayerKnowledge in Save2 and Save52
+
+**PROVEN · SERIALIZED.** Both preserved saves contain the entire version-3
+population. All ranges below are half-open. Unit offsets address the inflated
+SFS. Record and field offsets in the [decoder output](../tools/srr022/README.md)
+address the unit payload. The BCPS chunk index links both coordinate systems
+to physical compressed spans. [Save identities](PROVENANCE.md#save2-and-save52-binary-evidence)
+identify the historical inputs.
+
+| Measurement | Save2 | Save52 |
+| --- | ---: | ---: |
+| Unit 6 in inflated SFS | [0x3EA8D, 0x576A0) | [0x11F1F6, 0x1624FC) |
+| PlayerKnowledge count through last record, unit-relative | [24269, 52471) | [42687, 109971) |
+| Components, all version 3 and low key zero | 985 | 1,379 |
+| Visited bit set | 3 | 40 |
+| Item section present / omitted | 2 / 983 | 37 / 1,342 |
+| Item entries, all positive +0x21 | 27 | 906 |
+| Auxiliary IDs / nested item IDs / 12-byte trailer entries | 0 / 2 / 18 | 54 / 715 / 1,051 |
+| Bodies joinable from save alone | 956 | 1,209 |
+| Additional bodies conditional on installed TES4 header flags | 18 | 19 |
+| Save-scoped dynamic body IDs | 11 | 151 |
+
+The first global table closes at its next directory boundary after 17 units.
+The unit-6 dispatcher and the sizes of 17 preceding component tables lead
+to the PlayerKnowledge count. The following writer at `0x141822749` emits
+a u32 count and ten bytes per entry. The two next tables contain 1,821 and
+1,982 entries and end at unit offsets 70,685 and 129,795 respectively. No
+signature search or assumed planet count determines the population.
+
+**Comparison.** With the qualified full-plugin mappings, 970 body keys occur
+in both saves. Of these, 604 have equal compared fields and 366 differ. Four
+joinable bodies occur only in Save2 and 258 only in Save52. The 11 and 151
+dynamic bodies remain in their respective inventories with no cross-save
+match asserted. Of the conditional joins, 17 are equal, one differs, and one
+additional body occurs only in Save52. Using the saves alone yields 587 equal,
+365 changed, four only in Save2 and 257 only in Save52.
+
+Among shared keys, 221 masks, 33 stored levels, 17 auxiliary ID sequences and
+239 trailer sequences differ. The item-section bit differs on 28. These counts
+overlap. All 933 item identities resolve in the saved base-plugin namespace.
+No body/item pair appears in both saves. All 27 Save2 entries and all 906
+Save52 entries are one-sided, including entries on one-sided bodies. Neither
+save contains a zero progress byte or a present-but-empty item section.
+The item table includes IDs outside a body's inorganic resource list.
+
+**RECONSTRUCTION_PREDICTED.** On a successful load into fresh destinations,
+the reader builds the DB+0x268 typed body/low-word key, restores the mask
+and stored level, and fills the auxiliary vector with translated IDs. When
+bit 3 is set it indexes each 0x30-byte item slot by translated FormID and
+restores the two bytes and nested vector. A translated-key collision can
+discard a later insertion. The loader skips all-zero trailer tuples. No
+such tuples occur here. The ordinary level query returns 4 when bit 0 is
+set. Plugin availability and runtime redirects at a particular load epoch
+remain unobserved.
+
+**Independent gameplay and membership check.** At the separately pinned
+reproducer revision in [provenance](PROVENANCE.md), join its planetary
+directory and inorganic membership by FormID, then consult its atmosphere
+list separately. Save2 Kreet has mask `8000003E`, stored level 0 and 20
+positive item entries. Three match its seven canonical terrestrial candidates
+(Iron, Lead, Silver). The visit bit and atmospheric Helium-3 account for a
+fourth credit under the documented survey calculation. Neon has no saved
+entry. This agrees with the earlier 4/8 screenshots and distinguishes the
+later 5/8 observation. Vectera has seven items with zero matches to its five
+canonical inorganics, consistent with S21-03's 0/5. Sumati and Volii Alpha
+both omit the item section and have clear visit bits. S21-07 through S21-09
+show Volii Alpha at 0/2 and later 2/2 across different displays. Those
+captures began from Save2 and include subsequent gameplay. Neither save
+provides a controlled before/after action test.
+
+<!-- SRR-022 review -->
+**SRR-022 internal challenge: COMPLETE.** A separate reviewer decoded both
+original saves independently, compared every component and item by identity
+and byte offset, checked the native framing and ID branches, and challenged
+the refusal cases, source custody, screenshot hashes and task-only patch.
+The 14-path manifest SHA-256 is
+`1abaee16964e1b8ca732401ffc81cd275032d3628a1da59efc89c94c0c02cf9e`.
+It hashes UTF-8 lines of lowercase file SHA-256, two spaces, repository path
+and LF in lexical order, excluding this block and its following blank line.
+Dynamic cross-save identities and actual runtime/display state remain
+unobserved. Full-plugin joins retain the TES4-header condition above.
+<!-- /SRR-022 review -->
+
 
 **Reproducible method.** Use the tracked decoder in [offline reproduction](#offline-reproduction)
 with `functions 1417D6520 1417D6960 1417D7540 1416D0EF0 1416D1510 1416B6180 14136CFD0`.

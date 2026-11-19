@@ -221,6 +221,35 @@ percentage unless qualified.
 | S21-14 | Kreet, Landing Area scanner, expanded wheel; small cyan Ne tile and separate large cyan Ne/Neon wedge, reticle over cyan terrain. 5/8, survey 63%. | `d08e77ae602e6bf98430713e86be554f9d2bc92b98ecb82ca233aa382241e20b` |
 | S21-15 | Kreet, Locations, eight named rows; muted Ne tile still has three diamonds. 5/8, survey 63%. | `58e838822fe93a030c304a148b8ee428fb4674725a2c8de464c737277c19738a` |
 
+## Save2 and Save52 binary evidence
+
+**Custody-backed historical observation.** The game-managed Save2 was
+byte-identical to the existing HIST-0245 preservation and its earlier
+manifest. Save52 was copied once into private custody and verified against
+its game-managed original. Independent inspection joined the internal save
+numbers and character names to the source filenames. Both SFS headers record
+the version string 1.16.244.0 twice. The redisassembly used the matching
+retail executable SHA-256 above. Save creation executable hashes and the
+subsequent gameplay histories were not recorded.
+
+| Input | Physical bytes | Original and archive SHA-256 | Inflated unit-6 payload SHA-256 |
+| --- | ---: | --- | --- |
+| Save2 | 2,475,440 | `1ac3d496e532b6286d983a1449946ba4fe34a34e66295c9d1d7da677772903d1` | `76bf38c24063b3692539d40053b62d6714ea9344af515a01c67d48c2911f051c` |
+| Save52 | 16,411,136 | `6b4a10084c7e752c31fd2de121a00850aaa2bf1decd700b437d7dccfcdbc82e8` | `4d28b8d5ab1f58406d1d60191737040c68a8a049686d6f4eb9c226ff90565491` |
+
+**Reproducible method.** Run the [offline comparison](../tools/srr022/README.md)
+on matching lawful inputs. Source filenames, saves, streams, populated
+inventories and screenshot bytes remain private. Both saves carry 8 full,
+21 light and 9 medium plugin names. The full-slot comparison assumes the
+applicable overlay and scale flags match those in the consulted TES4 headers.
+Its evidence records header digests per plugin and the headers used for each
+conditional row. All 18/19 such body occurrences consult ordinary full
+plugins with flags 0x81 in the observed slots. The save-only comparison
+remains reproducible without this assumption. The separate membership check
+used the planetary directory, all-resources and atmosphere CSVs at reproducer
+revision `a8ff1c788bca415f571f06769ab3e712fa674f75`. The 15 screenshot
+observations have their own timeline and provenance above.
+
 ## Applicability register
 
 | Evidence or claim | Executable/build reference | Claim type | Qualification and limit |
