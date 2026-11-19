@@ -110,6 +110,9 @@ typed FormID lookup and per-form source history in the pinned retail image.
 | Function | Established retail-static operation |
 | --- | --- |
 | `FUN_1407B65D0`, `FUN_1407BA290` | Query the body knowledge mask or effective scan level. Named-query call sites at `0x140BF8077` and `0x140BE2CC0`. |
+| `FUN_141A37140`, `FUN_1421089F0` | Player cell/location transition and the spaceship handler's actor-location-change sink, respectively. Both use `FUN_140AC2AB0` to resolve the target body. [Predicates and event ancestry](retail-execution-lifecycle.md#location-changes-and-the-visited-bit) |
+| `FUN_1407B6710 → FUN_1407B6820` | Body/bit/value mutation. The worker updates an existing mask or calls `FUN_1407BF210` to submit a missing-key payload. [Mutation and creation](component-database.md#visited-bit-in-stored-playerknowledge) |
+| `FUN_140777350 → FUN_140775260 → FUN_140776900` | Typed command callback, keyed dispatch and new-wrapper construction or existing-payload assignment. |
 | `FUN_1407B75B0 → FUN_1407B77D0` | Body/ID/delta path to the stored PlayerKnowledge item table. |
 | `FUN_1417D6520 → FUN_1417D67D0 / FUN_1417D7540` | Populate caller snapshot, then compute progress. `FUN_1417D8D40` and `FUN_1417D6960` traverse membership. `FUN_1417D7EB0` supplies knowledge-dependent counts. |
 | `FUN_1416D0EF0 → FUN_1416D1510` | Gate, assemble and group body resource rows. `FUN_1416B6310 → FUN_1416B6180` transfers them to named UI fields. |

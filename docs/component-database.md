@@ -480,6 +480,57 @@ or the execution of that branch. For Volii Alpha the landed-aboard reading
 already includes both resources. The [control and remaining tests](hypotheses.md#locations-and-survey-observations)
 bound the interval and distinguish body visit credit from per-item writes.
 
+### Visited bit in stored PlayerKnowledge
+
+**PROVEN · retail static, 1.16.244.0.** Both verified visit callers pass
+the same three arguments to `FUN_1407B6710` — resolved u32 body ID in ECX,
+index 1 in EDX and true in R8B. Each first queries `FUN_1407B65D0(body, 1)`
+and bypasses the request on zero ID or a true result. A lookup miss and a
+clear bit both return false. Neither caller requires a particular scan level.
+Their distinct location inputs and event predicates are recorded in the
+[arrival analysis](retail-execution-lifecycle.md#location-changes-and-the-visited-bit).
+
+| Stage | Pinned control flow and observable consequence |
+| --- | --- |
+| Look up the destination | `0x1407B6799` calls `FUN_1407B6820` in the DB access scope. After building a pre-operation snapshot, the worker samples the old bit at `0x1407B68CE`. It looks up `(PlayerKnowledge type << 48) \| (bodyID << 16)` in DB+0x268 at `0x1407B68DA–6908`. Block zero **and** slot 0xFE0 select the missing arm. |
+| Existing component | `0x1407B6CA7–6CBA` reads the wrapper+0x20 mask, sets or clears the requested bit in a register, then stores the dword in the row. A clear bit followed by a set in this same row establishes a transition. An already-set bit produces the same mask. A caller's earlier negative precheck alone establishes neither outcome. |
+| Missing component | `0x1407B6958/695D` initialize temporary mask 0 and level −1. `0x1407B69AF/69B5` changes the temporary mask. `FUN_1407BF210` submits a typed command with callback `FUN_140777350`. Queue linkage at `0x1407BF2A2–2B8` and the optional notification at `0x1407BF2D1` establish submission. The configured host admits inline or queued service. [Command order and visibility](#command-order-and-visibility) |
+| Process the command | Callback → `FUN_140775260` → `FUN_140776900`. On the new-row arm, failed reservation at `0x14077696E–6975` skips construction. On success the key is written at `0x1407769AF` and the constructor called at `0x1407769D7` copies the mask at `0x14076E550`. The first observable row can already have mask 2. If the key exists at processing, `0x1407769F6/69FC` copies the staged **whole mask and level** into it. An intervening update could therefore be replaced. |
+| Return and observation | Both worker arms converge at `0x1407B6CBE`. Dispatch at `0x1407B6D11` carries the body, bit, requested value and earlier sample. The subsequent survey check at `0x1407B6D1C` and the outer scope release at `0x1407B679F–67FF` do not acknowledge a successful command copy or a displayed frame. A fresh keyed read after mutation establishes visibility to that reader. |
+
+**PROVEN · alternative inputs.** Other decoded direct references to the
+outer helper request indices 2, 4 or 6. The additional direct worker call
+at `0x141A2A033` sets index 5. The generic clear arm is real. Neither
+identified visit caller requests a clear. The scan mutation can submit a
+missing component with zero mask and an assigned level (`0x1407BA5E9–A5FB`).
+Conversely, PNDT input can supply a mask before any visit request. The two
+paths at `0x140770B77/0x140770BBD` read a payload or a dword, respectively.
+The latter incorporates the dword at `0x14076E51B`, and both submit through
+`FUN_140773760`. Bit 1 depends on the input. Unit 6 can separately restore
+the saved mask as described below. A DB reset can remove the stored row
+(`0x1424063DB`). These operations distinguish initialized, restored and
+absent state from a first observed in-place set.
+
+**Reproducible method.** Using the lawful pinned image and the
+[offline decoder](#offline-reproduction), run `scan 1407B6710 1407B6820
+141A37140 1421089F0` for decoded direct references and pointer candidates.
+Use `functions 1407B6820 1407BF210 140777350 140775260 140776900` for
+the two mutation arms. Direct-reference coverage does not inventory every
+whole-payload writer or resolve a virtual receiver in a past execution.
+
+<!-- SRR-024 review -->
+**SRR-024 internal challenge · COMPLETE.** A separate reviewer checked
+the player and spaceship call paths, actor and body identity, the parent-cell
+update order and both keyed mutation arms on retail 1.16.244.0. An independent
+Save2 decode and inspection of the three hash-matched originals confirmed
+the clear archived bit and the visible aboard credit. The historical first
+writer and the age of the orbital display remain unresolved. The five-path
+manifest SHA-256 is
+`3facab74a6ab3edbbef124e123396146dc38d5548cf9265115e3d6d380ef11f6`.
+It hashes the UTF-8 lines of lowercase file SHA-256, two spaces, repository
+path and LF in lexical order, excluding this block and its following blank line.
+<!-- /SRR-024 review -->
+
 ### PlayerKnowledge in the global save and load paths
 
 **PROVEN, retail static.** The body-keyed stored wrapper contains the u64 key

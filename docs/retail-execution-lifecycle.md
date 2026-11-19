@@ -456,6 +456,104 @@ sweep can reach the same store. A retained sample alone identifies no
 instruction. Open timing, queue, lifetime and persistence questions belong
 only in [the research lead register](hypotheses.md).
 
+## Location changes and the visited bit
+
+**PROVEN · retail static, 1.16.244.0.** The earliest attributable event
+boundary for the two known visit requests is a change in resolved location
+on the player path, or delivery of an eligible actor-location change to a
+spaceship event sink. Each path resolves its own location to a body before
+requesting bit 1. Neither takes the selected orbital card's key as its input.
+
+| Route | Ancestry, gates and target body |
+| --- | --- |
+| Player changes cell/location | The PlayerCharacter vtable entry at `0x144CBCCA8` (slot +0x860) and a direct player-global call at `0x1417E63EF` lead to `FUN_141A37140`. A virtual route supplies the player global and a resolved type-0x49 cell at `0x14059CA40–CA68`. After its own bypass checks, `FUN_140B19A60` calls the player slot at `0x140B19F24`. The direct route is also reachable through `0x14189552A` in starting-cell processing. On the visit arm the incoming cell differs from player+0xB0, is nonnull, and has bit 4 of cell+0x20 clear. `FUN_140AF4C50(cell)` resolves a location different from player+0xF38. After sending the actor/old/new location event at `0x141A37352`, it assigns the new pointer to +0xF38. The path requires a nonnull location and false from `FUN_140B58D50(player,0)`. It re-reads +0xF38 and resolves the body at `0x141A37398–73A6`. Only a nonzero body with negative visited query reaches `0x141A373D9`. The effective-level comparison and conditional level change at `0x141A373E4–7427` follow the request. |
+| Spaceship handler receives an actor-location change | `FUN_140B96EB0` packages actor, old location and new location at event +0/+8/+0x10. The sender at `0x140B96F17` can dispatch through the closure at `0x1402B7331` to sink slot +8 on the same stack. `0x14210AE2A–AE48` registers the handler's +0x58 subobject with this source. Its vptr `0x144D45B18`, slot +8, selects `FUN_1421089F0`. RTTI distinguishes this TESActorLocationChangeEvent sink from the adjacent +0x60 LandingEvent sink, whose +8 callback is `FUN_142108A90` and has no direct visit request. Other location-event publishers include `0x140BB538F/5477`. Delivery alone is insufficient. Actor and new location must exist, actor+0x98 must point to a base with byte +0x2E equal to 0x41 and bit 6 of dword +0x20 set, and `FUN_140B58D50(actor,0)` must be false. The player global must exist and `FUN_142116840(player,1)` must return the event actor. The handler resolves **event+0x10**, requires nonzero body and negative visited query, calls at `0x142108A77`, then returns zero on both request and bypass paths. |
+
+The registered GetSpaceship query (`0x1400DFD25–FDA4`) calls
+`FUN_142116840` with the same mode 1. The event actor must therefore be
+the spaceship returned for the player. Both visit routes separately use
+the exact mode of the ObjectReference IsInSpace binding. Registration at
+`0x142088BB0–8BC8` selects the wrapper at `0x14208BAF0`, which passes
+mode 0. The console query passes mode 1 (`0x140C7D3A8–D3AD`).
+Mode 0 accepts the retained cell at the special
+global or a flagged cell of subtype 2, and can follow a subtype-1 cell
+to a qualifying parent. Mode 1 also admits subtype 5 for that recursion
+(`0x140B58DB1–8E98`). A positive mode-0 result for the tested actor
+excludes that request. On the player route the guard reads the parent
+cell after +0xF38 has changed and before this invocation calls the base
+method at `0x141A37C24`. That method can install the incoming cell at
++0xB0 via `0x141936919` and `FUN_140B4E4E0`. The parent cell tested at
+request time therefore needs its own observation. A false result alone
+cannot date touchdown.
+
+Both use `FUN_140AC2AB0(out, location)`. It takes location+0x28 into
+`FUN_140AC2700`. A matching indexed relationship supplies the low dword
+at `0x140AC280E`. A zero result admits a second lookup at `0x140AC2B68`
+which can match along a location-parent chain and extract a body from the
+stored key at `0x140AC2DC3–2DCF`. The first output dword reaches ECX at
+each visit caller. Identifying that value with the player's intended
+destination requires a runtime join. The [component account](component-database.md#visited-bit-in-stored-playerknowledge)
+follows it through submission, creation or in-place update.
+
+**Historical control.** The archived Save2 unit-6 record for
+`Starfield.esm:05E3A5` (Volii Alpha), low key zero, occupies payload bytes
+[43003, 43031). Its mask is `0x80000000`, level −1, with no item section.
+Restoring this mask alone leaves bit 1 clear. Later play from that save
+produced S21-07 (orbital card 0/2, 31%), S21-08 (scanner aboard after
+landing 2/2, 88%) and S21-09 (scanner outside 2/2, 88%). Only Benzene and
+Water occupy the atmospheric span under the measured membership, with no
+terrestrial slots. For that body, a fresh successful knowledge read with
+bit 1 set and both pointers present credits two in `FUN_1417D7EB0`.
+Increasing the scan level or individual item bytes alone cannot yield
+that scanner numerator. The survey percent has separate inputs.
+[Save and screenshot evidence](component-database.md#playerknowledge-in-save2-and-save52)
+
+**Conditional interpretation.** With matched body, disclosed rows and
+fresh data, the two displays agree on atmospheric credit. A first set
+between their source reads fits the frames. An earlier set also fits if
+the orbital card still presents older selected-body detail while the scanner
+uses a newer snapshot. A pre-existing set would make either caller skip
+its request. Initialization and intervening updates are possible sources
+of pre-existing state, subject to measuring the source mask. Merely changing
+views with equally fresh matching inputs does not explain the difference.
+[Display producers](component-database.md#resource-displays-across-interfaces)
+
+**Unresolved event timing.** An active cell/location transition and a
+qualifying actor-location event are proven code routes. Orbital arrival,
+landing request and landing completion remain possible upstream occasions
+only if they supply one of the admitted changes. Orbital scanning and
+starmap selection have no identified direct visit edge here. A scan-level
+change alone is excluded as the source of this atmospheric increment.
+Disembarkation is excluded as a prerequisite for the visible aboard credit.
+The screens do not establish which route executed, even if the body was
+already visited by the time the orbital frame was displayed.
+
+**Minimum discriminating observation (unperformed).** In one matched
+orbit-to-aboard replay, read the target keyed mask immediately after
+restore and at the orbital card's detail build. Record the body and mask
+used by the first refreshed aboard scanner at `0x1417D7F2C–7F34`, the two
+span lengths, and the displayed counters. Keep the no-landing orbital
+refresh as a control. Between those checkpoints, follow only this key.
+
+1. At either request record the return site (`0x141A373DE` or
+   `0x142108A7C`), caller ancestry, cell or event actor/new location,
+   tested parent cell, IsInSpace result, resolved body and arrival/landing milestone. A different
+   actor, body or return site defeats that attribution.
+2. On a hit, compare the same row's mask immediately before and after
+   `0x1407B6CBA`. On a miss, join the command identity to its dispatch,
+   reservation and constructor return (`0x1407769DC`), or its existing-key
+   copy (`0x1407769F6`). Re-read the key after callback return and order
+   it against setter return and the UI source reads. An already-set mask,
+   a failed insertion or a pending command each defeats first-write
+   attribution to the request alone.
+3. A fresh clear orbital read followed by the first keyed set at the joined
+   location event rules out prior credit for that interval. A set before
+   landing excludes landing completion as the first write. If the orbital
+   display still says 0/2, compare its selected body and delivered packet
+   with the scanner read. A successful same-key read of 2/2 before the
+   card renders 0/2 identifies a presentation discrepancy. Matching packet
+   identities and fresh reads would challenge the stale-packet explanation.
+
 ## Static search and reproduction
 
 The reproducible route reads a lawfully obtained matching executable as
