@@ -111,6 +111,10 @@ typed FormID lookup and per-form source history in the pinned retail image.
 | `FUN_1407B75B0 → FUN_1407B77D0` | Body/ID/delta path to the stored PlayerKnowledge item table. |
 | `FUN_1417D6520 → FUN_1417D67D0 / FUN_1417D7540` | Populate caller snapshot, then compute progress. `FUN_1417D8D40` and `FUN_1417D6960` traverse membership. `FUN_1417D7EB0` supplies knowledge-dependent counts. |
 | `FUN_1416D0EF0 → FUN_1416D1510` | Gate, assemble and group body resource rows. `FUN_1416B6310 → FUN_1416B6180` transfers them to named UI fields. |
+| `FUN_1417D8560`, `FUN_1417D67D0` | Normalize each pointer span, then subtract shared pointers from atmosphere. |
+| `FUN_141360090`, `FUN_141369B80 → FUN_14136DC40 → FUN_14135FCC0` | Move Locations detail, enqueue callback, resolve owner and bind selected rows. |
+| `FUN_1415A01D0`, `FUN_141597330` | Update and register the scanner’s two scalar wrappers. Locations has its own row-counting consumer. |
+| `FUN_141411190 → FUN_142337790`, `FUN_141413570 → FUN_142337A50` | Global write/read pair for keyed PlayerKnowledge. Mask bit 3 gates item records. |
 | `FUN_140868B30 → FUN_14086A530 → FUN_14086A6D0` | Select from candidate forms built using copied biome slots. |
 
 For predicates, qualified endpoints and offline verification see the

@@ -292,14 +292,73 @@ gameplay epoch. Neither observation measures these instructions executing.
 | Named body queries → stored `BSGalaxy::PlayerKnowledge` | Registration at `0x14231D9D4–D9EC` binds the type word. The stored-component lookup uses DB+0x268 with key `(type << 48) \| (bodyID << 16)` in 64-bit arithmetic. GetPlanetVisited passes bit 1 to `FUN_1407B65D0`. IsCelestialBodyScanned tests `FUN_1407BA290(body) != -1`. A miss returns −1, bit 0 forces level 4, otherwise the result is the stored signed level. At `0x141A373D1–3D9` and `0x142108A6F–A77` the callers request bit 1 set through `FUN_1407B6710` (bit operations at `0x1407B6CB0/B6`). The first caller is a PlayerCharacter virtual method (vtable slot +0x860, entry at `0x144CBCCA8` → `FUN_141A37140`). Their timing relative to landing and disembarking is unverified. No actor ID appears in this key. Body-list inclusion has a further predicate/bypass check at `0x141360BD5–BE5`. |
 | Scanner/gather path → body and item → knowledge mutation | Reason 7 (HandScannerResourceScanned) at `0x1415996DA–9708` passes a nonzero form ID and a global receiver to `FUN_1407B75B0`. After outer/nested type checks and a type-0x9F item check, the reason-6 (ItemGathered) call at `0x1407B8467–8476` reaches the same helper. It resolves body context and submits a body/ID/delta operation. On a lookup hit `FUN_1407B77D0` updates or inserts an item and derives another capped byte via `FUN_1423464E0/142346630`. This qualifies a mutation route, with no guarantee that every scan or harvest reaches it. |
 | Body visit bit and item progress → resource count | `FUN_1417D7EB0` tests the same component. Bit 1 credits the **entire remaining atmospheric span**. Each nonnull +0x1E8 form credits one when lookup by form+0x28 finds an entry with byte +0x21 above zero (`0x1417D8049–80C5`). `0x1417D7887–78DA` writes the zero-extended byte accumulator to snapshot+0xC4 and the sum of both span lengths to +0xC8. Length includes slots that fail the numerator test. Atmospheric credit here requires no per-item mutation. Overall survey fraction at +0x1CC has separate cross-category arithmetic at `0x1417D7E67–7E95`. |
-| Snapshot and knowledge → selected body's resource rows | Locations constructs the body detail at `0x14135F108` (snapshot nested at +0x188), then calls `FUN_1416CF0F0`. Its tail call supplies the equality of two resolved keys (`0x1416CF169–F1AB`). `0x1416D04E0–0527` passes that flag to the row builder and moves the resulting vector into detail+0x168. `FUN_1416D0EF0` requires a knowledge lookup hit and either effective scan level != −1 or the supplied flag. Missing knowledge yields empty native rows even with the flag. This bounds disclosure at the producer. The exact UNKNOWN label and gameplay action that first opens the gate remain untraced. |
+| Snapshot and knowledge → selected body's resource rows | Locations constructs the body detail at `0x14135F108` (snapshot nested at +0x188), then calls `FUN_1416CF0F0`. Its tail call supplies the equality of two resolved keys (`0x1416CF169–F1AB`). `0x1416D04E0–0527` passes that flag to the row builder and moves the resulting vector into detail+0x168. `FUN_1416D0EF0` requires a knowledge lookup hit and either effective scan level != −1 or the supplied flag. Missing knowledge yields empty native rows even with the flag. This bounds disclosure at the producer. The page handles the resulting empty array below. The gameplay action that first opens the native gate remains untraced. |
 | Two spans → separately computed row fields → named Locations provider | `0x1416D1083–111A` walks detail+0x358 and +0x370 (snapshot+0x1D0 and +0x1E8). The former supplies the visit result, the latter the item-byte predicate. `FUN_1416D1510` gates on insertion by FormID, builds name and symbol, packs three color channels, inverts the knowledge argument for row+0x25, and computes +0x26 from scan state and form+0x110. It groups 0x28-byte records by that form byte. `0x1416D14A0–14CA` inserts seven groups in index order, using the output beginning for groups 5 and 6 and the end for earlier groups. This is native ordering before rendering. |
 | Native row → UI field contract | `LocationsBodyInfoData` is registered at `0x14135DE6C–DE81`. The body binder names `ResourcesA`, `iScanLevel`, `bPlayerVisited` and `fSurveyPercent` (`FUN_14135D570`). `0x14135FD0D` calls the common binder. Its resize path and indexed setter at `0x1416B6A24/6A7D` connect to the row schema via `0x1413685BA/85CA` and `0x14136B661/6970C`. `FUN_1416B6180` sets name, symbol, packed color, rarity, disabled, show-color and tagged fields in the order named at `0x14136CFE6–D074`. Thus `bDisabled` and `bShowColor` have different inputs. The latter compares resource class with a scan-level-derived threshold, with explicit special classes 5/6 (`0x1416D1967–19BD`). Neither field identifies final pixel brightness by itself. |
 
-The named scanner schema binds `uResourcesCurrent/Max` at
-`0x1415973A0/73B7`. A binding from those fields or snapshot+0xC4/+0xC8 to
-the **Locations** counter text remains unlocated. Resource rows, body survey
-percentage and the computed resource count have distinct native contracts.
+### How Locations gets its resource counter
+
+**PROVEN, static on the pinned executable and interface archive.** The scanner
+uses the snapshot scalars. Locations computes its fraction from the selected
+body’s resource rows. The paths agree under ordinary conditions, but their
+identity rules, widths and disclosure limits differ.
+
+| Stage | Operation and evidence |
+| --- | --- |
+| Normalize membership | At `0x1417D686B/6873`, each span passes through `FUN_1417D8560`. It sorts qword pointer values, compacts equal neighbors and erases the surviving null (`0x1417D85A7–8646`). The cross-span loop compares pointers at `0x1417D68A0/68E0`, writes survivors to atmosphere at `0x1417D68EE` and updates its end at `0x1417D691C`. A shared pointer survives once in the biome span and requires positive item progress for credit. Failed resolutions and repeated slots do not inflate the normal maximum. |
+| Count | On a knowledge hit, `0x1417D8049–80C5` adds visited atmospheric entries and increments for each positive terrestrial item. Current accumulates in an unsigned byte without saturation, then zero-extends. Maximum sums normalized pointer counts in 32 bits. Eight resources cannot wrap the byte. |
+| Scanner | `FUN_14159FEB0` installs a snapshot pointer at `0x14159FF6A`. `FUN_1415A01D0` obtains the Monocle menu model through virtual +0x58. At `0x1415A0506–0591` it reads +0xC4/+0xC8, updates changed dwords in wrappers +0xE0/+0x100 and dispatches virtual +0x48. `FUN_141597330` registers these as `uResourcesCurrent/Max`. |
+| Locations transport | Detail construction directly calls the snapshot builder at `0x1416CD560`. `0x14135F35B–F366` moves the projected detail. `0x141360436/0x14136043E` copies a block covering both counts to detail+0x24C/+0x250, while the row vector travels at +0x168. `FUN_141369B80` queues callback `FUN_14136DC40` and the moved packet. On owner resolution the callback calls `FUN_14135FCC0`, whose virtual +0x58 lookup and direct bind at `0x14135FD0D` supply the display model. |
+| Locations schema | The 34-field enumerator `FUN_14135D570` names paired flora, fauna and trait counts. Its resource field at `0x14135D818` is `ResourcesA`. The array resize and indexed row setters above supply its contents. The survey meter separately receives `fSurveyPercent` from detail+0x24, originating at snapshot+0x1CC. |
+
+The row helper inserts by **u32 FormID** (form+0x28, `0x1416D153A–1555`),
+atmosphere first. Distinct pointers carrying the same FormID would survive
+pointer normalization but compete for a single row. Row order by class is
+6, 5, 0, 1, 2, 3, 4. The packed RGB comes from the form triplet at +0xE0 or
+a class fallback when all three converted low bytes are zero
+(`0x1409E7890–78FB`, packing at `0x1416D1907–194A`). An effective level
+of −1 clears `bShowColor` even if the key-equality override discloses the list.
+Otherwise classes 5 and 6 always qualify, and other classes qualify at or
+below the threshold. Stored levels 0…4 map to themselves, unexpected stored
+values default to threshold zero, and mask bit 0 forces level 4
+(`0x1416D1967–19BD`, table `0x1416D1C30`). The independent `bDisabled`
+is the inverse of the visit or positive-item predicate appropriate to that row.
+
+**PROVEN, interface bytecode.** Both [pinned Locations layouts](PROVENANCE.md#locations-interface-input)
+subscribe `LocationsPage.onBodyInfoUpdate` to `LocationsBodyInfoData`.
+The callback passes event data to the body card. Its `AlmanacBodyDataInfo.SetBodyInfo`
+passes `ResourcesA` and `iScanLevel` to `UpdateResourceInfo`. The override calls
+the base `BodyDataInfo.UpdateResourceInfo`. Its actual counter rules are:
+
+- With a nonempty array, **y** is its full length. **x** starts at zero. For
+  each available icon position with a nonnull row, `SetResource` runs and
+  `!row.bDisabled` increments x. The method formats `(x/y)` and calls
+  `GlobalFunc.SetText` on `ResourcesAmount_mc.text_tf`. Each shipped layout
+  defines eight row slots, and initialization stops at the first missing icon
+  or the limit of eight. A ninth supplied row would affect y only.
+- With an empty array, scan level ≥ `SL_MINIMAL` (0) selects `$NONE`;
+  a lower level selects `$UNKNOWN`. This distinguishes a hidden list from
+  a displayed zero numerator. A missing amount clip skips the text write.
+- `PlanetInfoResourceIcon.SetResource` uses `bShowColor` to choose the
+  background color transform (packed `uColor` or `0x394253`), `bDisabled`
+  to select the icon’s **Unknown/Known** timeline frame, `uRarity + 1` to
+  select its rarity frame, and `bTagged` for tag visibility. In the imported
+  PlanetInfoCard symbol the Unknown background placement has zero alpha
+  multiplier and Known restores the default transform. These are authored
+  frame states; the applied transform, compositing and screenshot pixels are
+  separate observations. The full name is a **sibling text field**: the
+  Almanac override sets it from the icon’s stored `sName` for each visible
+  parent. Its name assignment has no disabled/color branch. Counting apparently
+  bright full names cannot recover x.
+
+For an open gate, one canonical form pointer per FormID, all rows fitting the
+card and consistent knowledge across reads, both routes count the same credited
+resources. This explains agreement without a scalar-to-text binding. Another
+method in the same movie, `GetInorganicsText`, mentions inorganic scalar
+fields. The selected Almanac override above calls `UpdateResourceInfo`
+for this label. The [matched cases and proposed tests](hypotheses.md#locations-and-survey-observations)
+separate this asset behavior from claims about a particular capture.
+
 The `ScanningPowerLevelAV` default object is named at `0x14005215F`.
 `FUN_14168AF80` reads its resolved pointer, obtains a float via the receiver
 at [0x145F43230]+0x70, truncates and clamps the result to 0…4 (null gives 0).
@@ -311,15 +370,28 @@ not identify the dispatch into that slot. The actor-value path supplies a stored
 used in presentation. The chain from a particular perk rank or orbital input
 to an individual resource write remains unresolved.
 
-**Persistence boundary.** The PlayerKnowledge factory's +0x28/+0x30 slots
-at vtable `0x144D5F2C8` lead through `FUN_14231FC90` to `FUN_142322A80`.
-Its +0x268 lookup and copy at `0x142322B96` take in-memory component data.
-PNDT command submission at `0x140770BA9/BE5` also has a memory source.
-These direct associations identify a factory and queued data, but provide
-no attributable save stream write or paired restore of the body and item
-fields. The existing seven-slot serialization question has a different payload.
-See the [controlled observations](hypotheses.md#locations-and-survey-observations)
-for the competing interpretations of the three captures.
+### PlayerKnowledge in the global save and load paths
+
+**PROVEN, retail static.** The body-keyed stored wrapper contains the u64 key
+at +0x10 and the PlayerKnowledge payload at +0x20. The registration, factory
+and PNDT paths identify the object in memory. At factory vtable
+`0x144D5F2C8` both +0x28 and +0x30 lead via `FUN_14231FC90` to
+`FUN_142322A80`, which copies an indirect memory source at `0x142322B96`.
+The PNDT MNAM/NNAM paths (`0x140770B77/0x140770BBD`) read plugin subrecords,
+initialize level −1 and enqueue typed data. Neither copy identifies the
+player’s save. A separate, paired global-data route does.
+
+| Operation | Body, type and field evidence |
+| --- | --- |
+| Write | SaveGlobalData unit 6 dispatch (`0x141825881–0x141825927` in the unit dispatcher, then `0x141822732`) reaches `FUN_141411190`. It selects the PlayerKnowledge type in DB+0x268. At `0x141411343–138B` it passes the key’s body ID through the ID writer, writes the low u16 and passes that same wrapper’s payload to `FUN_142337790`. Through archive context+0xB0, virtual +0x28, it writes the u32 mask (including visit bit 1), u16 format value 3 and i32 stored scan level at `0x1423377B9/77D2/77E8`. |
+| Conditional item records | Mask bit 3 gates the item section at `0x14233783D–7845`. It writes a u64 occupied-entry count, walks occupied 0x30-byte entries and sends the item FormID through the ID callback. It writes the +0x21 credit byte then +0x20 at `0x1423378CC–78F8`. The mutation path at `0x1407B78AD` calls `FUN_1423464E0`, which caps positive progress at 255 and sets payload mask bit 3 at `0x142346614`. Additional nested data follows. This ordering matters when comparing stored progress with the displayed numerator. |
+| Read | LoadGlobalData unit 6 selects its callback at `0x1418243F5–0x141824449` and `0x141823172–3191`. The paired load path at `0x14182E43E` reaches `FUN_141413570` via `0x14140D814`. Its ID reader and raw u16 read supply the body and low word, then `0x14141362E–164A` rebuilds the typed key. `0x141413756` calls `FUN_142337A50` on the destination payload. Archive virtual +0x20 restores mask, version and level at `0x142337A81/7AA3/7AB6`. Bit 3 gates the item block here too. `0x142337E60–7EB8` reads the item ID and +0x21, and reads +0x20 for version ≥2. `0x1423380C5–812C` repopulates the item table. WriteUtil (`FUN_14186BD40`) maps/encodes IDs and writes the encoded value in the unit’s four-byte mode. ReadUtil (`FUN_14186BC80`) obtains a buffered or stream ID and translates it via `FUN_1418599A0`. The per-item nested ID list is read from version 1 and a trailing block from version 3. |
+
+This pair establishes a fieldwise save/load route on the pinned executable.
+It does not establish the payload present in either proposed save, whether a
+particular action dirtied the component, or serialization of the seven biome
+allocation words. Conservation of a displayed count across reload would test
+visible continuity only.
 
 **Reproducible method.** Use the tracked decoder in [offline reproduction](#offline-reproduction)
 with `functions 1417D6520 1417D6960 1417D7540 1416D0EF0 1416D1510 1416B6180 14136CFD0`.
@@ -328,6 +400,30 @@ Use `window 1417D7F0D 22D` for the knowledge-count loop and
 Use `data 144D5F178 F` and `window 14231D9D4 1D` to verify the registration.
 Run on a lawfully obtained matching disk image. These commands write disassembly
 to stdout. Game state, load order and save contents are outside this static method.
+
+For the normalization, scanner, queued detail, typed writer and restore,
+run these additional bounded reads from the repository root:
+
+```powershell
+python -B tools/srr011/inspect_pe.py $image window 1417D8560 F1
+python -B tools/srr011/inspect_pe.py $image window 141360436 11
+python -B tools/srr011/inspect_pe.py $image window 1415A0506 8E
+python -B tools/srr011/inspect_pe.py $image functions 14135D570 141411190 141413570
+python -B tools/srr011/inspect_pe.py $image window 142337790 170
+python -B tools/srr011/inspect_pe.py $image window 142337DB2 136
+python -B tools/srr011/inspect_pe.py $image window 1423380C5 68
+```
+
+<!-- SRR-020 review -->
+**SRR-020 internal challenge — COMPLETE.** A separate reviewer challenged the
+counter binding, pointer normalization, Kreet control, UI bytecode and typed
+save/load paths against the source inputs. Gameplay timing and the screenshot
+epoch remain unresolved. The reviewed five-subject SHA-256 manifest is
+`265316a3698002b22edb75bf67c3e6ea02c39b619e6263cc904530ca24632dd4`.
+It hashes UTF-8 lines of lowercase file SHA-256, two spaces, repository path
+and LF in lexical order. The manifest excludes this block and its following
+blank line.
+<!-- /SRR-020 review -->
 
 <!-- SRR-019 review -->
 **SRR-019 internal challenge — COMPLETE.** An independent reviewer checked

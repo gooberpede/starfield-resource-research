@@ -21,39 +21,62 @@ in the [baseline](v1-research-baseline.md), [lifecycle](retail-execution-lifecyc
 | SRR011-U04; DEFERRED / P3 | What was `bImportCSVBiomeData:Data`'s effective value in the measured title epoch? | SRR-014 resolved setting name/default/writer; historical epoch value remains unmeasured. | Effective-setting or attributable runtime write/read witness for a concrete relevant epoch. No reason to rediscover writer origin. |
 | H1; OPEN / P3 | Does zero-count reflected ATMO LIST generically clear the property? | Vectera and effective export fit explicit clear; property/override contract incomplete. | Decode generic reflected property identifier and override reducer against a controlled multi-layer case. Non-blocking current corpus. |
 | SurveyAggregator; DEFERRED / P3 | What upstream state/channel does RE ID 1016657 expose? | The pinned native aggregator reads separate atmosphere and retained-biome spans. The historical exporter/build filter responsible for omissions remains unresolved. | Trace concrete upstream population/filter boundaries on a pinned applicable source. No generation dependence, no restored snapshot publication. |
-| SURVEY-UI; OPEN / P2 | Which action sets the body visit bit, and how does Locations render knowledge-dependent rows and the resource counter? | Native body, item, row and aggregate predicates are [identified](component-database.md#resource-membership-player-knowledge-and-the-locations-page). Arrival timing, final counter binding and styling remain open. | Compare the single-action transitions below. To settle rendering directly, identify the Locations consumer of `ResourcesA`, its counter calculation and its two row flags. |
+| SURVEY-UI; OPEN / P2 | When does the body visit bit change, and which state produced the Kreet capture? | The [pinned counter and icon bindings](component-database.md#how-locations-gets-its-resource-counter) are established statically. The screenshot epoch, actual scan level, positive items and first gameplay transition remain unknown. | Compare first disclosure, icon background/frame and single-item credit under matched conditions below. |
 
 ## Locations and survey observations
 
-User-provided Locations captures show Sumati at 17% with resources UNKNOWN,
-Vectera at 80% with five names and 0/5, and Kreet at 60% with eight names
-and 4/8. Prior actions, effective settings, build and skill rank in these
-captures are unknown. Vectera shows all five names beside a displayed numerator of zero. Kreet's apparent brightness discrepancy remains unexplained.
-The small diamonds are a separate visual feature. The native rarity, disabled
-and show-color fields offer distinct inputs to test.
+**User observations.** Sumati shows 17% and UNKNOWN, Vectera 80% and 0/5 with
+all five names, and Kreet 60% and 4/8 with eight names. The numerator and
+survey percentage measure different things. The captures do not identify
+the winning UI assets, plugins, settings, prior actions or effective scan
+level. The smaller diamonds are consistent with the separate rarity frames.
 
-**Proposed controlled observations, unperformed.** Start each branch from
-the same previously unvisited body in orbit with resources UNKNOWN. Record
-build, effective plugins/settings, Scanning rank, and independent evidence
-for one atmosphere-only resource and one non-overlapping terrestrial item.
-Hold these fixed. Before and after each single action, reopen the same
-Locations page and record list disclosure, names/order, row colors and
-diamonds, x/y and body %. Also record the orbital scan display separately.
-If entry to orbit already changes disclosure, retain that as its own baseline.
+**Kreet — PROVISIONAL explanation of the capture.** The
+[three measured biome vectors](allocation-validation.md#four-complete-sample-vectors)
+contain seven different nonzero resources and no He-3. In the independent
+vanilla atmosphere export Kreet has He-3 (`000057F5`) only. Cross-origin He-3
+is contradicted for this comparison. With these memberships, a visited Kreet
+and three positive terrestrial entries give four credited rows out of eight.
+At effective level 0, Water (class 6), He-3 (5), Iron, Lead and Argon (0)
+are the five color-eligible icons. Alkanes and Silver (1) join at level 1,
+and Neon (3) at level 3. Color eligibility controls the tile input; full-name
+text has its own field. The four actual credited identities and any claimed
+brightness division among the names cannot be inferred from this example.
+A spot check of the supplied 1920×1080 Kreet JPEG also distinguishes the
+tiles. Sampling x=1140 and y=343 + 66×i (zero-based displayed row i) gives
+five different RGBs, followed by exactly 0x394253 for Alkanes, Silver and
+Neon. This matches the fallback color in the pinned interface. A sampled
+background pixel does not identify a credited item or measure name styling.
+No discrepancy in counting is required.
 
-| Starting condition | Single action | Discriminating result |
+**Volii Alpha — conditional control.** The [retail title record](allocation-validation.md)
+has seven zeros in its single biome. The independent atmospheric set is
+Benzene and Water. If both pointers resolve and the snapshot reaches the
+atmosphere callback, the raw maximum is two. With a knowledge hit, changing
+only the visit bit would credit both at once. With the gate open and two
+rows, both disabled flags would clear together. At level zero only Water is
+color-eligible. No displayed Volii fraction has been observed here.
+
+Membership and class inputs for these comparisons come from sibling
+`starfield-resource-reproducer` commit
+`a8ff1c788bca415f571f06769ab3e712fa674f75`, files
+`data/planet-atmospheric-resources.csv` and `data/ires-hierarchy.csv`.
+Those sources describe resource membership and class, independently of a
+player’s survey state.
+
+**Ranked future tests (unperformed).** Save2 and Save52 are user-described
+candidate histories. For every branch, match build, plugins, UI layout,
+settings, rank, body and starting checkpoint. Retain a no-action branch.
+Reopen the same page after each single action. Record the Locations text,
+names, icon appearance and body percentage separately. Record scanner values
+or underlying state only if independently measurable and explicitly
+authorized. UNKNOWN supplies no prior numeric value.
+
+| Rank and fixture | Controlled comparison | Observation that separates the explanations |
 | --- | --- | --- |
-| Untouched in orbit, matched no-action control | Orbital scan | UNKNOWN supplies no baseline x. Record the first displayed x/y. Names with x=0 distinguish disclosure from a positive displayed numerator. Compare the first x and atmosphere row with the no-scan landing branch. |
-| Same starting point without orbital scan | Land, remain aboard | First change here supports a landing-associated transition. If the UI cannot be opened aboard, the timing remains interval-bounded. |
-| Landed aboard, with measurements | Disembark without using the scanner or collecting anything | A first atmosphere-row or credit change now distinguishes this interval from touchdown. Joint changes in several categories leave item attribution open. |
-| Same surface checkpoint, listed terrestrial item with no prior scan or harvest | Confirm one handheld scan | Record the target row and x independently. Test whether color or credit changes alone. Keep an untouched row for comparison. |
-| Restored pre-scan surface checkpoint, same item | Harvest once without handheld scan | Compare against the scan branch. A numerator increase here supports gathering as an independent route to displayed credit. |
-| Matched pre-orbit checkpoints differing only in Scanning rank | Perform the same orbital scan in each | Compare orbital overlay, Locations disclosure, color and x/y separately. A rank effect on styling alone would differ from a changed resource numerator. |
-
-A displayed count change cannot distinguish a computed visit-bit credit from
-a persistent item write by itself. The event feeding the identified bit-1 setters and the widget reading
-the selected body are the smallest native follow-ups. Historical CK Maal VIII
-already settles atmospheric *membership* for that trace.
+| 1 · Kreet, Save2 if the starting state matches | Hold visit/level fixed. Scan one previously uncredited terrestrial resource vs no action. From the same checkpoint, separately harvest it once without a scan. Compare an untouched row. In another matched pair vary only effective scan level 0→1, holding item knowledge fixed. | A new positive item predicts one additional enabled row and +1 to x, unchanged y. A level-only change predicts new color eligibility for Alkanes and Silver with unchanged x. Compare full-name text with tile and rarity separately. A mismatched scan level or initially credited item defeats the comparison. |
+| 2 · Volii Alpha, Save2 | From a common reachable checkpoint record arrival in orbit. Branch to orbital scan or no scan. On a no-scan branch record touchdown while aboard, then disembark without scanning or gathering. Retain matched no-action observations at each accessible point. | List disclosure alone can reveal names with zero credit. With both rows disclosed, simultaneous credit for both at one transition fits visit-bit credit; separate transitions with a single positive item would challenge the atmosphere-only explanation for that epoch. Record the first numeric display and compare it across branches. An inaccessible aboard screen bounds the interval only. |
+| 3 · Same-save reload, then Save52 as comparison | After a measured single-item change, compare a fresh-process reload of that checkpoint with reload of a pre-action control on the same profile. Use Save52 only to compare a separately documented richer/completed state. | Divergence by branch after reload supports continuity of the changed visible state; convergence after a confirmed pre-save difference challenges it. Equality alone cannot identify the on-disk fields. Different Save2/Save52 histories cannot isolate the restore mechanism. |
 
 ## Reconciled dispositions
 

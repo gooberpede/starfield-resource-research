@@ -80,6 +80,61 @@ base `0x140000000`, language `x86:LE:64:default` and compiler ID `windows`.
 An independent PE decode corroborated the instruction locations and critical
 operands in the focal listing. The historical scan builds remain unknown.
 
+## Locations interface input
+
+The installed `Data/Starfield - Interface.ba2` inspected on 19 November 2026
+is a 135,450,443-byte BTDX v2 GNRL archive, SHA-256
+`dab6aeebb7e54282818e9a1957e80baef22ae992c6363cbe910f92b8adf3e702`.
+This input qualifies the [Locations presentation findings](component-database.md#how-locations-gets-its-resource-counter).
+Co-installation with the pinned retail executable does not establish the
+assets selected in any supplied screenshot.
+
+| Archive member under `interface/` | Zero-based directory index | SHA-256 of complete compressed SWF member |
+| --- | ---: | --- |
+| `locationspage.swf` | 135 | `3977612bf4f8285ac6dfed149a8ce01c23ac8ccc5e8c1673be40434978c4998d` |
+| `locationspage_lrg.swf` | 136 | `79faa3c6c342935b42a278dde791ed49098f32073b3cdcc93890ce2072372038` |
+| `planetinfocard.swf` | 175 | `fdd8731f2445b67f4e0c0a4e6e394cca6aed13a24fdc90e90e64028b3f7636fd` |
+| `planetinfocard_lrg.swf` | 176 | `955a87392ba4c43c1ef6ba89c222583a0f2048b2ced376722cbd706376b124b4` |
+
+**Reproducible method.** From a lawful matching archive, use the following
+Python 3 standard-library check with the archive path as its sole argument.
+It reads four indexed entries, checks the counter loop in both page layouts
+and prints member identities. It writes no files.
+
+```python
+import hashlib, struct, sys, zlib
+
+with open(sys.argv[1], "rb") as archive:
+    assert hashlib.file_digest(archive, "sha256").hexdigest() == (
+        "dab6aeebb7e54282818e9a1957e80baef22ae992c6363cbe910f92b8adf3e702"
+    )
+    for index, method in [(135, 0x27CC0), (136, 0x27E94), (175, None), (176, None)]:
+        archive.seek(32 + 36 * index)
+        offset, packed, size = struct.unpack_from("<QII", archive.read(36), 16)
+        assert packed == 0
+        archive.seek(offset)
+        member = archive.read(size)
+        print(index, hashlib.sha256(member).hexdigest())
+        if method is not None:
+            body = zlib.decompress(member[8:])[method:][:225]
+            # AVM2 iftrue skips the increment of integer local 4.
+            assert body[0x53] == 0x11 and body[0x57:0x59] == bytes([0xC2, 4])
+            assert 0x57 + int.from_bytes(body[0x54:0x57], "little", signed=True) == 0x59
+```
+
+To verify the semantics, inspect the SWF DoABC tag (82), resolve AVM2
+multinames against its constant pool and follow these ABC method indexes in
+either Locations member. `1257` subscribes the provider, `1262 → 1285`
+passes event data to the card, `1039 → 1233` dispatches the projected data,
+and `1234` calls its superclass `1031`. In 1031 the instruction at method
+offset +0x50 reads `bDisabled` and +0x57 increments x. The formatting path
+at +0x86…+0xA7 reads x and the saved array length. Method 910 selects the
+icon color, timeline frame, rarity and tag. In the PlanetInfoCard members
+the corresponding icon method is 512. The two authored icon states can
+also be checked in DefineSprite 18 (standard) or 16 (large) by following
+the labeled frames and depth-1 color transform. No game process, UI dump
+or save is an input to this check.
+
 ## Applicability register
 
 | Evidence or claim | Executable/build reference | Claim type | Qualification and limit |
