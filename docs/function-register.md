@@ -103,6 +103,19 @@ typed FormID lookup and per-form source history in the pinned retail image.
 | `FUN_1405B5BE0`, `FUN_1405B9950`, `FUN_1428E4230` | **PROVEN STATIC** packed-file open wrapper, pathname composition and distinct direct or virtual provider route, followed by the typed file constructor. |
 | `FUN_1427D8950`, `FUN_1427D7FA0`, `FUN_1405BA840` | **PROVEN STATIC** relative-path virtual provider delegation, ordered provider search stopping on success, and packed-file close that clears the open stream pointer. |
 
+### Retail survey and Locations locators
+
+| Function | Established retail-static operation |
+| --- | --- |
+| `FUN_1407B65D0`, `FUN_1407BA290` | Query the body knowledge mask or effective scan level. Named-query call sites at `0x140BF8077` and `0x140BE2CC0`. |
+| `FUN_1407B75B0 → FUN_1407B77D0` | Body/ID/delta path to the stored PlayerKnowledge item table. |
+| `FUN_1417D6520 → FUN_1417D67D0 / FUN_1417D7540` | Populate caller snapshot, then compute progress. `FUN_1417D8D40` and `FUN_1417D6960` traverse membership. `FUN_1417D7EB0` supplies knowledge-dependent counts. |
+| `FUN_1416D0EF0 → FUN_1416D1510` | Gate, assemble and group body resource rows. `FUN_1416B6310 → FUN_1416B6180` transfers them to named UI fields. |
+| `FUN_140868B30 → FUN_14086A530 → FUN_14086A6D0` | Select from candidate forms built using copied biome slots. |
+
+For predicates, qualified endpoints and offline verification see the
+[relationship matrix](component-database.md#resource-membership-player-knowledge-and-the-locations-page).
+
 ## Creation Kit generation locators
 
 CK executable scope and static/live identity qualifications are in
@@ -204,8 +217,14 @@ RE ID **1016657**, historical runtime binding
 buffer whose populated spans are filtered for resource forms. It supplied the
 historical planet-all-resources.csv validation snapshot, now maintained only
 in the sibling reproducer. Observed planet membership has high confidence;
-exact upstream semantics and the relation to allocation remain unresolved.
-Current use exposes no biome identity and demonstrably omits some atmospheric
+the historical build and upstream filter remain unresolved.
+For **this retail pin**, Address Library v22's matching versionlib (format 5,
+data format 0, SHA-256 `299ea1b4da35b42e9bf1b8ed94fa980694a4dcbebfc7693201619c4c08fa49d8`)
+maps this ID to RVA `0x17D6520` (little-endian u32 at file offset
+`96 + 4 × 1016657`). The [pinned native graph](component-database.md#resource-membership-player-knowledge-and-the-locations-page)
+explains two separate membership spans and the knowledge-dependent summary.
+Attribution of the historical CSV to a particular span/filter and build is
+still open. Historical extraction exposes no biome identity and demonstrably omits some atmospheric
 resources. It is an empirical CK/RSGD-visible-channel proxy, never generation
 logic or a complete final membership oracle. See
 [baseline](v1-research-baseline.md#surveyaggregator-and-qualified-oracle) and

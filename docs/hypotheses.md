@@ -20,7 +20,40 @@ in the [baseline](v1-research-baseline.md), [lifecycle](retail-execution-lifecyc
 | SRR014-B8; DEFERRED / P3 | Can an actual notification subscriber mirror computed +0x300 slots into same-key +0x268? | SRR-015 resolved direct key-only dispatch and separate factory capability, not the subscriber/source/destination join. | Concrete installation/receiver ancestry and matching generated source/destination accesses; runtime attribution separately needs epoch-qualified execution. Reopen for a specific cross-store consumer/mismatch, not arbitrary subscriber speculation. |
 | SRR011-U04; DEFERRED / P3 | What was `bImportCSVBiomeData:Data`'s effective value in the measured title epoch? | SRR-014 resolved setting name/default/writer; historical epoch value remains unmeasured. | Effective-setting or attributable runtime write/read witness for a concrete relevant epoch. No reason to rediscover writer origin. |
 | H1; OPEN / P3 | Does zero-count reflected ATMO LIST generically clear the property? | Vectera and effective export fit explicit clear; property/override contract incomplete. | Decode generic reflected property identifier and override reducer against a controlled multi-layer case. Non-blocking current corpus. |
-| SurveyAggregator; DEFERRED / P3 | What upstream state/channel does RE ID 1016657 expose? | Known validator excludes some atmosphere membership; exact contract unresolved. | Trace concrete upstream population/filter boundaries on a pinned applicable source. No generation dependence, no restored snapshot publication. |
+| SurveyAggregator; DEFERRED / P3 | What upstream state/channel does RE ID 1016657 expose? | The pinned native aggregator reads separate atmosphere and retained-biome spans. The historical exporter/build filter responsible for omissions remains unresolved. | Trace concrete upstream population/filter boundaries on a pinned applicable source. No generation dependence, no restored snapshot publication. |
+| SURVEY-UI; OPEN / P2 | Which action sets the body visit bit, and how does Locations render knowledge-dependent rows and the resource counter? | Native body, item, row and aggregate predicates are [identified](component-database.md#resource-membership-player-knowledge-and-the-locations-page). Arrival timing, final counter binding and styling remain open. | Compare the single-action transitions below. To settle rendering directly, identify the Locations consumer of `ResourcesA`, its counter calculation and its two row flags. |
+
+## Locations and survey observations
+
+User-provided Locations captures show Sumati at 17% with resources UNKNOWN,
+Vectera at 80% with five names and 0/5, and Kreet at 60% with eight names
+and 4/8. Prior actions, effective settings, build and skill rank in these
+captures are unknown. Vectera shows all five names beside a displayed numerator of zero. Kreet's apparent brightness discrepancy remains unexplained.
+The small diamonds are a separate visual feature. The native rarity, disabled
+and show-color fields offer distinct inputs to test.
+
+**Proposed controlled observations, unperformed.** Start each branch from
+the same previously unvisited body in orbit with resources UNKNOWN. Record
+build, effective plugins/settings, Scanning rank, and independent evidence
+for one atmosphere-only resource and one non-overlapping terrestrial item.
+Hold these fixed. Before and after each single action, reopen the same
+Locations page and record list disclosure, names/order, row colors and
+diamonds, x/y and body %. Also record the orbital scan display separately.
+If entry to orbit already changes disclosure, retain that as its own baseline.
+
+| Starting condition | Single action | Discriminating result |
+| --- | --- | --- |
+| Untouched in orbit, matched no-action control | Orbital scan | UNKNOWN supplies no baseline x. Record the first displayed x/y. Names with x=0 distinguish disclosure from a positive displayed numerator. Compare the first x and atmosphere row with the no-scan landing branch. |
+| Same starting point without orbital scan | Land, remain aboard | First change here supports a landing-associated transition. If the UI cannot be opened aboard, the timing remains interval-bounded. |
+| Landed aboard, with measurements | Disembark without using the scanner or collecting anything | A first atmosphere-row or credit change now distinguishes this interval from touchdown. Joint changes in several categories leave item attribution open. |
+| Same surface checkpoint, listed terrestrial item with no prior scan or harvest | Confirm one handheld scan | Record the target row and x independently. Test whether color or credit changes alone. Keep an untouched row for comparison. |
+| Restored pre-scan surface checkpoint, same item | Harvest once without handheld scan | Compare against the scan branch. A numerator increase here supports gathering as an independent route to displayed credit. |
+| Matched pre-orbit checkpoints differing only in Scanning rank | Perform the same orbital scan in each | Compare orbital overlay, Locations disclosure, color and x/y separately. A rank effect on styling alone would differ from a changed resource numerator. |
+
+A displayed count change cannot distinguish a computed visit-bit credit from
+a persistent item write by itself. The event feeding the identified bit-1 setters and the widget reading
+the selected body are the smallest native follow-ups. Historical CK Maal VIII
+already settles atmospheric *membership* for that trace.
 
 ## Reconciled dispositions
 

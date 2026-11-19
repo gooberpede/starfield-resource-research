@@ -64,6 +64,17 @@ Same [retail pin](PROVENANCE.md#current-retail-identity). See the
 | Relative-source provider list | The relative packed-file open uses the `GlobalLocations` pointer at image +0x61FAB68, with list head at +0x28. Nodes carry the next pointer at +0 and provider at +8; provider vtable slot +0x30 resolves the request. | **PROVEN STATIC** at `0x1405B9FB2..0x1405B9FD3`, `FUN_1427D8950` and `0x1427D7FD6..0x1427D8005`. | Effective per-file route after stream retirement. |
 | Per-form source vector | TESForm +0x30 holds u16 index, with FFFF sentinel. Image +0x5E881E8 u32 count, +0x5E881F0 qword index pointer. Bucket +0 qword TESFile-pointer array, +8 u32 length. | **PROVEN STATIC** diagnostic at `0x14058E453..0x14058E508`, writer and append at `FUN_1405E0D50` and `FUN_1405DC730`. | Complete winning-record provenance across loader variants. |
 
+## Retail survey state and caller snapshot
+
+**PROVEN, retail static** on 1.16.244.0. Offsets are bytes. A stored wrapper
+includes a 0x20-byte prefix. The snapshot is a separate caller-owned object.
+
+| Base | Field and operation | Locator |
+| --- | --- | --- |
+| PlayerKnowledge payload | +0 u32 mask (bits 0, 1), +4 i32 level. +0x18 item lookup structure, +0x40 backing pointer, +0x48 index limit used for miss comparison. Item stride 0x30, byte +0x21 tested for positive progress and +0x20 separately updated. Body ID keys the component, item FormID keys the lookup. | `0x1416D0F4C–0FBB`, `0x1416D10D3–1102`, `FUN_1407B77D0`. |
+| Survey snapshot | +0xC4 and +0xC8 u32 computed resource credit and span length sum, +0x1B0 visit byte, +0x1B8 resolved atmosphere form pointer, +0x1C8 body ID, +0x1CC binary32 aggregate survey fraction, +0x1D0/+0x1E8 pointer vectors. | `FUN_1417D6520/1417D7540/1417D7EB0` and [matrix](component-database.md#resource-membership-player-knowledge-and-the-locations-page). |
+| Resource row input to UI setter | Stride 0x28, string values at +0/+0x10, +0x20 packed u32 color, +0x24 rarity byte, +0x25 disabled, +0x26 show-color, +0x27 tagged. | `0x1416D194A–19D1`, `FUN_1416B6180`, `FUN_14136CFD0`. |
+
 ## Creation Kit reference
 
 Use the separately [fingerprinted CK static evidence](PROVENANCE.md#creation-kit-static-evidence)

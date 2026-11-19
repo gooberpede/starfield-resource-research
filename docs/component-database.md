@@ -277,6 +277,70 @@ Its range query at `0x14077870C → 0x14077B92C` opens a different
 edge discriminator `0x1461E1D9C` and copies 24 bytes per matched entry
 at `0x14077BA3F–0x14077BA4D`.
 
+## Resource membership, player knowledge and the Locations page
+
+**PROVEN, retail static** on the [pinned 1.16.244.0 image](PROVENANCE.md#current-retail-identity).
+Addresses are preferred-image VAs. This graph describes reachable instructions.
+The title-card measurements establish populated allocation edges. The supplied
+Locations captures establish displayed values in a different, unidentified
+gameplay epoch. Neither observation measures these instructions executing.
+
+| Source → operation | Destination and decisive observation |
+| --- | --- |
+| Copied biome result → resource selection | `FUN_14086A6D0` passes a stack destination at `0x14086A78B–A798`, resolves nonzero copied IDs, checks type 0x9F and appends form pointers. Via `FUN_14086A530`, `FUN_140868B30` filters candidates, selects one and reads form+0xF0 at `0x140868E8A–E98`. This branch ends at selection. A different installed reader at `0x1409518D8` supplies an ID and a byte to the packed-value consumer at `0x14234C9C3–CA63`. Neither branch identifies a Locations row. |
+| Borrowed +0x300 biome edge and separate atmosphere modifier → body snapshot | `FUN_1417D6520` records the body ID at +0x1C8 and calls population and summarization at `0x1417D67B2/7BA`. `FUN_1417D8D40` resolves the body's atmosphere modifier (type 0xAD or fallback) and enumerates typed biome edges. Inside the edge callback, `0x1417D6BC5–6C2E` appends the modifier's pointer list to snapshot+0x1D0. The nested body range reads edge+0x70…+0x88 and resolves collected IDs into +0x1E8 at `0x1417D7455–7499`. Both operations depend on reaching the outer callback. `0x1417D6868–6923` normalizes the spans and removes overlap from +0x1D0. An unresolved or wrong-type slot ID can yield a null pointer. |
+| Named body queries → stored `BSGalaxy::PlayerKnowledge` | Registration at `0x14231D9D4–D9EC` binds the type word. The stored-component lookup uses DB+0x268 with key `(type << 48) \| (bodyID << 16)` in 64-bit arithmetic. GetPlanetVisited passes bit 1 to `FUN_1407B65D0`. IsCelestialBodyScanned tests `FUN_1407BA290(body) != -1`. A miss returns −1, bit 0 forces level 4, otherwise the result is the stored signed level. At `0x141A373D1–3D9` and `0x142108A6F–A77` the callers request bit 1 set through `FUN_1407B6710` (bit operations at `0x1407B6CB0/B6`). The first caller is a PlayerCharacter virtual method (vtable slot +0x860, entry at `0x144CBCCA8` → `FUN_141A37140`). Their timing relative to landing and disembarking is unverified. No actor ID appears in this key. Body-list inclusion has a further predicate/bypass check at `0x141360BD5–BE5`. |
+| Scanner/gather path → body and item → knowledge mutation | Reason 7 (HandScannerResourceScanned) at `0x1415996DA–9708` passes a nonzero form ID and a global receiver to `FUN_1407B75B0`. After outer/nested type checks and a type-0x9F item check, the reason-6 (ItemGathered) call at `0x1407B8467–8476` reaches the same helper. It resolves body context and submits a body/ID/delta operation. On a lookup hit `FUN_1407B77D0` updates or inserts an item and derives another capped byte via `FUN_1423464E0/142346630`. This qualifies a mutation route, with no guarantee that every scan or harvest reaches it. |
+| Body visit bit and item progress → resource count | `FUN_1417D7EB0` tests the same component. Bit 1 credits the **entire remaining atmospheric span**. Each nonnull +0x1E8 form credits one when lookup by form+0x28 finds an entry with byte +0x21 above zero (`0x1417D8049–80C5`). `0x1417D7887–78DA` writes the zero-extended byte accumulator to snapshot+0xC4 and the sum of both span lengths to +0xC8. Length includes slots that fail the numerator test. Atmospheric credit here requires no per-item mutation. Overall survey fraction at +0x1CC has separate cross-category arithmetic at `0x1417D7E67–7E95`. |
+| Snapshot and knowledge → selected body's resource rows | Locations constructs the body detail at `0x14135F108` (snapshot nested at +0x188), then calls `FUN_1416CF0F0`. Its tail call supplies the equality of two resolved keys (`0x1416CF169–F1AB`). `0x1416D04E0–0527` passes that flag to the row builder and moves the resulting vector into detail+0x168. `FUN_1416D0EF0` requires a knowledge lookup hit and either effective scan level != −1 or the supplied flag. Missing knowledge yields empty native rows even with the flag. This bounds disclosure at the producer. The exact UNKNOWN label and gameplay action that first opens the gate remain untraced. |
+| Two spans → separately computed row fields → named Locations provider | `0x1416D1083–111A` walks detail+0x358 and +0x370 (snapshot+0x1D0 and +0x1E8). The former supplies the visit result, the latter the item-byte predicate. `FUN_1416D1510` gates on insertion by FormID, builds name and symbol, packs three color channels, inverts the knowledge argument for row+0x25, and computes +0x26 from scan state and form+0x110. It groups 0x28-byte records by that form byte. `0x1416D14A0–14CA` inserts seven groups in index order, using the output beginning for groups 5 and 6 and the end for earlier groups. This is native ordering before rendering. |
+| Native row → UI field contract | `LocationsBodyInfoData` is registered at `0x14135DE6C–DE81`. The body binder names `ResourcesA`, `iScanLevel`, `bPlayerVisited` and `fSurveyPercent` (`FUN_14135D570`). `0x14135FD0D` calls the common binder. Its resize path and indexed setter at `0x1416B6A24/6A7D` connect to the row schema via `0x1413685BA/85CA` and `0x14136B661/6970C`. `FUN_1416B6180` sets name, symbol, packed color, rarity, disabled, show-color and tagged fields in the order named at `0x14136CFE6–D074`. Thus `bDisabled` and `bShowColor` have different inputs. The latter compares resource class with a scan-level-derived threshold, with explicit special classes 5/6 (`0x1416D1967–19BD`). Neither field identifies final pixel brightness by itself. |
+
+The named scanner schema binds `uResourcesCurrent/Max` at
+`0x1415973A0/73B7`. A binding from those fields or snapshot+0xC4/+0xC8 to
+the **Locations** counter text remains unlocated. Resource rows, body survey
+percentage and the computed resource count have distinct native contracts.
+The `ScanningPowerLevelAV` default object is named at `0x14005215F`.
+`FUN_14168AF80` reads its resolved pointer, obtains a float via the receiver
+at [0x145F43230]+0x70, truncates and clamps the result to 0…4 (null gives 0).
+Only an increase over the effective level reaches `FUN_1407BA3A0` and the
+hit-path payload+4 write at `0x1407BA8C6–A8CE`. The StarMap BodyInspectState vtable at `0x144C941C0` points at
+`FUN_141680910` in slot +0x10, which calls this path at `0x141680A7C`.
+The named StarMapMenu_ScanPlanet binding at `0x1416BFCAE–FCE9` alone does
+not identify the dispatch into that slot. The actor-value path supplies a stored level
+used in presentation. The chain from a particular perk rank or orbital input
+to an individual resource write remains unresolved.
+
+**Persistence boundary.** The PlayerKnowledge factory's +0x28/+0x30 slots
+at vtable `0x144D5F2C8` lead through `FUN_14231FC90` to `FUN_142322A80`.
+Its +0x268 lookup and copy at `0x142322B96` take in-memory component data.
+PNDT command submission at `0x140770BA9/BE5` also has a memory source.
+These direct associations identify a factory and queued data, but provide
+no attributable save stream write or paired restore of the body and item
+fields. The existing seven-slot serialization question has a different payload.
+See the [controlled observations](hypotheses.md#locations-and-survey-observations)
+for the competing interpretations of the three captures.
+
+**Reproducible method.** Use the tracked decoder in [offline reproduction](#offline-reproduction)
+with `functions 1417D6520 1417D6960 1417D7540 1416D0EF0 1416D1510 1416B6180 14136CFD0`.
+Use `window 1417D7F0D 22D` for the knowledge-count loop and
+`window 1416B69B8 10A` for the row bind across exception-range boundaries.
+Use `data 144D5F178 F` and `window 14231D9D4 1D` to verify the registration.
+Run on a lawfully obtained matching disk image. These commands write disassembly
+to stdout. Game state, load order and save contents are outside this static method.
+
+<!-- SRR-019 review -->
+**SRR-019 internal challenge — COMPLETE.** An independent reviewer checked
+the pinned native relationships, contrary cases and proposed observations.
+The orbital-scan design records the first visible numerator because UNKNOWN
+supplies no prior value. The rendered counter binding, arrival event and
+save-stream attribution remain open. Reviewed content manifest SHA-256
+`95a2adc57084b0b3fa5f2e4e2acd7f0b28cd8e2414e2f1388dee42e4103fcc58`
+covers the four changed subjects in lexical path order (UTF-8 lines of
+lowercase file SHA-256, two spaces, repository path and LF), excluding this
+delimited block and its following blank line.
+<!-- /SRR-019 review -->
+
 ## Command order and visibility
 
 **PROVEN STATIC.** The submitter copies the model inputs before
