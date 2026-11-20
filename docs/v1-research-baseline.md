@@ -75,7 +75,9 @@ These mechanisms must remain distinct:
 4. descendant float32-scaled candidate indexing;
 5. guard-fallback float32-scaled cached-family indexing.
 
-The shared probability conversion is:
+The pseudocode below describes the recovered arithmetic. For the split
+between the binary32 unit conversion and caller scaling, see the
+[CK selector instructions](#selector-sources-and-native-arithmetic).
 
 ```python
 raw_float = float32(raw_uint32)
@@ -85,7 +87,8 @@ probability = float32(unit_value * float32(0.99999))
 
 ### Biome-shuffle integer helper
 
-The **PROVEN** helper uses rejection and modulo:
+This pseudocode expresses the **PROVEN** rejection and modulo rule in CK
+`FUN_141587240`:
 
 ```python
 while True:
@@ -143,11 +146,12 @@ The earlier idea that Everywhere used a chance field or ordinary weighted select
 
 `FUN_1415DCFB0` is the **PROVEN LIVE** primary per-biome generator in the CK Galaxy View Apply path.
 
-Within each invocation:
+For a resolved BIOM, the CK [instruction locators below](#native-orchestration-and-guard-locators)
+give this branch order:
 
 ```text
 Special/category-5 selection
-→ Special written/recorded into shared state
+→ Special write if both result pointers are present and shared count < 8
 → five-tree guard
 → shared-eight guard
 → normal Common/category-0 selector OR guard fallback
@@ -175,7 +179,7 @@ The up-front draw occurs with zero entries, one entry, or a single 100-percent e
 
 ### Special insertion before guards
 
-**PROVEN LIVE:** a selected Special is written and recorded into shared state before either Common guard. A new Special can fill slot eight and force the current biome into guard fallback. A duplicate Special does not increase the modeled unique-identity count.
+**PROVEN LIVE:** a new Special can fill slot eight before either Common guard and force the current biome into fallback. A duplicate Special does not increase the modeled unique-identity count. In the [CK listing](experiments/evidence/pre-biome-resource-state/FUN_1415dcfb0-instructions.txt), the count and pointer checks at `0x1415DD0A3–0x1415DD0B7` can bypass both the Special store and the shared-state call.
 
 Universal same-FormID behavior across every possible insertion site has not been directly traced. The cross-origin unique-FormID occupancy rule is a **STRONG, full-corpus-validated model**, while the shared count and guard at eight are proven.
 
@@ -377,6 +381,11 @@ FinalPlanetaryResources
 ```
 
 An atmospheric FormID must not mask failure of an RSGD path expected to produce the same identity. Deduplicate only at the final player-facing membership boundary while retaining occurrence and assignment provenance internally.
+
+To compare these outputs with a retained retail biome, use the
+[seven-slot projection](allocation-validation.md#keys-and-slot-projection).
+It preserves holes in the assigned family and applies the Special write
+gate. Atmosphere affects shared occupancy and has no dedicated biome slot.
 
 
 

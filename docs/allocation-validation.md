@@ -15,7 +15,7 @@ and omits some atmosphere-derived membership. It is not generation input.
 The [generation baseline](v1-research-baseline.md) preserves the pathological
 cases and recovered CK mechanism.
 
-The [generation baseline](v1-research-baseline.md#validation-baseline)
+The [holdout table](v1-research-baseline.md#fresh-holdout-identities-and-channels)
 lists all ten fresh holdouts and their channels: CK biome distributions,
 observed atmosphere and retail planet-wide scans matched 10/10. Historical
 build hashes, dates and input versions remain unknown. No unrecorded raw
@@ -103,7 +103,7 @@ resolved as a valid `BGSResource`. The paired reason was
 | Decaran VII-b Cratered (`000C5717`) | `000057EB, 000057EC, 0, 0, 00005DF8, 000057F5, 0` | Kreet Frozen passed | `STRUCTURALLY_POPULATED` |
 
 The vectors descriptively match all seven positions of the
-[SRR-012 conditional predictions](allocation-validation.md#selected-title-card-structural-observations).
+[conditional predictions recorded in the sampling contract](../tools/srr013/contract.py).
 The observation did not attest effective inputs or qualify the strict
 exact-tuple contract. Pre-checkpoint allocator execution is the leading
 explanation under the [retained-writer evidence](retail-execution-lifecycle.md).
@@ -309,7 +309,7 @@ biome index and processing order as input provenance. Refuse a repeat
 BIOM under one owner pending a qualified disambiguation rule. Repeated
 BIOMs across owners and overlapping names are expected.
 [Native keys](component-database.md) ·
-[Eligibility](allocation-validation.md#selected-title-card-structural-observations)
+[Eligibility](#independent-membership-evidence)
 
 | Payload offset | Native slot | Independent projection |
 | --- | --- | --- |
@@ -335,7 +335,7 @@ BIOM resource-generation references. Ordered atmosphere assumptions use
 the pinned generation data. The profile assumes those winners, an admitted
 authored submission stream, and no applicable later ENAM or CSV submissions.
 Those assumptions define a conditional work set for each control owner.
-[Independent field corroboration](allocation-validation.md#selected-title-card-structural-observations)
+[Independent field corroboration](#independent-base-field-controls)
 
 `resolve_authority` accepts an independently evidenced
 `srr016-authored-operations-v1` object. Its source and SHA-256 identify the
@@ -388,7 +388,7 @@ and its four emitted rarity levels. This preserves cache and fallback
 assignments and explicit zero holes. The native lanes in ascending address
 order are Common, Uncommon, Rare, Exotic, Unique, Special, Everywhere.
 Atmosphere contributes to pre-pass occupancy.
-[Native slot locators](allocation-validation.md#selected-title-card-structural-observations)
+[Native slot locators](component-database.md#slot-storage-and-copied-consumers)
 
 ```text
 screen the complete owner against authored order, input witnesses and native key order
@@ -431,13 +431,13 @@ boundary are Helium-3 `000057F5` for `0005E0BE/000C5717`,
 is zero. A separate fixture shows that a selected Special already occupying
 the eighth-slot state also projects zero even if the model accepts the
 duplicate occurrence. The pinned production occurrence behavior is
-preserved. [Count-eight evidence](allocation-validation.md)
+preserved. [Special slot projection](#keys-and-slot-projection)
 
 | Claim | Evidence | Limit |
 | --- | --- | --- |
 | Four conditional expected keys | Base-master field corroboration and authored insertion semantics | Applied winner and actual submission or removal for a retail epoch remain unresolved. |
 | Four conditional seven-lane tuples | Full-owner production generation and offline reference tuple assertions | Retail historical observations retain their original structural verdicts. |
-| Special count-eight write gate | Native branch and store addresses, plus three pinned model regressions | Retail values at those three keys remain unmeasured. |
+| Special count-eight write gate | Native branch and store addresses, plus three pinned model regressions | The [later census comparison](#srr-018-comparison-of-the-verified-srr-017-title-card-capture) observed zero Special at all three keys. Their effective inputs remain unattested. |
 | Scope and immutability checks | Synthetic fixtures with partial work sets, aliasing, digest drift and altered observations | Runtime map and pre-observation receipt custody need independent authenticated evidence. |
 | Full retail universe | Unknown | Requires winning PNDT, PPBD, BIOM, ENAM and CSV inputs, type and runtime ID authority, and applicable submission closure. |
 | Full retail slot comparison | Unknown | Requires complete whole-owner inputs, retail-qualified ordering and guard semantics, and matching remap/effective-input attestations. |

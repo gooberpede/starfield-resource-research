@@ -394,7 +394,9 @@ through `FUN_1407B7D60`. A successful item lookup returns the byte at
 If the result is zero, `FUN_1407BB5B0` and its callback collect nonzero
 resource IDs from the body's seven biome slots. At `0x141597B43–B46`
 equality with the **end** of that search grants known status to a FormID
-*absent* from the list. An empty list can therefore make a row known.
+*absent* from the list. This test classifies a terrestrial row already drawn
+from the current snapshot. An empty slot-ID list can mark that row known
+without adding any resource to the wheel.
 The scalar numerator has no such exception. An atmospheric/terrestrial
 pointer overlap survives on the terrestrial side of normalization and takes
 that side's test.
