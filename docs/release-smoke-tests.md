@@ -80,3 +80,18 @@ From the isolated research export with the candidate qualifier, both Git-backed 
 An import probe resolved the package inside the fetched checkout. All four canonical tests passed again, and the production export again produced 7,445 biome and 335 atmosphere rows. The public-fetch run receipt records commands, inputs, output hashes and exits, SHA-256 `039daf29562ec5c0ecc736783037b86bd3a3e3c2446cceef1675199dc98ae405`.
 
 Private capture replay, historical arithmetic, saves, screenshots, live acquisition, owned native fixture compilation and Ghidra reanalysis were outside this run. The existing [SRR-025 results](audits/research-closure-and-readiness.md#reproduction-and-custody) retain their original evidence conditions.
+
+## Prerelease verification on 20 November 2026
+
+The final verification started from separate public HTTPS fetches of research `578c3cf1d02d4275f988cbb39c8a0b8e36c23b82` (LF) and the companion pin above (CRLF). The candidate patch covers release documentation only. Interpreter import probes located the model in the fetched companion. The research standard-library interpreter had no model import. The installed PE, CK, ESM and interface archive passed their recorded identity checks.
+
+| Offline check | Result |
+| --- | --- |
+| Canonical suite and selected generation controls | Four canonical tests passed, including two 1,444/1,444 generations. All 58 selected controls passed, including guard fallback, zero candidates, atmosphere, shuffle and worked cases. |
+| Consumer export | 7,780 occurrences across 7,445 biome and 335 atmosphere rows. |
+| Research checks | Four decision-gate, ten synthetic comparator, 28 oracle qualifier, 20 source/identity and 14 save tests passed. The freeze produced four conditional controls. |
+| Selected compact ZIP | 3,211 observed keys and 15,032 zero lanes. All 22,470 diagnostic lanes matched on the 3,210 shared keys. Compact mode reported zero strict-comparable rows. The original report records 0/3,211 strict admissions. |
+| Full save specimens | Save-only and header-assisted comparison each returned 985 and 1,379 components, with 27 and 906 positive item entries. The header mapping remains conditional. |
+| Lawful installed data | The disk-input identity check, bounded retail PE decode and eight interface member digests passed. Both executables reported file and product version 1.16.244.0. |
+
+Public link checks reached the pinned companion and its input and code references. The historical startup loader and menu-return reports cited in the [retail lifecycle subject](retail-execution-lifecycle.md) returned HTTP 404 without credentials. Their recorded Git blob identities matched local custody. Their historical associations remain custody-backed. Use the subject's pinned retail PE walk to check static edges. The legacy selector bundle README also names an earlier investigation path. Its current interpretation is in the [generation baseline](v1-research-baseline.md).

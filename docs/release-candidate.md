@@ -1,6 +1,6 @@
 # Proposed first research release
 
-**Provisional.** SRR-025 recommended closing research within the tested scope. The maintainer still owns release numbering, approval of the exact source tree and publication. The inventory below starts from research commit `d37d56e4b843e14e98ca6a87d04eaabfc67f562c` (190 tracked files). The release commit will be selected after review.
+**Unpublished candidate.** The source baseline is research commit `578c3cf1d02d4275f988cbb39c8a0b8e36c23b82` (187 tracked files), including the completed historical brief archive. The proposed tree adds release-document updates. The maintainer selects the publication commit and approves each attachment separately.
 
 ## Draft release notes
 
@@ -16,7 +16,7 @@ Proposed tag `v1.0.0-sf1.16.244.0`. This proposed release documents the recovere
 
 The historical canonical comparison matched 1,444/1,444 CK/RSGD-visible planet memberships. The targeted pathological CK biome cases and ten fresh CK/retail holdouts matched in their measured channels. Retail comparison found 22,470 diagnostic slot agreements across 3,210 shared keys. **0/3,211 rows qualified for strict native-oracle admission.** A biome match identifies a region to search. Deposit geometry and co-location within an outpost radius remain unknown.
 
-The fingerprints qualify the corresponding static analyses. Historical CK live sessions, retail screenshots and holdout scans lack session-specific executable fingerprints. Native instruction equivalence and applicability to other builds remain unestablished. The [companion model, inputs and tests](https://github.com/gooberpede/starfield-resource-reproducer/tree/a8ff1c788bca415f571f06769ab3e712fa674f75) are pinned to `a8ff1c788bca415f571f06769ab3e712fa674f75`. Readers can use the research source tree directly. Proposed supplements cover the comparison result, seven-slot census, selected survey displays and the two complete saves used for the serialized-state comparison. Availability depends on clearance of each specific attachment. Verification involving game files requires separately obtained lawful matching inputs.
+The fingerprints qualify the corresponding static analyses. Historical CK live sessions, retail screenshots and holdout scans lack session-specific executable fingerprints. Native instruction equivalence and applicability to other builds remain unestablished. The [companion model, inputs and tests](https://github.com/gooberpede/starfield-resource-reproducer/tree/a8ff1c788bca415f571f06769ab3e712fa674f75) are pinned to `a8ff1c788bca415f571f06769ab3e712fa674f75`. Readers can use the research source tree directly. Five supplements have been assembled for individual maintainer decision. The original comparison report records strict admission. The compact census supports a fresh diagnostic comparison. Nine original survey frames show the selected Volii Alpha and Kreet displays. The two complete saves support independent inspection of 985 and 1,379 serialized PlayerKnowledge components. The candidate manifest identifies every attachment. Two historical startup and menu-return reports remain custody-backed. The lawful retail executable supports the documented static walk independently. Verification involving game files requires separately obtained lawful matching inputs.
 <!-- release-notes-end -->
 
 ## Version and source contract
@@ -31,11 +31,11 @@ Select an attachment when its absence would materially limit a reader's ability 
 
 | Proposed manual asset | Reader and purpose | Current bytes and decision |
 | --- | --- | --- |
-| `retail-allocation-comparison-v1.0.0-sf1.16.244.0.zip` | Inspect the original diagnostic outcome, strict admission and input digests. | Built, 4,898 bytes. SHA-256 `7e2b377d4c2b8ec133298f809f606c178d058f8f5c95242b2e52ca107bee6d7f`. Approve the bounded report and selected identifiers. |
-| `retail-biome-slots-v1.0.0-sf1.16.244.0.zip` | Independently count the 3,211 observed keys and compare their seven lanes with the pinned model using the compact comparator. | **Planned, unbuilt.** Exact CSV and a newly prepared path-free comparison manifest. Requires clearance for the complete normalized table of Bethesda-derived identifiers. |
-| `survey-display-evidence-v1.0.0-sf1.16.244.0.zip` | Inspect selected Volii Alpha and Kreet display states and their recorded order. | **Planned, unbuilt.** Nine unmodified JPEGs and a public index. Clear the selected imagery, visible details and embedded metadata. |
-| `save2-srr022-v1.0.0-sf1.16.244.0.sfs` | Reinspect the serialized baseline for the Save2 observations and one side of the PlayerKnowledge comparison. | Existing full SFS, 2,475,440 bytes. SHA-256 `1ac3d496e532b6286d983a1449946ba4fe34a34e66295c9d1d7da677772903d1`. Individual consent and rights decision pending. |
-| `save52-srr022-v1.0.0-sf1.16.244.0.sfs` | Independently inspect the later, extensively played state and repeat the comparison across complete saves. | Existing full SFS, 16,411,136 bytes. SHA-256 `6b4a10084c7e752c31fd2de121a00850aaa2bf1decd700b437d7dccfcdbc82e8`. Separate consent and rights decision pending. |
+| `retail-allocation-comparison-v1.0.0-sf1.16.244.0.zip` | Inspect the original diagnostic outcome, strict admission and input digests. | Built, 4,898 bytes. SHA-256 `7e2b377d4c2b8ec133298f809f606c178d058f8f5c95242b2e52ca107bee6d7f`. Original four-member ZIP verified. |
+| `retail-biome-slots-v1.0.0-sf1.16.244.0.zip` | Independently count the 3,211 observed keys and compare their seven lanes with the pinned model using the compact comparator. | Built, 322,252 bytes. SHA-256 `f3b12ad15614ca45816c596deb2c4545b521abded6a8e3790fb2424adbfbb320`. Exact CSV and path-free sidecar. |
+| `survey-display-evidence-v1.0.0-sf1.16.244.0.zip` | Inspect selected Volii Alpha and Kreet display states and their recorded order. | Built, 3,196,427 bytes. SHA-256 `a2e3b79df945211a78126eb57e630d3d2426a53ae897f5d3c191624e500326f1`. Nine original JPEGs and a public index. |
+| `save2-srr022-v1.0.0-sf1.16.244.0.sfs` | Reinspect the serialized baseline for the Save2 observations and one side of the PlayerKnowledge comparison. | Existing full SFS, 2,475,440 bytes. SHA-256 `1ac3d496e532b6286d983a1449946ba4fe34a34e66295c9d1d7da677772903d1`. Verified complete copy. Owner approved proposed inclusion. |
+| `save52-srr022-v1.0.0-sf1.16.244.0.sfs` | Independently inspect the later, extensively played state and repeat the comparison across complete saves. | Existing full SFS, 16,411,136 bytes. SHA-256 `6b4a10084c7e752c31fd2de121a00850aaa2bf1decd700b437d7dccfcdbc82e8`. Verified complete copy. Owner approved proposed inclusion. |
 
 **Source-contained.** The research subjects, provenance, registers, focused CK evidence, tools, schemas and tests travel with the approved Git tree. Preserve LICENSE and THIRD_PARTY_NOTICES.md. Review its inherited executable-derived excerpts and both nested historical archives as part of that tree. The pinned companion revision owns the model, production CSVs and validation oracle.
 
@@ -45,28 +45,26 @@ Select an attachment when its absence would materially limit a reader's ability 
 
 **Omitted.** Whole Ghidra databases, bulk decompilations, observer memory, source-path manifests, Steam account records, exploratory outputs, failed-trial directories, other saves and the private backup packages add no required release capability. The earlier 2,135-hash inventory remains a private discovery aid. Custody decisions about those files are independent of release approval.
 
-The checkout also contains repository housekeeping (`.gitignore`, `exports/.gitkeep`). A packaging dry run at the starting commit using Git 2.53.0.windows.1 and the ZIP options below produced 190 files in 1,032,467 bytes, SHA-256 `f0302d68d9bef2002efb3776c99f27ea88d5f2ac1ac199c6aa2279991ee1e5b8`. Python's `ZipFile.testzip()` passed on the archive and both nested ZIPs. That digest identifies the starting snapshot only. The source downloads inherit the selected commit, including tracked historical material. Leaving a file off the attachment list cannot remove it from that commit. If any tracked item lacks clearance, hold publication until its disposition is resolved in the reviewed candidate. See [third-party notices](../THIRD_PARTY_NOTICES.md) and the [publication rules](research-workflow.md#publication).
+The checkout also contains repository housekeeping (`.gitignore`, `exports/.gitkeep`). A packaging dry run at the earlier SRR-026 starting commit `d37d56e4b843e14e98ca6a87d04eaabfc67f562c` using Git 2.53.0.windows.1 and the ZIP options below produced 190 files in 1,032,467 bytes, SHA-256 `f0302d68d9bef2002efb3776c99f27ea88d5f2ac1ac199c6aa2279991ee1e5b8`. Python's `ZipFile.testzip()` passed on the archive and both nested ZIPs. That digest identifies the starting snapshot only. The source downloads inherit the selected commit, including tracked historical material. Leaving a file off the attachment list cannot remove it from that commit. If any tracked item lacks clearance, hold publication until its disposition is resolved in the reviewed candidate. See [third-party notices](../THIRD_PARTY_NOTICES.md) and the [publication rules](research-workflow.md#publication).
 
 ## Release decision and remaining work
 
 SRR-026 pins the release inputs, removes implicit sibling discovery from
 oracle qualification and identifies which methods a clean research checkout
-can run. The [dependency inventory](release-workflows.md) covers each supported
+can run. The documentation and archival changes are present at the candidate baseline. The [dependency inventory](release-workflows.md) covers each supported
 workflow. The [smoke receipts](release-smoke-tests.md) distinguish new runs
 from prior custody-backed results.
 
 | Status | Owner | Action or limit |
 | --- | --- | --- |
-| Release gate · exact source tree and rights | Maintainer | Review the bounded CK excerpts, attributed code and nested archive members at the actual release commit. Resolve any hold before approving that tree. |
-| Release gate · documentation and history | SRR-027 and SRR-028 maintainers | Assess technical documentation and navigation in SRR-027. Reconcile historical briefs and audits in SRR-028, preserving unique evidence. Review any resulting change in the final candidate. |
-| Release gate · independent acquisition and packaging | Final candidate verifier | Obtain both exact Git checkouts independently. Verify the companion HEAD, run the pinned oracle controls with the specified checkout byte policy, rerun the canonical regression and inspect the source archive made from the approved research commit. Record commit, tree, checksum and exits. |
-| Release gate · publication | Maintainer | Approve the research version, tag, final notes and rights disposition after candidate verification. |
+| Source and attachment selection | Maintainer | Review the exact candidate tree and five asset digests. Preserve the GPL notices, the distinctions for derived evidence and imagery, and the individual save decisions. Record any withheld assets and their effects on reproducibility. |
+| Publication | Maintainer | Approve the commit matching the reviewed tree, version, notes and selected assets before any tag or upload. |
 | Held individual method | Research tooling maintainer | Assign ownership and qualify a self-contained reader before advertising fresh Kreet/Decaran base-field rederivation. The historical comparison and the conditional corpus controls retain their separate evidence scopes. |
 | Nonblocking operator limits | Operator | Live title-card collection needs a separately authorized session and matching installation. The private preservation command also assumes the documented C: and D: space checks. Neither is needed to consume the research model. |
 
 ## Final verification and later authorized publication
 
-The maintainer must approve one full research commit after SRR-027, SRR-028 and final candidate checks. In a clean detached checkout at that approved commit, PowerShell users can reproduce a local source ZIP for review. Supply `$approvedCommit` as the approved full object ID and `$reviewDir` as a fresh, existing directory outside the checkout. Inspect the Git list, ZIP members and nested archives for held material. The local ZIP hash identifies those local bytes only. Retain the receipt privately.
+The maintainer must approve one full research commit whose tree matches the verified candidate. In a clean detached checkout at that approved commit, PowerShell users can reproduce a local source ZIP for review. Supply `$approvedCommit` as the approved full object ID and `$reviewDir` as a fresh, existing directory outside the checkout. Inspect the Git list, ZIP members and nested archives for held material. The local ZIP hash identifies those local bytes only. Retain the receipt privately.
 
 ```powershell
 $tag = 'v1.0.0-sf1.16.244.0'
@@ -83,7 +81,7 @@ tar -tf $zip
 if ($LASTEXITCODE) { throw 'Archive inspection failed' }
 ```
 
-For publication, the maintainer first records the approved subset in a release manifest with one row per attachment: public filename, measured byte length, SHA-256, purpose, clearance decision and exact permitted members. For each planned ZIP, assemble only its listed members, inspect them after extraction, and measure the finished archive. For each SFS, compare the complete payload with the specimen hash and use its neutral public filename. The private custody ZIPs contain additional material and are excluded. Record withheld candidates and their verification limits in the final notes.
+For publication, the maintainer first records the approved subset in a release manifest with one row per attachment: public filename, measured byte length, SHA-256, purpose, clearance decision and exact permitted members. For each assembled ZIP, verify the listed members after extraction and compare the archive digest with the candidate manifest. For each SFS, compare the complete payload with the specimen hash and use its neutral public filename. The private custody ZIPs contain additional material and are excluded. Record withheld candidates and their verification limits in the final notes.
 
 1. Review that manifest, the exact research commit, the release notes and individual rights decisions. Supply `$repo`, `$tag`, `$title`, `$approvedCommit` and `$noteFile` for this release. Obtain explicit authorization for the tag and publication.
 2. From the verified checkout, create the approved annotated tag with `git tag -a $tag $approvedCommit -m $title`, push that tag with `git push origin "refs/tags/$tag"` after verifying the remote, and create a draft with `gh release create $tag --repo $repo --verify-tag --draft --title $title --notes-file $noteFile`. Stop on a failed command.
