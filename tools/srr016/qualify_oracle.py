@@ -384,8 +384,10 @@ class AuthorAndProjectionFixtures(TestCase):
 class PinnedControlFixtures(TestCase):
     @classmethod
     def setUpClass(cls):
-        sibling = Path(__file__).resolve().parents[3] / "starfield-resource-reproducer"
-        cls.ledger, cls.oracle, cls.receipt = freeze(Path(os.environ.get("SRR016_REPRODUCER", sibling)))
+        checkout = os.environ.get("SRR016_REPRODUCER")
+        if not checkout:
+            raise ValueError("Set SRR016_REPRODUCER to the separately obtained pinned checkout")
+        cls.ledger, cls.oracle, cls.receipt = freeze(Path(checkout))
 
     def test_all_four_slots_against_independent_offline_words(self):
         expected = {tuple(ids(key)): ids(words) for key, words in FIXED_WORDS.items()}

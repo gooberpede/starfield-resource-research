@@ -28,13 +28,14 @@ canonical receipt digest independently. `$srrReproducer`, `$srrOut`,
 `$srrObservation` and `$srrFrozenReceiptSha256` below are caller-supplied paths
 and the independently retained digest, not pre-existing private dependencies.
 
-The oracle qualifier defaults to a sibling directory named
-`starfield-resource-reproducer`. For a checkout elsewhere, set
-`$env:SRR016_REPRODUCER = $srrReproducer` before qualification. Its tests
-read the pinned checkout without modifying it.
+Use a separately obtained, clean Git checkout for the reproducer. Set
+`$srrReproducer` to its absolute path and `$env:SRR016_REPRODUCER = $srrReproducer`
+before oracle qualification. The other model commands take the path explicitly.
+For the SRR-018 comparison, run from the research Git checkout so its HEAD
+can also be recorded. See the [release workflow inventory](../docs/release-workflows.md).
 
 ```powershell
-python -B -m tools.srr016.qualify_oracle -q
+python -E -B -m tools.srr016.qualify_oracle -q
 python -B -m tools.srr016.oracle $srrReproducer $srrOut
 python -B -m tools.srr016.compare $srrObservation `
   (Join-Path $srrOut ledger.json) (Join-Path $srrOut oracle.json) `
@@ -55,7 +56,7 @@ synthetic qualifiers without them; exact historical arithmetic requires the
 hash-identified evidence in lawful custody. Compact arithmetic does not replay
 native acquisition. Qualification results must keep fixture evidence separate.
 
-The standalone base-input check reads a lawful master and pinned sibling,
+The standalone base-input check reads a lawful master and pinned reproducer,
 prints disk identities/gate disposition and writes nothing:
 
 ```powershell
@@ -63,23 +64,15 @@ python -B tools/srr013/retail_inputs.py <Starfield.esm> <reproducer-root>
 python -B tools/srr012/check_contract.py
 ```
 
-To independently rederive base fields, use the
-[versioned ESM reader](https://github.com/gooberpede/starfield-outpost-research/blob/d116bc63ff394b0156539161c8d1addfc902665a/save-analysis/scripts/inspect_outpost_definitions.py),
-blob `391dd8fb007b8ed8ceff48fce2f6ba97a61bd618`, in its own checkout.
-With that script directory on `PYTHONPATH`, import `esm_records` from
-`inspect_outpost_definitions` and call
-`esm_records(esm_path, {b"PNDT", b"BIOM", b"RSGD"}, repeated=True)`.
-Hash the lawful base master before and after; require
-`1dabed00c3f4282dd3bb54d2e9601e40b577d8742d078b7ccef203adbfef0da7`.
-Filter to Kreet/Decaran and their selected BIOM/RSGD IDs in
-[validation](../docs/allocation-validation.md#independent-base-field-controls).
-Compare PNDT RSCS seeds, ordered PPBD prefixes decoded as `<IfII`
-(BIOM ID, coverage, per-biome seed, override ID), each BIOM's ordered
-four-byte RNAM references and referenced typed RSGD records. Retain field
-verification only, without raw proprietary records. This independently
-corroborates base definitions, not the running process's winning inputs.
-The self-contained oracle qualifier above separately verifies the four
-conditional control vectors using the explicitly supplied pinned reproducer.
+The historical independent base-field check used an
+[outpost ESM reader](https://github.com/gooberpede/starfield-outpost-research/blob/d116bc63ff394b0156539161c8d1addfc902665a/save-analysis/scripts/inspect_outpost_definitions.py)
+(blob `391dd8fb007b8ed8ceff48fce2f6ba97a61bd618`) on the pinned base master.
+It compared the PNDT RSCS seeds, ordered PPBD prefixes (`<IfII`), ordered
+BIOM.RNAM references and typed RSGD records. The [validation table](../docs/allocation-validation.md#independent-base-field-controls)
+preserves the results. Fresh direct ESM field rederivation is held from this
+release's supported procedures pending a repository-owned reader or a decision
+on ownership. The disk-identity check and the four conditional corpus-vector
+checks above remain available independently.
 
 `tools.srr016.ledger.CONTROL_SOURCE` retains the historical string
 `SRR-012-sample-plan.md#offline-reproduction` as an evidence identity, not a

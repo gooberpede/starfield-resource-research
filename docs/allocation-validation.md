@@ -246,7 +246,7 @@ These are independently corroborated base definitions, conditional for retail wi
 | Kreet `0003F59F`, 2842708811 | 2 · `002C9985` · `VolcanicRoughLifeKreet` | `00244CCC` · `000083EA` |
 | Decaran VII-b `0005DF7F`, 1633829920 | 0 · `000C5717` · `CrateredNoLife11` | `0018CE00` · `000083E0` |
 
-Kreet shuffle order is 2,0,1, with atmospheric Helium-3. Its override Common weights are 100%; Frozen uses its singleton BIOM RSGD and category-6 Water. Decaran has 100% Common/Special override weights, no category-6 candidate and no inorganic ATMO in the pinned extract. These paths avoid Common guards. The [independent reader procedure](../tools/README.md#offline-oracle-and-comparison) rederives the base fields.
+Kreet shuffle order is 2,0,1, with atmospheric Helium-3. Its override Common weights are 100%; Frozen uses its singleton BIOM RSGD and category-6 Water. Decaran has 100% Common/Special override weights, no category-6 candidate and no inorganic ATMO in the pinned extract. These paths avoid Common guards. The [tool catalog](../tools/README.md#offline-oracle-and-comparison) identifies the historical independent base-field reader and the supported corpus checks.
 
 ## Independent expected population and strict input contract
 

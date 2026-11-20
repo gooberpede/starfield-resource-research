@@ -24,3 +24,7 @@ Retained [native evidence](experiments/evidence/README.md) consists of static
 exports, not live traces. Completed [implementation briefs](implementation-briefs/README.md)
 are indexed separately from the [readiness assessment and historical audits](audits/README.md).
 Use the subjects above for scientific authority. Full retired prose remains in Git.
+
+For the proposed repository release, see the [candidate manifest and draft
+notes](release-candidate.md), [workflow dependencies](release-workflows.md)
+and [clean-export test results](release-smoke-tests.md).
