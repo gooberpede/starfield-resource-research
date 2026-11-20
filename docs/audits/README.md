@@ -1,4 +1,8 @@
-# Historical audit archive
+# Research audits
+
+[Research closure and readiness](research-closure-and-readiness.md) assesses bounded reuse of the v1.0 inorganic model and records the recommendation to the maintainer.
+
+## Historical audit archive
 
 The unchanged [audit archive](audits.zip) contains two historical audits:
 - `PUBLIC-RELEASE-READINESS-RECHECK.md`

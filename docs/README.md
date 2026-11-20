@@ -22,5 +22,5 @@ Methods: [research workflow](research-workflow.md), [Ghidra](../ghidra/README.md
 
 Retained [native evidence](experiments/evidence/README.md) consists of static
 exports, not live traces. Completed [implementation briefs](implementation-briefs/README.md)
-and [audits](audits/README.md) are historical archive indexes, not scientific
-authority or current authorization. Full retired prose remains in Git.
+are indexed separately from the [readiness assessment and historical audits](audits/README.md).
+Use the subjects above for scientific authority. Full retired prose remains in Git.
