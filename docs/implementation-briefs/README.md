@@ -1,7 +1,7 @@
 # Historical implementation briefs
 
-The [existing archive](implementation-briefs.zip) contains 53 byte-preserved
-historical briefs: 21 original members and 32 completed loose briefs under
+The [existing archive](implementation-briefs.zip) contains 64 byte-preserved
+historical briefs: 21 original members and 43 completed loose briefs under
 `completed/`. These are past work instructions, **not scientific authority or
 live authorization**. Their assumptions, links and authorizations are historical.
 Use the [subject library](../README.md) for current findings and methods.
@@ -62,3 +62,14 @@ No future brief is automatically archived by this transaction.
 | `completed/SRR-017-retail-readiness-completion-continuation-brief.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
 | `completed/SRR-017-retail-ready-complete-allocation-extractor-brief.md` | Native full/medium/small identity, corrected index separator rule, operator workflow and successful complete title observation |
 | `completed/SRR-018-retail-allocation-oracle-comparison-and-evidence-preservation-brief.md` | 3210 shared keys/22470 diagnostic slot agreements/1445 derived membership matches, strict oracle 0/3,211 admitted rows and 0 owners |
+| `completed/SRR-019-resource-consumers-survey-state-boundaries-brief.md` | Resource consumers and player survey-state boundaries |
+| `completed/SRR-020-locations-resource-presentation-playerknowledge-persistence-brief.md` | Locations resource presentation and PlayerKnowledge persistence |
+| `completed/SRR-021-planetary-map-radial-scanner-and-screenshot-evidence-brief.md` | Planetary resource displays and Save2 screenshot evidence |
+| `completed/SRR-022-playerknowledge-save-serialization-comparison-brief.md` | PlayerKnowledge save serialization and comparison |
+| `completed/SRR-023-retail-resource-allocator-startup-lifecycle-brief.md` | Retail resource allocator startup lifecycle |
+| `completed/SRR-024-playerknowledge-visit-bit-lifecycle-brief.md` | PlayerKnowledge visit-bit lifecycle |
+| `completed/SRR-025-research-closure-and-readiness-audit-brief.md` | Research closure and readiness assessment |
+| `completed/SRR-026-follow-up-evidence-preservation-and-release-assets-brief.md` | Follow-up on durable evidence preservation and release assets |
+| `completed/SRR-026-release-evidence-selection-continuation-brief.md` | Continuation on claim-based evidence selection and Save2/Save52 assessment |
+| `completed/SRR-026-release-scope-assets-and-portability-brief.md` | Initial release scope, asset inventory and portability |
+| `completed/SRR-027-documentation-sufficiency-and-technical-presentation-brief.md` | Documentation sufficiency and technical presentation |
